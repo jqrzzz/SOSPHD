@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark-first: operational command center aesthetic */
+    --background: 240 6% 7%;
+    --foreground: 210 20% 95%;
+    --card: 240 5% 10%;
+    --card-foreground: 210 20% 95%;
+    --popover: 240 5% 10%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 213 94% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 210 20% 90%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 215 14% 55%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 210 20% 95%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 213 94% 56%;
+    --chart-1: 213 94% 56%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --radius: 0.5rem;
+    --sidebar-background: 240 6% 6%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 213 94% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 4% 14%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 240 4% 18%;
+    --sidebar-ring: 213 94% 56%;
+
+    /* Semantic status colors */
+    --status-open: 213 94% 56%;
+    --status-active: 38 92% 50%;
+    --status-closed: 142 71% 45%;
+    --severity-1: 142 71% 45%;
+    --severity-2: 160 60% 45%;
+    --severity-3: 38 92% 50%;
+    --severity-4: 25 95% 53%;
+    --severity-5: 0 72% 51%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
