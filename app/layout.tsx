@@ -11,13 +11,13 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'ResearchOS - Decision Provenance for Tourist SOS',
+  title: 'SOS PHD | Research Automation for Tourist SOS',
   description:
-    'Audit-grade incident timeline and case management with provenance tracking for publishable research.',
+    'PhD research automation — track phases, generate papers, and measure TTDC/TTGP/TTTA from Tourist SOS operational data.',
 }
 
 export const viewport: Viewport = {
-  themeColor: '#111318',
+  themeColor: '#0D1017',
 }
 
 export default function RootLayout({
