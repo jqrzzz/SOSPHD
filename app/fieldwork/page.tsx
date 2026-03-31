@@ -34,6 +34,7 @@ import {
   updateProtocolAction,
 } from "@/lib/fieldwork-actions";
 import type { JournalEntryType, FieldProtocol } from "@/lib/data/fieldwork-types";
+import { APP_CONFIG } from "@/lib/config";
 
 /* ── Entry type config ──────────────────────────────────────────────── */
 
@@ -57,14 +58,7 @@ const ENTRY_TYPE_ICONS: Record<JournalEntryType, string> = {
   media: "📎",
 };
 
-const CORRIDORS = [
-  "Koh Samui → Bangkok",
-  "Phuket → Bangkok",
-  "Chiang Mai → Bangkok",
-  "Pattaya → Bangkok",
-  "Krabi → Bangkok",
-  "Bangkok Hub",
-];
+const CORRIDORS = APP_CONFIG.research.corridors;
 
 /* ── Component ──────────────────────────────────────────────────────── */
 

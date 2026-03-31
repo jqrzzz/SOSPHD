@@ -23,6 +23,7 @@ import {
 import { getContacts, getJournalEntries } from "@/lib/data/fieldwork-store";
 import { createContactAction } from "@/lib/fieldwork-actions";
 import type { Contact, ContactRole } from "@/lib/data/fieldwork-types";
+import { APP_CONFIG } from "@/lib/config";
 
 /* ── Role config ────────────────────────────────────────────────────── */
 
@@ -54,14 +55,7 @@ const ROLE_COLORS: Record<ContactRole, string> = {
   other: "bg-gray-500/10 text-gray-400 border-gray-500/20",
 };
 
-const CORRIDORS = [
-  "Koh Samui → Bangkok",
-  "Phuket → Bangkok",
-  "Chiang Mai → Bangkok",
-  "Pattaya → Bangkok",
-  "Krabi → Bangkok",
-  "Bangkok Hub",
-];
+const CORRIDORS = APP_CONFIG.research.corridors;
 
 /* ── Component ──────────────────────────────────────────────────────── */
 

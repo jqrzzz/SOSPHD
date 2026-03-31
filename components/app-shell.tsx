@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { APP_CONFIG } from "@/lib/config";
 import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
@@ -21,12 +22,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserEmail(user?.email ?? null);
+      setUserEmail(user?.email ?? APP_CONFIG.owner.email);
+      setUserName(
+        user?.user_metadata?.full_name ?? APP_CONFIG.owner.name,
+      );
     });
   }, []);
 
@@ -76,9 +81,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex flex-col gap-2 border-t border-border p-3">
           {userEmail && (
-            <p className="truncate text-xs text-muted-foreground" title={userEmail}>
-              {userEmail}
-            </p>
+            <div className="flex flex-col gap-0.5">
+              {userName && (
+                <p className="truncate text-xs font-medium text-sidebar-foreground/80" title={userName}>
+                  {userName}
+                </p>
+              )}
+              <p className="truncate text-xs text-muted-foreground" title={userEmail}>
+                {userEmail}
+              </p>
+            </div>
           )}
           <button
             onClick={handleSignOut}
@@ -89,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {isSigningOut ? "Signing out..." : "Sign Out"}
           </button>
           <p className="text-xs text-muted-foreground/60">
-            SOS PHD v0.1
+            {APP_CONFIG.app.name} v{APP_CONFIG.app.version}
           </p>
         </div>
       </aside>
