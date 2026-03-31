@@ -100,7 +100,7 @@ export default function FieldworkPage() {
   return (
     <div className="flex flex-1 flex-col overflow-auto">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+      <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Field Journal</h1>
           <p className="text-sm text-muted-foreground">
@@ -121,7 +121,7 @@ export default function FieldworkPage() {
             New Entry
           </Button>
         </div>
-      </div>
+      </header>
 
       <div className="flex flex-1 gap-0 overflow-hidden">
         {/* Main content */}

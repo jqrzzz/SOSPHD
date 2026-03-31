@@ -99,7 +99,7 @@ export default function ContactsPage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+      <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Research Network</h1>
           <p className="text-sm text-muted-foreground">
@@ -109,7 +109,7 @@ export default function ContactsPage() {
         <Button size="sm" onClick={() => setShowNew(true)}>
           Add Contact
         </Button>
-      </div>
+      </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Contact list */}
