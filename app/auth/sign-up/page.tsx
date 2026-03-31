@@ -43,7 +43,7 @@ export default function SignUpPage() {
         options: {
           emailRedirectTo:
             process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-            `${window.location.origin}/cases`,
+            `${window.location.origin}/spine`,
         },
       });
       if (error) throw error;
@@ -64,7 +64,7 @@ export default function SignUpPage() {
               Create Account
             </CardTitle>
             <CardDescription>
-              Set up your ResearchOS account to get started
+              Set up your SOS PHD account to get started
             </CardDescription>
           </CardHeader>
           <CardContent>

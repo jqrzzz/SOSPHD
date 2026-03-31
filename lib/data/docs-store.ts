@@ -166,7 +166,7 @@ The stepped-wedge design is ideal because:
 ## Design Parameters
 
 - **Clusters:** Individual sites (clinics/regions)
-- **Steps:** Site activation dates (when ResearchOS goes live)
+- **Steps:** Site activation dates (when Tourist SOS coordination layer goes live)
 - **Observation periods:** Continuous data collection before and after activation
 - **Primary outcomes:** TTDC, TTGP
 - **Secondary outcomes:** Override rate, recommendation acceptance rate
