@@ -204,6 +204,8 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
       "Option 1: First inbound contact to Tourist SOS (recommended — clean, consistent)",
       "Option 2: First contact to any provider (harder — often missing)",
     ],
+    answer:
+      "Option 1 — First inbound contact to Tourist SOS. We control the timestamp, it's consistent across sites, and INCIDENT_OCCURRED can be logged separately as an optional event.",
   },
   {
     id: "oq-2",
@@ -215,6 +217,8 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
       "Yes — TTTA captures practical reality",
       "No — TTTA only counts professional transport activation (cleaner, but may miss real movement)",
     ],
+    answer:
+      "Yes — count it. In under-resourced corridors, private vehicle IS the transport reality. Tag transport_mode = PRIVATE_VEHICLE and filter in analysis for sensitivity checks.",
   },
   {
     id: "oq-3",
@@ -223,6 +227,8 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
       "In practice, what is the most common gating point for GUARANTEED_PAYMENT? Imaging, admission, surgery, or transport/evac?",
     source: "Definitions Appendix v1.0, Milestone C",
     options: ["Imaging (CT/MRI)", "Admission", "Surgery", "Transport/evac"],
+    answer:
+      "Transport/evac — baseline data shows 46/48 evac cases were insured, meaning the money question becomes decisive when the patient needs to be moved to a higher-capability facility. Payment gates care escalation, not initial treatment.",
   },
   {
     id: "oq-4",
@@ -235,6 +241,8 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
       "Broad — specialist acceptance or admission order",
       "Hybrid (recommended) — strict if available, else broad",
     ],
+    answer:
+      "Hybrid — use strict markers (OR, ICU, cath lab) when available, fall back to specialist acceptance when clinical data is sparse. Label definitive_marker_type on every case for transparency.",
   },
   {
     id: "oq-5",
@@ -247,6 +255,8 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
       "Clinician input",
       "Rule-based from symptoms/vitals",
     ],
+    answer:
+      "AI-assisted with operator confirmation for v1.0. Use AI models to suggest severity from available symptoms/vitals/chief complaint, operator confirms or overrides. Log method as 'ai_assisted'. Upgrade to clinician validation in v2.0 for inter-rater reliability.",
   },
   {
     id: "oq-6",
@@ -258,6 +268,8 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
       "Always human-initiated (call, message, referral)",
       "Some triggers exist (describe which)",
     ],
+    answer:
+      "Currently human-initiated (call, WhatsApp, clinic referral). Designing for future auto-triggers from SOSTRAVEL (SOS button, geofence alerts). When auto-triggers activate, FIRST_CONTACT will be machine-timestamped with source = 'app_trigger'.",
   },
   {
     id: "oq-7",
