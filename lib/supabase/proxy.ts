@@ -48,10 +48,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If logged in and hitting root, send to cases
+  // If logged in and hitting root, send to PhD spine
   if (pathname === "/" && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/cases";
+    url.pathname = "/spine";
     return NextResponse.redirect(url);
   }
 

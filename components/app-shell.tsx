@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
+  { href: "/spine", label: "PhD Spine", icon: SpineIcon },
   { href: "/cases", label: "Cases", icon: ClipboardIcon },
   { href: "/dashboard", label: "Dashboard", icon: ChartIcon },
   { href: "/docs", label: "Docs", icon: FileTextIcon },
@@ -41,10 +42,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="flex w-56 flex-col border-r border-border bg-sidebar">
         <div className="flex h-14 items-center gap-2 border-b border-border px-4">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-            <span className="text-xs font-bold text-primary-foreground">R</span>
+            <span className="text-xs font-bold text-primary-foreground">S</span>
           </div>
           <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
-            ResearchOS
+            SOS PHD
           </span>
         </div>
 
@@ -86,7 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {isSigningOut ? "Signing out..." : "Sign Out"}
           </button>
           <p className="text-xs text-muted-foreground/60">
-            Decision Provenance v0.1
+            SOS PHD v0.1
           </p>
         </div>
       </aside>
@@ -98,6 +99,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 /* ── Inline icons ──── */
+
+function SpineIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 2v20" />
+      <path d="M8 6h8" />
+      <path d="M7 10h10" />
+      <path d="M8 14h8" />
+      <path d="M9 18h6" />
+    </svg>
+  );
+}
 
 function FileTextIcon({ className }: { className?: string }) {
   return (
