@@ -103,6 +103,9 @@ This repo shares a **Supabase database** with 5 other projects:
 - **Clean, cohesive design** — match Tourist SOS brand, teal accents, dark mode.
 - **No errors, no complexity** — keep it simple and functional.
 - **Respect the shared database** — use `phd_` prefix, never modify other projects' tables.
-- **Read-only access to operational data** — SOSPHD can read `cases`, `profiles`, etc. for research but never writes to them.
+- **Read-only access to operational data** — SOSPHD can read from other projects' tables for research but never writes to them. Key data sources:
+  - SOSPRO: `cases` (status pipeline, gop_status), `case_activities` (timestamped audit log), `transfers` (picked_up_at, delivered_at) — primary source for TTTA/TTGP/TTDC metrics
+  - SOSCOMMAND: `cases`, `claims`, `providers`, `payers` — operational context
+  - SOSTRAVEL: `emergency_cases`, `facilities` — patient-facing incident data
 - **AI automation preferred** — lean into AI for categorization, analysis, guidance.
 - **Swap-for-Supabase pattern** — in-memory stores are scaffolding, function signatures match Supabase queries.
