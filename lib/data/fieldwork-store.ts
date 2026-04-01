@@ -1,8 +1,9 @@
-/* ─── In-Memory Fieldwork Store ────────────────────────────────────────
- *  Same pattern as store.ts — swap for Supabase client calls later.
- *  Covers: Field Journal, Contacts, Field Protocols.
+/* ─── Fieldwork Store (Supabase) ───────────────────────────────────────
+ *  Queries phd_journal_entries, phd_contacts, phd_protocols.
+ *  Falls back to seed data when Supabase is unavailable.
  * ────────────────────────────────────────────────────────────────────── */
 
+import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
 import type {
   JournalEntry,
   JournalEntryType,
@@ -14,11 +15,9 @@ import type {
   ProtocolSection,
 } from "./fieldwork-types";
 
-// ── Constants ───────────────────────────────────────────────────────
+// ── Seed data (fallback when Supabase unavailable) ─────────────────
 
 const DEMO_USER_ID = "user_demo";
-
-// ── Seed: Journal Entries ───────────────────────────────────────────
 
 const seedJournal: JournalEntry[] = [
   {
@@ -109,8 +108,6 @@ const seedJournal: JournalEntry[] = [
   },
 ];
 
-// ── Seed: Contacts ──────────────────────────────────────────────────
-
 const seedContacts: Contact[] = [
   {
     id: "ct_001",
@@ -189,8 +186,6 @@ const seedContacts: Contact[] = [
     business_card_url: null,
   },
 ];
-
-// ── Seed: Protocol Templates ────────────────────────────────────────
 
 const seedProtocols: FieldProtocol[] = [
   {
@@ -303,34 +298,40 @@ const seedProtocols: FieldProtocol[] = [
   },
 ];
 
-// ── Mutable store ───────────────────────────────────────────────────
-
-const journal = [...seedJournal];
-const contacts = [...seedContacts];
-const protocols = [...seedProtocols];
-
-let nextJournalNum = 5;
-let nextContactNum = 5;
-let nextProtocolNum = 3;
-let nextAttachmentNum = 1;
-
 // ── Journal ─────────────────────────────────────────────────────────
 
-export function getJournalEntries(filters?: {
+export async function getJournalEntries(filters?: {
   entry_type?: JournalEntryType;
   tag?: string;
   search?: string;
   pinned_only?: boolean;
   limit?: number;
-}): JournalEntry[] {
-  let result = [...journal];
+}): Promise<JournalEntry[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      let query = sb
+        .from("phd_journal_entries")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(filters?.limit ?? 50);
 
-  if (filters?.entry_type) {
-    result = result.filter((e) => e.entry_type === filters.entry_type);
+      if (filters?.entry_type) query = query.eq("entry_type", filters.entry_type);
+      if (filters?.pinned_only) query = query.eq("is_pinned", true);
+      if (filters?.tag) query = query.contains("tags", [filters.tag]);
+      if (filters?.search) query = query.or(
+        `title.ilike.%${filters.search}%,content.ilike.%${filters.search}%`
+      );
+
+      const { data, error } = await query;
+      if (!error && data) return data as JournalEntry[];
+    } catch { /* fall through to seed */ }
   }
-  if (filters?.tag) {
-    result = result.filter((e) => e.tags.includes(filters.tag!));
-  }
+
+  // Fallback: filter seed data in-memory
+  let result = [...seedJournal];
+  if (filters?.entry_type) result = result.filter((e) => e.entry_type === filters.entry_type);
+  if (filters?.tag) result = result.filter((e) => e.tags.includes(filters.tag!));
   if (filters?.search) {
     const q = filters.search.toLowerCase();
     result = result.filter(
@@ -341,22 +342,27 @@ export function getJournalEntries(filters?: {
         e.tags.some((t) => t.toLowerCase().includes(q)),
     );
   }
-  if (filters?.pinned_only) {
-    result = result.filter((e) => e.is_pinned);
-  }
-
-  result.sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-
+  if (filters?.pinned_only) result = result.filter((e) => e.is_pinned);
+  result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return result.slice(0, filters?.limit ?? 50);
 }
 
-export function getJournalEntryById(id: string): JournalEntry | undefined {
-  return journal.find((e) => e.id === id);
+export async function getJournalEntryById(id: string): Promise<JournalEntry | null> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_journal_entries")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (!error && data) return data as JournalEntry;
+    } catch { /* fall through */ }
+  }
+  return seedJournal.find((e) => e.id === id) ?? null;
 }
 
-export function createJournalEntry(data: {
+export async function createJournalEntry(data: {
   entry_type: JournalEntryType;
   title: string;
   content: string;
@@ -366,65 +372,90 @@ export function createJournalEntry(data: {
   contact_ids?: string[];
   linked_case_id?: string | null;
   attachments?: JournalAttachment[];
-}): JournalEntry {
-  const now = new Date().toISOString();
-  const entry: JournalEntry = {
-    id: `je_${String(nextJournalNum++).padStart(3, "0")}`,
-    created_at: now,
-    updated_at: now,
-    user_id: DEMO_USER_ID,
-    entry_type: data.entry_type,
-    title: data.title,
-    content: data.content,
-    location: data.location ?? null,
-    corridor: data.corridor ?? null,
-    tags: data.tags ?? [],
-    contact_ids: data.contact_ids ?? [],
-    linked_case_id: data.linked_case_id ?? null,
-    attachments: data.attachments ?? [],
-    is_pinned: false,
-  };
-  journal.push(entry);
-  return entry;
+}): Promise<JournalEntry | null> {
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_journal_entries")
+      .insert({
+        user_id: userId,
+        entry_type: data.entry_type,
+        title: data.title,
+        content: data.content,
+        location: data.location ?? null,
+        corridor: data.corridor ?? null,
+        tags: data.tags ?? [],
+        contact_ids: data.contact_ids ?? [],
+        linked_case_id: data.linked_case_id ?? null,
+        attachments: data.attachments ?? [],
+        is_pinned: false,
+      })
+      .select()
+      .single();
+    if (!error && row) return row as JournalEntry;
+  }
+  return null;
 }
 
-export function updateJournalEntry(
+export async function updateJournalEntry(
   id: string,
   data: Partial<Pick<JournalEntry, "title" | "content" | "entry_type" | "location" | "corridor" | "tags" | "contact_ids" | "linked_case_id" | "is_pinned" | "attachments">>,
-): JournalEntry | null {
-  const entry = journal.find((e) => e.id === id);
-  if (!entry) return null;
-  Object.assign(entry, data, { updated_at: new Date().toISOString() });
-  return entry;
+): Promise<JournalEntry | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_journal_entries")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (!error && row) return row as JournalEntry;
+  }
+  return null;
 }
 
-export function deleteJournalEntry(id: string): boolean {
-  const idx = journal.findIndex((e) => e.id === id);
-  if (idx === -1) return false;
-  journal.splice(idx, 1);
-  return true;
-}
-
-export function createAttachmentId(): string {
-  return `att_${String(nextAttachmentNum++).padStart(3, "0")}`;
+export async function deleteJournalEntry(id: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("phd_journal_entries").delete().eq("id", id);
+    return !error;
+  }
+  return false;
 }
 
 // ── Contacts ────────────────────────────────────────────────────────
 
-export function getContacts(filters?: {
+export async function getContacts(filters?: {
   role?: ContactRole;
   tag?: string;
   search?: string;
   limit?: number;
-}): Contact[] {
-  let result = [...contacts];
+}): Promise<Contact[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      let query = sb
+        .from("phd_contacts")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(filters?.limit ?? 100);
 
-  if (filters?.role) {
-    result = result.filter((c) => c.role === filters.role);
+      if (filters?.role) query = query.eq("role", filters.role);
+      if (filters?.tag) query = query.contains("tags", [filters.tag]);
+      if (filters?.search) query = query.or(
+        `name.ilike.%${filters.search}%,organization.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`
+      );
+
+      const { data, error } = await query;
+      if (!error && data) return data as Contact[];
+    } catch { /* fall through */ }
   }
-  if (filters?.tag) {
-    result = result.filter((c) => c.tags.includes(filters.tag!));
-  }
+
+  let result = [...seedContacts];
+  if (filters?.role) result = result.filter((c) => c.role === filters.role);
+  if (filters?.tag) result = result.filter((c) => c.tags.includes(filters.tag!));
   if (filters?.search) {
     const q = filters.search.toLowerCase();
     result = result.filter(
@@ -436,19 +467,26 @@ export function getContacts(filters?: {
         c.tags.some((t) => t.toLowerCase().includes(q)),
     );
   }
-
-  result.sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-  );
-
+  result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   return result.slice(0, filters?.limit ?? 100);
 }
 
-export function getContactById(id: string): Contact | undefined {
-  return contacts.find((c) => c.id === id);
+export async function getContactById(id: string): Promise<Contact | null> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_contacts")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (!error && data) return data as Contact;
+    } catch { /* fall through */ }
+  }
+  return seedContacts.find((c) => c.id === id) ?? null;
 }
 
-export function createContact(data: {
+export async function createContact(data: {
   name: string;
   role: ContactRole;
   organization?: string | null;
@@ -461,110 +499,156 @@ export function createContact(data: {
   tags?: string[];
   notes?: string;
   business_card_url?: string | null;
-}): Contact {
-  const now = new Date().toISOString();
-  const contact: Contact = {
-    id: `ct_${String(nextContactNum++).padStart(3, "0")}`,
-    created_at: now,
-    updated_at: now,
-    user_id: DEMO_USER_ID,
-    name: data.name,
-    role: data.role,
-    organization: data.organization ?? null,
-    title: data.title ?? null,
-    email: data.email ?? null,
-    phone: data.phone ?? null,
-    whatsapp: data.whatsapp ?? null,
-    location: data.location ?? null,
-    corridor: data.corridor ?? null,
-    tags: data.tags ?? [],
-    notes: data.notes ?? "",
-    linked_journal_ids: [],
-    business_card_url: data.business_card_url ?? null,
-  };
-  contacts.push(contact);
-  return contact;
+}): Promise<Contact | null> {
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_contacts")
+      .insert({
+        user_id: userId,
+        name: data.name,
+        role: data.role,
+        organization: data.organization ?? null,
+        title: data.title ?? null,
+        email: data.email ?? null,
+        phone: data.phone ?? null,
+        whatsapp: data.whatsapp ?? null,
+        location: data.location ?? null,
+        corridor: data.corridor ?? null,
+        tags: data.tags ?? [],
+        notes: data.notes ?? "",
+        linked_journal_ids: [],
+        business_card_url: data.business_card_url ?? null,
+      })
+      .select()
+      .single();
+    if (!error && row) return row as Contact;
+  }
+  return null;
 }
 
-export function updateContact(
+export async function updateContact(
   id: string,
   data: Partial<Pick<Contact, "name" | "role" | "organization" | "title" | "email" | "phone" | "whatsapp" | "location" | "corridor" | "tags" | "notes" | "business_card_url" | "linked_journal_ids">>,
-): Contact | null {
-  const contact = contacts.find((c) => c.id === id);
-  if (!contact) return null;
-  Object.assign(contact, data, { updated_at: new Date().toISOString() });
-  return contact;
+): Promise<Contact | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_contacts")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (!error && row) return row as Contact;
+  }
+  return null;
 }
 
-export function deleteContact(id: string): boolean {
-  const idx = contacts.findIndex((c) => c.id === id);
-  if (idx === -1) return false;
-  contacts.splice(idx, 1);
-  return true;
+export async function deleteContact(id: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("phd_contacts").delete().eq("id", id);
+    return !error;
+  }
+  return false;
 }
 
 // ── Protocols ───────────────────────────────────────────────────────
 
-export function getProtocols(filters?: {
+export async function getProtocols(filters?: {
   status?: ProtocolStatus;
   limit?: number;
-}): FieldProtocol[] {
-  let result = [...protocols];
+}): Promise<FieldProtocol[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      let query = sb
+        .from("phd_protocols")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(filters?.limit ?? 50);
 
-  if (filters?.status) {
-    result = result.filter((p) => p.status === filters.status);
+      if (filters?.status) query = query.eq("status", filters.status);
+
+      const { data, error } = await query;
+      if (!error && data) return data as FieldProtocol[];
+    } catch { /* fall through */ }
   }
 
-  result.sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-  );
-
+  let result = [...seedProtocols];
+  if (filters?.status) result = result.filter((p) => p.status === filters.status);
+  result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   return result.slice(0, filters?.limit ?? 50);
 }
 
-export function getProtocolById(id: string): FieldProtocol | undefined {
-  return protocols.find((p) => p.id === id);
+export async function getProtocolById(id: string): Promise<FieldProtocol | null> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_protocols")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (!error && data) return data as FieldProtocol;
+    } catch { /* fall through */ }
+  }
+  return seedProtocols.find((p) => p.id === id) ?? null;
 }
 
-export function getProtocolTemplates(): FieldProtocol[] {
-  return protocols.filter((p) => p.status === "template");
+export async function getProtocolTemplates(): Promise<FieldProtocol[]> {
+  return getProtocols({ status: "template" });
 }
 
-export function createProtocolFromTemplate(
+export async function createProtocolFromTemplate(
   templateId: string,
   data: { location?: string; corridor?: string; linked_contact_ids?: string[] },
-): FieldProtocol | null {
-  const template = protocols.find((p) => p.id === templateId);
+): Promise<FieldProtocol | null> {
+  const template = await getProtocolById(templateId);
   if (!template) return null;
 
-  const now = new Date().toISOString();
-  const protocol: FieldProtocol = {
-    id: `fp_${String(nextProtocolNum++).padStart(3, "0")}`,
-    created_at: now,
-    updated_at: now,
-    user_id: DEMO_USER_ID,
-    template_id: templateId,
-    status: "in_progress",
-    title: template.title,
-    description: template.description,
-    sections: JSON.parse(JSON.stringify(template.sections)),
-    location: data.location ?? null,
-    corridor: data.corridor ?? null,
-    linked_journal_id: null,
-    linked_contact_ids: data.linked_contact_ids ?? [],
-  };
-  protocols.push(protocol);
-  return protocol;
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_protocols")
+      .insert({
+        user_id: userId,
+        template_id: templateId,
+        status: "in_progress",
+        title: template.title,
+        description: template.description,
+        sections: template.sections,
+        location: data.location ?? null,
+        corridor: data.corridor ?? null,
+        linked_journal_id: null,
+        linked_contact_ids: data.linked_contact_ids ?? [],
+      })
+      .select()
+      .single();
+    if (!error && row) return row as FieldProtocol;
+  }
+  return null;
 }
 
-export function updateProtocol(
+export async function updateProtocol(
   id: string,
   data: Partial<Pick<FieldProtocol, "status" | "sections" | "location" | "corridor" | "linked_journal_id" | "linked_contact_ids">>,
-): FieldProtocol | null {
-  const protocol = protocols.find((p) => p.id === id);
-  if (!protocol) return null;
-  Object.assign(protocol, data, { updated_at: new Date().toISOString() });
-  return protocol;
+): Promise<FieldProtocol | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_protocols")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (!error && row) return row as FieldProtocol;
+  }
+  return null;
 }
 
 export function getProtocolProgress(protocol: FieldProtocol): {

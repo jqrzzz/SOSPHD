@@ -71,7 +71,7 @@ export async function createJournalAction(
     ? parsed.data.contact_ids.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const entry = createJournalEntry({
+  const entry = await createJournalEntry({
     entry_type: parsed.data.entry_type as JournalEntryType,
     title: parsed.data.title,
     content: parsed.data.content,
@@ -83,7 +83,7 @@ export async function createJournalAction(
   });
 
   revalidatePath("/fieldwork");
-  return { success: true, id: entry.id };
+  return { success: true, id: entry?.id };
 }
 
 export async function updateJournalAction(
@@ -100,19 +100,19 @@ export async function updateJournalAction(
     is_pinned?: boolean;
   },
 ) {
-  const result = updateJournalEntry(id, data);
+  const result = await updateJournalEntry(id, data);
   if (!result) return { error: "Entry not found" };
   revalidatePath("/fieldwork");
   return { success: true };
 }
 
 export async function deleteJournalAction(id: string) {
-  deleteJournalEntry(id);
+  await deleteJournalEntry(id);
   revalidatePath("/fieldwork");
 }
 
 export async function togglePinAction(id: string, pinned: boolean) {
-  updateJournalEntry(id, { is_pinned: pinned });
+  await updateJournalEntry(id, { is_pinned: pinned });
   revalidatePath("/fieldwork");
 }
 
@@ -145,7 +145,7 @@ export async function createContactAction(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const contact = createContact({
+  const contact = await createContact({
     name: parsed.data.name,
     role: parsed.data.role as ContactRole,
     organization: parsed.data.organization || null,
@@ -161,7 +161,7 @@ export async function createContactAction(
 
   revalidatePath("/fieldwork");
   revalidatePath("/contacts");
-  return { success: true, id: contact.id };
+  return { success: true, id: contact?.id };
 }
 
 export async function updateContactAction(
@@ -181,7 +181,7 @@ export async function updateContactAction(
     business_card_url: string | null;
   }>,
 ) {
-  const result = updateContact(id, data);
+  const result = await updateContact(id, data);
   if (!result) return { error: "Contact not found" };
   revalidatePath("/fieldwork");
   revalidatePath("/contacts");
@@ -189,7 +189,7 @@ export async function updateContactAction(
 }
 
 export async function deleteContactAction(id: string) {
-  deleteContact(id);
+  await deleteContact(id);
   revalidatePath("/fieldwork");
   revalidatePath("/contacts");
 }
@@ -200,7 +200,7 @@ export async function startProtocolAction(
   templateId: string,
   data: { location?: string; corridor?: string; linked_contact_ids?: string[] },
 ) {
-  const protocol = createProtocolFromTemplate(templateId, data);
+  const protocol = await createProtocolFromTemplate(templateId, data);
   if (!protocol) return { error: "Template not found" };
   revalidatePath("/fieldwork");
   return { success: true, id: protocol.id };
@@ -210,7 +210,7 @@ export async function updateProtocolAction(
   id: string,
   data: Parameters<typeof updateProtocol>[1],
 ) {
-  const result = updateProtocol(id, data);
+  const result = await updateProtocol(id, data);
   if (!result) return { error: "Protocol not found" };
   revalidatePath("/fieldwork");
   return { success: true };

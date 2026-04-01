@@ -21,13 +21,13 @@ export default async function DocsPage(props: {
   const searchQuery = searchParams.q;
   const tagFilter = searchParams.tag;
 
-  const docs = getDocs({
+  const docs = await getDocs({
     folder: folderFilter,
     search: searchQuery,
     tag: tagFilter,
   });
 
-  const allTags = getAllTags();
+  const allTags = await getAllTags();
 
   return (
     <div className="flex flex-1 flex-col">

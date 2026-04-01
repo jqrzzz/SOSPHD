@@ -1,7 +1,9 @@
-/* ─── In-Memory Workspace Store ────────────────────────────────────────
- *  Same swap-for-Supabase pattern as other stores.
+/* ─── Workspace Store (Supabase) ───────────────────────────────────────
+ *  Queries phd_uploads, phd_mind_maps.
+ *  Falls back to seed data when Supabase is unavailable.
  * ────────────────────────────────────────────────────────────────────── */
 
+import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
 import type {
   Upload,
   UploadCategory,
@@ -10,9 +12,9 @@ import type {
   MindMapEdge,
 } from "./workspace-types";
 
-const DEMO_USER_ID = "user_demo";
+// ── Seed data (fallback) ─────────────────────────────────────────────
 
-// ── Seed uploads ─────────────────────────────────────────────────────
+const DEMO_USER_ID = "user_demo";
 
 const seedUploads: Upload[] = [
   {
@@ -39,8 +41,7 @@ const seedUploads: Upload[] = [
     category: "transcript",
     url: "#",
     tags: ["case-004", "transcript", "dcs"],
-    notes:
-      "Transcript of operator call during DCS case. Documents 22h payment delay.",
+    notes: "Transcript of operator call during DCS case. Documents 22h payment delay.",
     linked_case_id: "case_004",
     linked_doc_id: null,
   },
@@ -59,8 +60,6 @@ const seedUploads: Upload[] = [
     linked_doc_id: "doc_004",
   },
 ];
-
-// ── Seed mind maps ───────────────────────────────────────────────────
 
 const seedMindMaps: MindMap[] = [
   {
@@ -90,25 +89,32 @@ const seedMindMaps: MindMap[] = [
   },
 ];
 
-// ── Mutable store ────────────────────────────────────────────────────
-
-const uploads = [...seedUploads];
-const mindMaps = [...seedMindMaps];
-
-let nextUploadNum = 4;
-let nextMindMapNum = 2;
-
 // ── Uploads ──────────────────────────────────────────────────────────
 
-export function getUploads(filters?: {
+export async function getUploads(filters?: {
   category?: UploadCategory;
   search?: string;
-}): Upload[] {
-  let result = [...uploads];
+}): Promise<Upload[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      let query = sb
+        .from("phd_uploads")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-  if (filters?.category) {
-    result = result.filter((u) => u.category === filters.category);
+      if (filters?.category) query = query.eq("category", filters.category);
+      if (filters?.search) query = query.or(
+        `filename.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`
+      );
+
+      const { data, error } = await query;
+      if (!error && data) return data as Upload[];
+    } catch { /* fall through */ }
   }
+
+  let result = [...seedUploads];
+  if (filters?.category) result = result.filter((u) => u.category === filters.category);
   if (filters?.search) {
     const q = filters.search.toLowerCase();
     result = result.filter(
@@ -118,14 +124,10 @@ export function getUploads(filters?: {
         u.tags.some((t) => t.toLowerCase().includes(q)),
     );
   }
-
-  return result.sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+  return result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
-export function createUpload(data: {
+export async function createUpload(data: {
   filename: string;
   mime_type: string;
   size_bytes: number;
@@ -135,83 +137,120 @@ export function createUpload(data: {
   notes?: string;
   linked_case_id?: string | null;
   linked_doc_id?: string | null;
-}): Upload {
-  const upload: Upload = {
-    id: `upload_${String(nextUploadNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    user_id: DEMO_USER_ID,
-    filename: data.filename,
-    mime_type: data.mime_type,
-    size_bytes: data.size_bytes,
-    category: data.category,
-    url: data.url,
-    tags: data.tags ?? [],
-    notes: data.notes ?? "",
-    linked_case_id: data.linked_case_id ?? null,
-    linked_doc_id: data.linked_doc_id ?? null,
-  };
-  uploads.push(upload);
-  return upload;
+}): Promise<Upload | null> {
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_uploads")
+      .insert({
+        user_id: userId,
+        filename: data.filename,
+        mime_type: data.mime_type,
+        size_bytes: data.size_bytes,
+        category: data.category,
+        url: data.url,
+        tags: data.tags ?? [],
+        notes: data.notes ?? "",
+        linked_case_id: data.linked_case_id ?? null,
+        linked_doc_id: data.linked_doc_id ?? null,
+      })
+      .select()
+      .single();
+    if (!error && row) return row as Upload;
+  }
+  return null;
 }
 
-export function deleteUpload(id: string): boolean {
-  const idx = uploads.findIndex((u) => u.id === id);
-  if (idx === -1) return false;
-  uploads.splice(idx, 1);
-  return true;
+export async function deleteUpload(id: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("phd_uploads").delete().eq("id", id);
+    return !error;
+  }
+  return false;
 }
 
 // ── Mind Maps ────────────────────────────────────────────────────────
 
-export function getMindMaps(): MindMap[] {
-  return [...mindMaps].sort(
-    (a, b) =>
-      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+export async function getMindMaps(): Promise<MindMap[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_mind_maps")
+        .select("*")
+        .order("updated_at", { ascending: false });
+      if (!error && data) return data as MindMap[];
+    } catch { /* fall through */ }
+  }
+  return [...seedMindMaps].sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
   );
 }
 
-export function getMindMapById(id: string): MindMap | undefined {
-  return mindMaps.find((m) => m.id === id);
+export async function getMindMapById(id: string): Promise<MindMap | null> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_mind_maps")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (!error && data) return data as MindMap;
+    } catch { /* fall through */ }
+  }
+  return seedMindMaps.find((m) => m.id === id) ?? null;
 }
 
-export function createMindMap(title: string): MindMap {
-  const mm: MindMap = {
-    id: `mm_${String(nextMindMapNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    user_id: DEMO_USER_ID,
-    title,
-    nodes: [
-      { id: "n1", x: 400, y: 250, label: title, color: "#3b82f6", radius: 36 },
-    ],
-    edges: [],
-  };
-  mindMaps.push(mm);
-  return mm;
+export async function createMindMap(title: string): Promise<MindMap | null> {
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_mind_maps")
+      .insert({
+        user_id: userId,
+        title,
+        nodes: [{ id: "n1", x: 400, y: 250, label: title, color: "#3b82f6", radius: 36 }],
+        edges: [],
+      })
+      .select()
+      .single();
+    if (!error && row) return row as MindMap;
+  }
+  return null;
 }
 
-export function updateMindMap(
+export async function updateMindMap(
   id: string,
   updates: {
     title?: string;
     nodes?: MindMapNode[];
     edges?: MindMapEdge[];
   },
-): MindMap | null {
-  const mm = mindMaps.find((m) => m.id === id);
-  if (!mm) return null;
-
-  if (updates.title !== undefined) mm.title = updates.title;
-  if (updates.nodes !== undefined) mm.nodes = updates.nodes;
-  if (updates.edges !== undefined) mm.edges = updates.edges;
-  mm.updated_at = new Date().toISOString();
-
-  return mm;
+): Promise<MindMap | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_mind_maps")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (!error && row) return row as MindMap;
+  }
+  return null;
 }
 
-export function deleteMindMap(id: string): boolean {
-  const idx = mindMaps.findIndex((m) => m.id === id);
-  if (idx === -1) return false;
-  mindMaps.splice(idx, 1);
-  return true;
+export async function deleteMindMap(id: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("phd_mind_maps").delete().eq("id", id);
+    return !error;
+  }
+  return false;
 }

@@ -62,7 +62,7 @@ export async function createUploadAction(
         .filter(Boolean)
     : [];
 
-  createUpload({
+  await createUpload({
     filename: parsed.data.filename,
     mime_type: parsed.data.mime_type,
     size_bytes: parsed.data.size_bytes,
@@ -79,29 +79,29 @@ export async function createUploadAction(
 }
 
 export async function deleteUploadAction(id: string) {
-  deleteUpload(id);
+  await deleteUpload(id);
   revalidatePath("/workspace");
 }
 
 // ── Mind Map actions ─────────────────────────────────────────────────
 
 export async function createMindMapAction(title: string) {
-  const mm = createMindMap(title || "Untitled Map");
+  const mm = await createMindMap(title || "Untitled Map");
   revalidatePath("/workspace");
-  return { id: mm.id };
+  return { id: mm?.id ?? "" };
 }
 
 export async function saveMindMapAction(
   id: string,
   data: { title?: string; nodes?: MindMapNode[]; edges?: MindMapEdge[] },
 ) {
-  const result = updateMindMap(id, data);
+  const result = await updateMindMap(id, data);
   if (!result) return { error: "Mind map not found" };
   revalidatePath("/workspace");
   return { success: true };
 }
 
 export async function deleteMindMapAction(id: string) {
-  deleteMindMap(id);
+  await deleteMindMap(id);
   revalidatePath("/workspace");
 }

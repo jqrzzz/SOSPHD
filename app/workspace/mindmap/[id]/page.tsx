@@ -10,7 +10,7 @@ export default async function MindMapPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const mindMap = getMindMapById(id);
+  const mindMap = await getMindMapById(id);
 
   if (!mindMap) {
     notFound();

@@ -27,7 +27,7 @@ function getMissingMilestones(caseId: string): string[] {
   return MILESTONE_EVENTS.filter((m) => !present.has(m));
 }
 
-export function buildContextSnapshot(): ContextSnapshot {
+export async function buildContextSnapshot(): Promise<ContextSnapshot> {
   const allCases = getCases();
 
   // Recent 10 cases as safe summaries
@@ -75,14 +75,16 @@ export function buildContextSnapshot(): ContextSnapshot {
     .filter((m) => m.missing.length > 0);
 
   // Tasks and notes
-  const topTasks = getTasks({ limit: 5 }).map((t) => ({
+  const topTasksRaw = await getTasks({ limit: 5 });
+  const topTasks = topTasksRaw.map((t) => ({
     id: t.id,
     title: t.title,
     status: t.status,
     priority: t.priority,
   }));
 
-  const recentNotes = getNotes(5).map((n) => ({
+  const recentNotesRaw = await getNotes(5);
+  const recentNotes = recentNotesRaw.map((n) => ({
     id: n.id,
     title: n.title,
     content: n.content.slice(0, 200),

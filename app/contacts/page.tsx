@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useEffect, useActionState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { getContacts, getJournalEntries } from "@/lib/data/fieldwork-store";
 import { createContactAction } from "@/lib/fieldwork-actions";
-import type { Contact, ContactRole } from "@/lib/data/fieldwork-types";
+import type { Contact, ContactRole, JournalEntry } from "@/lib/data/fieldwork-types";
 import { APP_CONFIG } from "@/lib/config";
 
 /* ── Role config ────────────────────────────────────────────────────── */
@@ -60,8 +60,18 @@ const CORRIDORS = APP_CONFIG.research.corridors;
 /* ── Component ──────────────────────────────────────────────────────── */
 
 export default function ContactsPage() {
-  const contacts = getContacts();
-  const journal = getJournalEntries({ limit: 100 });
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [journal, setJournal] = useState<JournalEntry[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      getContacts(),
+      getJournalEntries({ limit: 100 }),
+    ]).then(([c, j]) => {
+      setContacts(c);
+      setJournal(j);
+    });
+  }, []);
 
   const [showNew, setShowNew] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -205,7 +215,7 @@ function ContactDetail({
   journal,
 }: {
   contact: Contact;
-  journal: ReturnType<typeof getJournalEntries>;
+  journal: JournalEntry[];
 }) {
   const linkedEntries = journal.filter((e) => e.contact_ids.includes(contact.id));
 

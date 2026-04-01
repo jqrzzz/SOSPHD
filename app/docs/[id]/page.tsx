@@ -9,13 +9,13 @@ export default async function DocDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {
   const params = await props.params;
-  const doc = getDocById(params.id);
+  const doc = await getDocById(params.id);
 
   if (!doc) {
     notFound();
   }
 
-  const versions = getVersionsByDocId(doc.id);
+  const versions = await getVersionsByDocId(doc.id);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

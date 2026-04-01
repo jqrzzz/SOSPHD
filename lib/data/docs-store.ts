@@ -1,12 +1,17 @@
-/* ─── In-Memory Docs Store ─────────────────────────────────────────────
- *  Same pattern as store.ts / advisor-store.ts — swap for Supabase later.
+/* ─── Docs Store (Supabase) ────────────────────────────────────────────
+ *  Queries phd_docs, phd_doc_versions.
+ *  Falls back to seed data when Supabase is unavailable.
+ *
+ *  Note: DB column `change_note` maps to TypeScript `note` field.
+ *  DB has no `site_id` or `user_id` on doc_versions — handled in mapping.
  * ────────────────────────────────────────────────────────────────────── */
 
+import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
 import type { Doc, DocVersion, DocStatus } from "./docs-types";
 
-const DEMO_USER_ID = "user_demo";
+// ── Seed data (fallback) ─────────────────────────────────────────────
 
-// ── Seed data ────────────────────────────────────────────────────────
+const DEMO_USER_ID = "user_demo";
 
 const seedDocs: Doc[] = [
   {
@@ -205,33 +210,60 @@ const seedVersions: DocVersion[] = [
   },
 ];
 
-// ── Mutable store ────────────────────────────────────────────────────
+// ── Helper: map DB row → DocVersion (column name difference) ────────
 
-const docs = [...seedDocs];
-const versions = [...seedVersions];
+function mapDbVersion(row: Record<string, unknown>): DocVersion {
+  return {
+    id: row.id as string,
+    created_at: row.created_at as string,
+    doc_id: row.doc_id as string,
+    user_id: DEMO_USER_ID,
+    content_md: row.content_md as string,
+    note: (row.change_note as string) ?? null,
+  };
+}
 
-let nextDocNum = 5;
-let nextVersionNum = 3;
+// ── Helper: map DB row → Doc (no site_id in DB) ────────────────────
+
+function mapDbDoc(row: Record<string, unknown>): Doc {
+  return {
+    ...(row as unknown as Doc),
+    site_id: null,
+  };
+}
 
 // ── Query functions ─────────────────────────────────────────────────
 
-export function getDocs(filters?: {
+export async function getDocs(filters?: {
   folder?: string;
   status?: DocStatus;
   search?: string;
   tag?: string;
-}): Doc[] {
-  let result = [...docs];
+}): Promise<Doc[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      let query = sb
+        .from("phd_docs")
+        .select("*")
+        .order("updated_at", { ascending: false });
 
-  if (filters?.folder) {
-    result = result.filter((d) => d.folder === filters.folder);
+      if (filters?.folder) query = query.eq("folder", filters.folder);
+      if (filters?.status) query = query.eq("status", filters.status);
+      if (filters?.tag) query = query.contains("tags", [filters.tag]);
+      if (filters?.search) query = query.or(
+        `title.ilike.%${filters.search}%,content_md.ilike.%${filters.search}%`
+      );
+
+      const { data, error } = await query;
+      if (!error && data) return data.map((r) => mapDbDoc(r as Record<string, unknown>));
+    } catch { /* fall through */ }
   }
-  if (filters?.status) {
-    result = result.filter((d) => d.status === filters.status);
-  }
-  if (filters?.tag) {
-    result = result.filter((d) => d.tags.includes(filters.tag));
-  }
+
+  let result = [...seedDocs];
+  if (filters?.folder) result = result.filter((d) => d.folder === filters.folder);
+  if (filters?.status) result = result.filter((d) => d.status === filters.status);
+  if (filters?.tag) result = result.filter((d) => d.tags.includes(filters.tag!));
   if (filters?.search) {
     const q = filters.search.toLowerCase();
     result = result.filter(
@@ -241,102 +273,135 @@ export function getDocs(filters?: {
         d.tags.some((t) => t.toLowerCase().includes(q)),
     );
   }
-
-  return result.sort(
-    (a, b) =>
-      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-  );
+  return result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 }
 
-export function getDocById(id: string): Doc | undefined {
-  return docs.find((d) => d.id === id);
+export async function getDocById(id: string): Promise<Doc | null> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_docs")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (!error && data) return mapDbDoc(data as Record<string, unknown>);
+    } catch { /* fall through */ }
+  }
+  return seedDocs.find((d) => d.id === id) ?? null;
 }
 
-export function createDoc(data: {
+export async function createDoc(data: {
   title: string;
   folder?: string;
   tags?: string[];
   content_md?: string;
   linked_case_id?: string | null;
-}): Doc {
-  const now = new Date().toISOString();
+}): Promise<Doc | null> {
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
   const slug = data.title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-  const newDoc: Doc = {
-    id: `doc_${String(nextDocNum++).padStart(3, "0")}`,
-    created_at: now,
-    updated_at: now,
-    user_id: DEMO_USER_ID,
-    site_id: null,
-    title: data.title,
-    slug,
-    folder: data.folder ?? "General",
-    tags: data.tags ?? [],
-    content_md: data.content_md ?? "",
-    status: "draft",
-    linked_case_id: data.linked_case_id ?? null,
-  };
-  docs.push(newDoc);
-  return newDoc;
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_docs")
+      .insert({
+        user_id: userId,
+        title: data.title,
+        slug,
+        folder: data.folder ?? "General",
+        tags: data.tags ?? [],
+        content_md: data.content_md ?? "",
+        status: "draft",
+        linked_case_id: data.linked_case_id ?? null,
+      })
+      .select()
+      .single();
+    if (!error && row) return mapDbDoc(row as Record<string, unknown>);
+  }
+  return null;
 }
 
-export function updateDoc(
+export async function updateDoc(
   id: string,
   updates: Partial<Pick<Doc, "title" | "content_md" | "folder" | "tags" | "status" | "linked_case_id">>,
-): Doc | null {
-  const doc = docs.find((d) => d.id === id);
-  if (!doc) return null;
-
-  if (updates.title !== undefined) doc.title = updates.title;
-  if (updates.content_md !== undefined) doc.content_md = updates.content_md;
-  if (updates.folder !== undefined) doc.folder = updates.folder;
-  if (updates.tags !== undefined) doc.tags = updates.tags;
-  if (updates.status !== undefined) doc.status = updates.status;
-  if (updates.linked_case_id !== undefined) doc.linked_case_id = updates.linked_case_id;
-
-  doc.updated_at = new Date().toISOString();
-
-  return doc;
+): Promise<Doc | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_docs")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (!error && row) return mapDbDoc(row as Record<string, unknown>);
+  }
+  return null;
 }
 
 // ── Versions ─────────────────────────────────────────────────────────
 
-export function getVersionsByDocId(docId: string): DocVersion[] {
-  return versions
+export async function getVersionsByDocId(docId: string): Promise<DocVersion[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_doc_versions")
+        .select("*")
+        .eq("doc_id", docId)
+        .order("created_at", { ascending: false });
+      if (!error && data) return data.map((r) => mapDbVersion(r as Record<string, unknown>));
+    } catch { /* fall through */ }
+  }
+  return seedVersions
     .filter((v) => v.doc_id === docId)
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
-export function createVersion(data: {
+export async function createVersion(data: {
   doc_id: string;
   content_md: string;
   note?: string | null;
-}): DocVersion {
-  const version: DocVersion = {
-    id: `ver_${String(nextVersionNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    doc_id: data.doc_id,
-    user_id: DEMO_USER_ID,
-    content_md: data.content_md,
-    note: data.note ?? null,
-  };
-  versions.push(version);
-  return version;
+}): Promise<DocVersion | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_doc_versions")
+      .insert({
+        doc_id: data.doc_id,
+        content_md: data.content_md,
+        change_note: data.note ?? "",
+      })
+      .select()
+      .single();
+    if (!error && row) return mapDbVersion(row as Record<string, unknown>);
+  }
+  return null;
 }
 
-export function getVersionById(id: string): DocVersion | undefined {
-  return versions.find((v) => v.id === id);
+export async function getVersionById(id: string): Promise<DocVersion | null> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_doc_versions")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (!error && data) return mapDbVersion(data as Record<string, unknown>);
+    } catch { /* fall through */ }
+  }
+  return seedVersions.find((v) => v.id === id) ?? null;
 }
 
 // ── Unique tags across all docs ──────────────────────────────────────
 
-export function getAllTags(): string[] {
+export async function getAllTags(): Promise<string[]> {
+  const docs = await getDocs();
   const tagSet = new Set<string>();
   for (const doc of docs) {
     for (const tag of doc.tags) {

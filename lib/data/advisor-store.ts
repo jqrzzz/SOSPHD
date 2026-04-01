@@ -1,7 +1,9 @@
-/* ─── In-Memory Advisor Store ──────────────────────────────────────────
- *  Same pattern as store.ts — swap for Supabase client calls later.
+/* ─── Advisor Store (Supabase) ─────────────────────────────────────────
+ *  Queries phd_notes, phd_tasks, phd_advisor_sessions, phd_advisor_messages.
+ *  Falls back to seed data when Supabase is unavailable.
  * ────────────────────────────────────────────────────────────────────── */
 
+import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
 import type {
   ResearchNote,
   ResearchTask,
@@ -11,7 +13,7 @@ import type {
   AdvisorRole,
 } from "./advisor-types";
 
-// ── Seed data ────────────────────────────────────────────────────────
+// ── Seed data (fallback) ─────────────────────────────────────────────
 
 const DEMO_USER_ID = "user_demo";
 
@@ -144,146 +146,215 @@ const seedSessions: AdvisorSession[] = [
   },
 ];
 
-const seedMessages: AdvisorMessage[] = [];
-
-// ── Mutable store ────────────────────────────────────────────────────
-
-const notes = [...seedNotes];
-const tasks = [...seedTasks];
-const sessions = [...seedSessions];
-const messages = [...seedMessages];
-
-let nextNoteNum = 6;
-let nextTaskNum = 6;
-let nextSessionNum = 2;
-let nextMessageNum = 1;
-
 // ── Notes ────────────────────────────────────────────────────────────
 
-export function getNotes(limit = 10): ResearchNote[] {
-  return [...notes]
+export async function getNotes(limit = 10): Promise<ResearchNote[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_notes")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (!error && data) return data as ResearchNote[];
+    } catch { /* fall through */ }
+  }
+  return [...seedNotes]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, limit);
 }
 
-export function createNote(data: {
+export async function createNote(data: {
   title?: string | null;
   content: string;
   tags?: string[];
   linked_case_id?: string | null;
-}): ResearchNote {
-  const note: ResearchNote = {
-    id: `note_${String(nextNoteNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    user_id: DEMO_USER_ID,
-    site_id: "site_001",
-    title: data.title ?? null,
-    content: data.content,
-    tags: data.tags ?? [],
-    linked_case_id: data.linked_case_id ?? null,
-  };
-  notes.push(note);
-  return note;
+}): Promise<ResearchNote | null> {
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_notes")
+      .insert({
+        user_id: userId,
+        site_id: "site_001",
+        title: data.title ?? null,
+        content: data.content,
+        tags: data.tags ?? [],
+        linked_case_id: data.linked_case_id ?? null,
+      })
+      .select()
+      .single();
+    if (!error && row) return row as ResearchNote;
+  }
+  return null;
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────
 
-export function getTasks(filters?: {
+export async function getTasks(filters?: {
   status?: TaskStatus;
   limit?: number;
-}): ResearchTask[] {
-  let result = [...tasks];
+}): Promise<ResearchTask[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      let query = sb
+        .from("phd_tasks")
+        .select("*")
+        .order("priority", { ascending: true })
+        .order("created_at", { ascending: false })
+        .limit(filters?.limit ?? 50);
 
-  if (filters?.status) {
-    result = result.filter((t) => t.status === filters.status);
+      if (filters?.status) query = query.eq("status", filters.status);
+
+      const { data, error } = await query;
+      if (!error && data) return data as ResearchTask[];
+    } catch { /* fall through */ }
   }
 
-  // Sort by priority (asc), then created_at (desc)
+  let result = [...seedTasks];
+  if (filters?.status) result = result.filter((t) => t.status === filters.status);
   result.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
-
   return result.slice(0, filters?.limit ?? 50);
 }
 
-export function createTask(data: {
+export async function createTask(data: {
   title: string;
   description?: string | null;
   priority?: number;
   due_date?: string | null;
   linked_case_id?: string | null;
-}): ResearchTask {
-  const task: ResearchTask = {
-    id: `task_${String(nextTaskNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    user_id: DEMO_USER_ID,
-    site_id: null,
-    status: "todo",
-    priority: data.priority ?? 2,
-    due_date: data.due_date ?? null,
-    title: data.title,
-    description: data.description ?? null,
-    linked_case_id: data.linked_case_id ?? null,
-  };
-  tasks.push(task);
-  return task;
+}): Promise<ResearchTask | null> {
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_tasks")
+      .insert({
+        user_id: userId,
+        site_id: null,
+        status: "todo",
+        priority: data.priority ?? 2,
+        due_date: data.due_date ?? null,
+        title: data.title,
+        description: data.description ?? null,
+        linked_case_id: data.linked_case_id ?? null,
+      })
+      .select()
+      .single();
+    if (!error && row) return row as ResearchTask;
+  }
+  return null;
 }
 
-export function updateTaskStatus(id: string, status: TaskStatus): ResearchTask | null {
-  const task = tasks.find((t) => t.id === id);
-  if (!task) return null;
-  task.status = status;
-  return task;
+export async function updateTaskStatus(id: string, status: TaskStatus): Promise<ResearchTask | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_tasks")
+      .update({ status })
+      .eq("id", id)
+      .select()
+      .single();
+    if (!error && row) return row as ResearchTask;
+  }
+  return null;
 }
 
 // ── Sessions ─────────────────────────────────────────────────────────
 
-export function getSessions(): AdvisorSession[] {
-  return [...sessions].sort(
+export async function getSessions(): Promise<AdvisorSession[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_advisor_sessions")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!error && data) return data as AdvisorSession[];
+    } catch { /* fall through */ }
+  }
+  return [...seedSessions].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 }
 
-export function createSession(title?: string): AdvisorSession {
-  const session: AdvisorSession = {
-    id: `session_${String(nextSessionNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    user_id: DEMO_USER_ID,
-    title: title ?? "New Session",
-  };
-  sessions.push(session);
-  return session;
+export async function createSession(title?: string): Promise<AdvisorSession | null> {
+  const sb = getSupabase();
+  const userId = await getCurrentUserId();
+
+  if (sb && userId) {
+    const { data: row, error } = await sb
+      .from("phd_advisor_sessions")
+      .insert({
+        user_id: userId,
+        title: title ?? "New Session",
+      })
+      .select()
+      .single();
+    if (!error && row) return row as AdvisorSession;
+  }
+  return null;
 }
 
-export function getSessionById(id: string): AdvisorSession | undefined {
-  return sessions.find((s) => s.id === id);
+export async function getSessionById(id: string): Promise<AdvisorSession | null> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_advisor_sessions")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (!error && data) return data as AdvisorSession;
+    } catch { /* fall through */ }
+  }
+  return seedSessions.find((s) => s.id === id) ?? null;
 }
 
 // ── Messages ─────────────────────────────────────────────────────────
 
-export function getMessagesBySessionId(sessionId: string): AdvisorMessage[] {
-  return messages
-    .filter((m) => m.session_id === sessionId)
-    .sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-    );
+export async function getMessagesBySessionId(sessionId: string): Promise<AdvisorMessage[]> {
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from("phd_advisor_messages")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+      if (!error && data) return data as AdvisorMessage[];
+    } catch { /* fall through */ }
+  }
+  return [];
 }
 
-export function addMessage(data: {
+export async function addMessage(data: {
   session_id: string;
   role: AdvisorRole;
   content: string;
   context_snapshot?: Record<string, unknown> | null;
-}): AdvisorMessage {
-  const msg: AdvisorMessage = {
-    id: `msg_${String(nextMessageNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    session_id: data.session_id,
-    role: data.role,
-    content: data.content,
-    context_snapshot: data.context_snapshot ?? null,
-  };
-  messages.push(msg);
-  return msg;
+}): Promise<AdvisorMessage | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_advisor_messages")
+      .insert({
+        session_id: data.session_id,
+        role: data.role,
+        content: data.content,
+        context_snapshot: data.context_snapshot ?? null,
+      })
+      .select()
+      .single();
+    if (!error && row) return row as AdvisorMessage;
+  }
+  return null;
 }

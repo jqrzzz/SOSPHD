@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useEffect, useActionState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,7 @@ import {
   startProtocolAction,
   updateProtocolAction,
 } from "@/lib/fieldwork-actions";
-import type { JournalEntryType, FieldProtocol } from "@/lib/data/fieldwork-types";
+import type { JournalEntry, JournalEntryType, Contact, FieldProtocol } from "@/lib/data/fieldwork-types";
 import { APP_CONFIG } from "@/lib/config";
 
 /* ── Entry type config ──────────────────────────────────────────────── */
@@ -63,10 +63,26 @@ const CORRIDORS = APP_CONFIG.research.corridors;
 /* ── Component ──────────────────────────────────────────────────────── */
 
 export default function FieldworkPage() {
-  const entries = getJournalEntries();
-  const contacts = getContacts();
-  const templates = getProtocolTemplates();
-  const activeProtocols = getProtocols({ status: "in_progress" });
+  const [entries, setEntries] = useState<Awaited<ReturnType<typeof getJournalEntries>>>([]);
+  const [contacts, setContacts] = useState<Awaited<ReturnType<typeof getContacts>>>([]);
+  const [templates, setTemplates] = useState<Awaited<ReturnType<typeof getProtocolTemplates>>>([]);
+  const [activeProtocols, setActiveProtocols] = useState<Awaited<ReturnType<typeof getProtocols>>>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      getJournalEntries(),
+      getContacts(),
+      getProtocolTemplates(),
+      getProtocols({ status: "in_progress" }),
+    ]).then(([e, c, t, p]) => {
+      setEntries(e);
+      setContacts(c);
+      setTemplates(t);
+      setActiveProtocols(p);
+      setLoaded(true);
+    });
+  }, []);
 
   const [showNew, setShowNew] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -286,8 +302,8 @@ function JournalCard({
   expanded,
   onToggle,
 }: {
-  entry: ReturnType<typeof getJournalEntries>[number];
-  contacts: ReturnType<typeof getContacts>;
+  entry: JournalEntry;
+  contacts: Contact[];
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -410,7 +426,7 @@ function NewEntryDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  contacts: ReturnType<typeof getContacts>;
+  contacts: Contact[];
 }) {
   const [state, formAction, isPending] = useActionState(createJournalAction, null);
   const [entryType, setEntryType] = useState<JournalEntryType>("observation");

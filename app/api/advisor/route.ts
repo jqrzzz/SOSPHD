@@ -51,7 +51,7 @@ Only include linked_case_id if the task directly relates to a specific case.
 - Do NOT speculate about patient identities or demographics beyond what is recorded`;
 
 function formatContextForPrompt(
-  ctx: ReturnType<typeof buildContextSnapshot>,
+  ctx: Awaited<ReturnType<typeof buildContextSnapshot>>,
 ): string {
   const lines: string[] = [
     `## Current Context Snapshot`,
@@ -133,7 +133,7 @@ export async function POST(req: Request) {
   }: { messages: UIMessage[]; sessionId?: string } = await req.json();
 
   // Build safe context
-  const contextSnapshot = buildContextSnapshot();
+  const contextSnapshot = await buildContextSnapshot();
   const contextText = formatContextForPrompt(contextSnapshot);
 
   const result = streamText({
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
 
         // Persist assistant message with context snapshot
         if (sessionId) {
-          addMessage({
+          await addMessage({
             session_id: sessionId,
             role: "assistant",
             content: textContent,
