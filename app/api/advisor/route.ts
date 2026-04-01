@@ -4,6 +4,7 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
+import { openai } from "@ai-sdk/openai";
 import { buildContextSnapshot } from "@/lib/data/context-builder";
 import { createTasksFromAI } from "@/lib/advisor-actions";
 import { addMessage } from "@/lib/data/advisor-store";
@@ -171,6 +172,13 @@ function extractAndCreateTasks(text: string): void {
 }
 
 export async function POST(req: Request) {
+  if (!process.env.OPENAI_API_KEY) {
+    return Response.json(
+      { error: "OPENAI_API_KEY not configured. Add it to .env.local to enable the advisor." },
+      { status: 503 },
+    );
+  }
+
   const {
     messages,
     sessionId,
@@ -187,7 +195,7 @@ export async function POST(req: Request) {
   const agentText = formatAgentInsights(pulse, actions, gaps);
 
   const result = streamText({
-    model: "openai/gpt-4o-mini",
+    model: openai("gpt-4o-mini"),
     system: `${SYSTEM_PROMPT}\n\n${contextText}\n${agentText}`,
     messages: await convertToModelMessages(messages),
     abortSignal: req.signal,
