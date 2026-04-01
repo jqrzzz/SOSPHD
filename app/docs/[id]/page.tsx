@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDocById, getVersionsByDocId } from "@/lib/data/docs-store";
 import { DocEditor } from "@/components/doc-editor";
@@ -19,6 +20,20 @@ export default async function DocDetailPage(props: {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+        <Link
+          href="/docs"
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          &larr; Docs
+        </Link>
+        <span className="text-sm text-muted-foreground">/</span>
+        <span className="truncate text-sm font-medium text-foreground">
+          {doc.title || "Untitled"}
+        </span>
+      </div>
+
       {/* No-PHI banner */}
       <div
         className="flex items-center gap-2 border-b border-[hsl(142_71%_45%)]/20 bg-[hsl(142_71%_45%)]/5 px-4 py-1.5"

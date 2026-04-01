@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { APP_CONFIG } from "@/lib/config";
 import { useEffect, useState } from "react";
+import { CommandPalette } from "@/components/command-palette";
+import { QuickCaptureNote, QuickCaptureTask } from "@/components/advisor-quick-capture";
 
 const NAV_ITEMS = [
   { href: "/spine", label: "PhD Spine", icon: SpineIcon },
@@ -127,19 +129,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        {/* Mobile header */}
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2 md:hidden">
+        {/* Top bar — mobile nav toggle + quick actions */}
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent"
+            className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent md:hidden"
             aria-label="Open navigation"
           >
             <MenuIcon className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold text-foreground">SOS PHD</span>
+          <span className="text-sm font-semibold text-foreground md:hidden">SOS PHD</span>
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+              className="hidden items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent transition-colors sm:flex"
+            >
+              <SearchIcon className="h-3.5 w-3.5" />
+              <span>Search</span>
+              <kbd className="ml-1 rounded border border-border bg-background px-1 py-0.5 text-[10px] font-mono">
+                {typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent) ? "⌘" : "Ctrl+"}K
+              </kbd>
+            </button>
+            <QuickCaptureNote />
+            <QuickCaptureTask />
+          </div>
         </div>
         {children}
       </main>
+
+      {/* Command Palette (Cmd+K) */}
+      <CommandPalette />
     </div>
   );
 }
@@ -231,6 +251,15 @@ function UsersIcon({ className }: { className?: string }) {
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
     </svg>
   );
 }
