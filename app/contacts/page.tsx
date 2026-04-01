@@ -24,6 +24,7 @@ import { getContacts, getJournalEntries } from "@/lib/data/fieldwork-store";
 import { createContactAction } from "@/lib/fieldwork-actions";
 import type { Contact, ContactRole, JournalEntry } from "@/lib/data/fieldwork-types";
 import { APP_CONFIG } from "@/lib/config";
+import { toast } from "sonner";
 
 /* ── Role config ────────────────────────────────────────────────────── */
 
@@ -341,11 +342,14 @@ function NewContactDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const [state, formAction, isPending] = useActionState(createContactAction, null);
-
-  if (state?.success) {
-    onClose();
-  }
+  const [state, formAction, isPending] = useActionState(async (prev: { error?: string; success?: boolean } | null, fd: FormData) => {
+    const result = await createContactAction(prev, fd);
+    if (result?.success) {
+      toast.success("Contact added");
+      onClose();
+    }
+    return result;
+  }, null);
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>

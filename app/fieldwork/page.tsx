@@ -36,6 +36,7 @@ import {
 import type { JournalEntry, JournalEntryType, Contact, FieldProtocol } from "@/lib/data/fieldwork-types";
 import { APP_CONFIG } from "@/lib/config";
 import { autoCategorize } from "@/lib/agent";
+import { toast } from "sonner";
 
 /* ── Entry type config ──────────────────────────────────────────────── */
 
@@ -429,7 +430,11 @@ function NewEntryDialog({
   onClose: () => void;
   contacts: Contact[];
 }) {
-  const [state, formAction, isPending] = useActionState(createJournalAction, null);
+  const [state, formAction, isPending] = useActionState(async (prev: { error?: string; success?: boolean } | null, fd: FormData) => {
+    const result = await createJournalAction(prev, fd);
+    if (result?.success) toast.success("Journal entry created");
+    return result;
+  }, null);
   const [entryType, setEntryType] = useState<JournalEntryType>("observation");
   const [aiSuggestions, setAiSuggestions] = useState<{
     suggestedType: string;

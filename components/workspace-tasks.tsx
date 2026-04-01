@@ -21,7 +21,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { createTaskAction, updateTaskStatusAction } from "@/lib/advisor-actions";
+import { createTaskAction, updateTaskStatusAction, updateTaskAction, deleteTaskAction } from "@/lib/advisor-actions";
+import { toast } from "sonner";
 import type { ResearchTask, TaskStatus } from "@/lib/data/advisor-types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -43,8 +44,27 @@ export function WorkspaceTasks({
   initialTasks: ResearchTask[];
 }) {
   const [open, setOpen] = useState(false);
-  const [createState, createAction, createPending] = useActionState(createTaskAction, null);
+  const [editTask, setEditTask] = useState<ResearchTask | null>(null);
+
+  const [createState, createAction, createPending] = useActionState(async (prev: { error?: string; success?: boolean } | null, fd: FormData) => {
+    const result = await createTaskAction(prev, fd);
+    if (result?.success) {
+      setOpen(false);
+      toast.success("Task created");
+    }
+    return result;
+  }, null);
+
   const [, statusAction] = useActionState(updateTaskStatusAction, null);
+
+  const [editState, editAction, editPending] = useActionState(async (prev: { error?: string; success?: boolean } | null, fd: FormData) => {
+    const result = await updateTaskAction(prev, fd);
+    if (result?.success) {
+      setEditTask(null);
+      toast.success("Task updated");
+    }
+    return result;
+  }, null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -128,7 +148,7 @@ export function WorkspaceTasks({
                   {columnTasks.map((task) => {
                     const pri = PRIORITY_LABELS[task.priority] ?? PRIORITY_LABELS[2];
                     return (
-                      <Card key={task.id}>
+                      <Card key={task.id} className="group">
                         <CardContent className="flex flex-col gap-2 p-3">
                           <h4 className="text-sm font-medium text-foreground leading-snug">
                             {task.title}
@@ -142,24 +162,48 @@ export function WorkspaceTasks({
                             <Badge variant="outline" className={cn("text-xs", pri.className)}>
                               {pri.label}
                             </Badge>
-                            <form action={statusAction}>
-                              <input type="hidden" name="id" value={task.id} />
-                              {status === "todo" && (
-                                <Button type="submit" variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                                  <input type="hidden" name="status" value="doing" />
-                                  Start
-                                </Button>
-                              )}
-                              {status === "doing" && (
-                                <Button type="submit" variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                                  <input type="hidden" name="status" value="done" />
-                                  Complete
-                                </Button>
-                              )}
-                              {status === "done" && (
-                                <span className="text-xs text-emerald-400">Done</span>
-                              )}
-                            </form>
+                            <div className="flex items-center gap-1">
+                              <form action={statusAction}>
+                                <input type="hidden" name="id" value={task.id} />
+                                {status === "todo" && (
+                                  <Button type="submit" variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                                    <input type="hidden" name="status" value="doing" />
+                                    Start
+                                  </Button>
+                                )}
+                                {status === "doing" && (
+                                  <Button type="submit" variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                                    <input type="hidden" name="status" value="done" />
+                                    Complete
+                                  </Button>
+                                )}
+                                {status === "done" && (
+                                  <span className="text-xs text-emerald-400">Done</span>
+                                )}
+                              </form>
+                            </div>
+                          </div>
+                          {/* Edit/Delete — visible on hover */}
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => setEditTask(task)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                              onClick={async () => {
+                                await deleteTaskAction(task.id);
+                                toast.success("Task deleted");
+                              }}
+                            >
+                              Delete
+                            </Button>
                           </div>
                           {task.due_date && (
                             <span className="text-xs text-muted-foreground font-mono">
@@ -176,6 +220,47 @@ export function WorkspaceTasks({
           );
         })}
       </div>
+
+      {/* Edit Task Dialog */}
+      <Dialog open={!!editTask} onOpenChange={(o) => !o && setEditTask(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+          </DialogHeader>
+          {editTask && (
+            <form action={editAction} className="flex flex-col gap-4">
+              <input type="hidden" name="id" value={editTask.id} />
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-task-title">Title</Label>
+                <Input id="edit-task-title" name="title" required defaultValue={editTask.title} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-task-desc">Description</Label>
+                <Textarea id="edit-task-desc" name="description" rows={3} defaultValue={editTask.description ?? ""} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-task-pri">Priority</Label>
+                <Select name="priority" defaultValue={String(editTask.priority)}>
+                  <SelectTrigger id="edit-task-pri">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">High</SelectItem>
+                    <SelectItem value="2">Medium</SelectItem>
+                    <SelectItem value="3">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editState?.error && (
+                <p className="text-sm text-destructive">{editState.error}</p>
+              )}
+              <Button type="submit" disabled={editPending}>
+                {editPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

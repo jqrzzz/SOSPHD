@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDashboardSummary, getCaseMetricRows } from "@/lib/data/analytics";
 import { DashboardSummaryCards } from "@/components/dashboard-summary";
 import { DashboardMetricChart } from "@/components/dashboard-metric-chart";
@@ -6,6 +7,8 @@ import { getResearchPulse, suggestNextActions, detectGaps } from "@/lib/agent";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { DashboardExport } from "@/components/dashboard-export";
 
 export default async function DashboardPage() {
   const summary = getDashboardSummary();
@@ -35,13 +38,18 @@ export default async function DashboardPage() {
     <div className="flex flex-1 flex-col overflow-y-auto">
       {/* Header */}
       <header className="border-b border-border px-6 py-4">
-        <h1 className="text-lg font-semibold tracking-tight">
-          Analytics Dashboard
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          TTDC, TTGP, and TTTA across all cases. Data feeds directly into Paper
-          1 results.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">
+              Analytics Dashboard
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              TTDC, TTGP, and TTTA across all cases. Data feeds directly into Paper
+              1 results.
+            </p>
+          </div>
+          <DashboardExport rows={rows} />
+        </div>
       </header>
 
       <div className="flex flex-col gap-6 p-6">
@@ -76,6 +84,9 @@ export default async function DashboardPage() {
               <span className="text-xs text-muted-foreground">
                 corridors with field data
               </span>
+              <Button variant="link" asChild className="h-auto p-0 text-xs text-primary">
+                <Link href="/dashboard/corridors">View briefings</Link>
+              </Button>
             </CardContent>
           </Card>
 

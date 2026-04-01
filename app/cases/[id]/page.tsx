@@ -10,6 +10,7 @@ import { MetricCard } from "@/components/metric-card";
 import { SeverityBadge } from "@/components/severity-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { CaseTimeline } from "@/components/case-timeline";
+import { CaseMetricTimeline } from "@/components/case-metric-timeline";
 import { EventForm } from "@/components/event-form";
 import { RecommendationCard } from "@/components/recommendation-card";
 import { formatDate } from "@/lib/utils";
@@ -75,6 +76,16 @@ export default async function CaseDetailPage(props: {
               ))}
             </div>
           </section>
+
+          {/* Metric Timeline Visualization */}
+          {events.length >= 2 && (
+            <section aria-label="Metric timeline">
+              <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
+                Metric Timeline
+              </h2>
+              <CaseMetricTimeline events={events} metrics={metrics} />
+            </section>
+          )}
 
           {/* AI Recommendations */}
           {recommendations.length > 0 && (

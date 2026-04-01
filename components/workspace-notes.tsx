@@ -15,7 +15,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
-import { createNoteAction } from "@/lib/advisor-actions";
+import { createNoteAction, updateNoteAction, deleteNoteAction } from "@/lib/advisor-actions";
+import { toast } from "sonner";
 import type { ResearchNote } from "@/lib/data/advisor-types";
 
 export function WorkspaceNotes({
@@ -25,7 +26,24 @@ export function WorkspaceNotes({
 }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(createNoteAction, null);
+  const [editNote, setEditNote] = useState<ResearchNote | null>(null);
+  const [state, formAction, pending] = useActionState(async (prev: { error?: string; success?: boolean } | null, fd: FormData) => {
+    const result = await createNoteAction(prev, fd);
+    if (result?.success) {
+      setOpen(false);
+      toast.success("Note created");
+    }
+    return result;
+  }, null);
+
+  const [editState, editAction, editPending] = useActionState(async (prev: { error?: string; success?: boolean } | null, fd: FormData) => {
+    const result = await updateNoteAction(prev, fd);
+    if (result?.success) {
+      setEditNote(null);
+      toast.success("Note updated");
+    }
+    return result;
+  }, null);
 
   const filtered = initialNotes.filter((n) => {
     if (!search) return true;
@@ -98,7 +116,7 @@ export function WorkspaceNotes({
       ) : (
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((note) => (
-            <Card key={note.id} className="flex flex-col">
+            <Card key={note.id} className="flex flex-col group">
               <CardContent className="flex flex-1 flex-col gap-2 p-4">
                 {note.title && (
                   <h3 className="text-sm font-semibold text-foreground">
@@ -119,17 +137,67 @@ export function WorkspaceNotes({
                   <span className="text-xs text-muted-foreground font-mono">
                     {formatDate(note.created_at, "short")}
                   </span>
-                  {note.linked_case_id && (
-                    <Badge variant="outline" className="text-xs">
-                      {note.linked_case_id}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setEditNote(note)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                      onClick={async () => {
+                        await deleteNoteAction(note.id);
+                        toast.success("Note deleted");
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Edit Note Dialog */}
+      <Dialog open={!!editNote} onOpenChange={(o) => !o && setEditNote(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Note</DialogTitle>
+          </DialogHeader>
+          {editNote && (
+            <form action={editAction} className="flex flex-col gap-4">
+              <input type="hidden" name="id" value={editNote.id} />
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-note-title">Title</Label>
+                <Input id="edit-note-title" name="title" defaultValue={editNote.title ?? ""} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-note-content">Content</Label>
+                <Textarea
+                  id="edit-note-content"
+                  name="content"
+                  rows={5}
+                  required
+                  defaultValue={editNote.content}
+                />
+              </div>
+              {editState?.error && (
+                <p className="text-sm text-destructive">{editState.error}</p>
+              )}
+              <Button type="submit" disabled={editPending}>
+                {editPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -192,6 +192,32 @@ export async function createNote(data: {
   return null;
 }
 
+export async function updateNote(id: string, data: {
+  title?: string | null;
+  content?: string;
+}): Promise<ResearchNote | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_notes")
+      .update(data)
+      .eq("id", id)
+      .select()
+      .single();
+    if (!error && row) return row as ResearchNote;
+  }
+  return null;
+}
+
+export async function deleteNote(id: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("phd_notes").delete().eq("id", id);
+    return !error;
+  }
+  return false;
+}
+
 // ── Tasks ────────────────────────────────────────────────────────────
 
 export async function getTasks(filters?: {
@@ -266,6 +292,34 @@ export async function updateTaskStatus(id: string, status: TaskStatus): Promise<
     if (!error && row) return row as ResearchTask;
   }
   return null;
+}
+
+export async function updateTask(id: string, data: {
+  title?: string;
+  description?: string | null;
+  priority?: number;
+  due_date?: string | null;
+}): Promise<ResearchTask | null> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data: row, error } = await sb
+      .from("phd_tasks")
+      .update(data)
+      .eq("id", id)
+      .select()
+      .single();
+    if (!error && row) return row as ResearchTask;
+  }
+  return null;
+}
+
+export async function deleteTask(id: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("phd_tasks").delete().eq("id", id);
+    return !error;
+  }
+  return false;
 }
 
 // ── Sessions ─────────────────────────────────────────────────────────
