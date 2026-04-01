@@ -13,7 +13,7 @@ This repo shares a **Supabase database** with 5 other projects:
 
 | Project | Repo | Purpose | Table prefix/ownership |
 |---------|------|---------|----------------------|
-| SOSWEBSITE | jqrzzz/soswebsite | Public site (tourist-sos.com) | Shared core tables (profiles, etc.) |
+| SOSWEBSITE | jqrzzz/soswebsite | Public site + operational console | 39 core tables: cases, providers, payers, patients, financials, agreements, documents |
 | SOSTRAVEL | jqrzzz/sostravel | Travel health & safety tools | medical_*, health_*, emergency_*, chat_*, facilities, whatsapp_sessions |
 | SOSCOMMAND | jqrzzz/soscommand | Operations command center | cases, claims, providers, payers, partners, invoices, payments, teams, agreements, certifications |
 | SOSPRO | jqrzzz/sospro | Professional/clinic tools | clinic-related tables |
@@ -105,7 +105,8 @@ This repo shares a **Supabase database** with 5 other projects:
 - **Respect the shared database** — use `phd_` prefix, never modify other projects' tables.
 - **Read-only access to operational data** — SOSPHD can read from other projects' tables for research but never writes to them. Key data sources:
   - SOSPRO: `cases` (status pipeline, gop_status), `case_activities` (timestamped audit log), `transfers` (picked_up_at, delivered_at) — clinic/transport-level metrics
-  - SOSCOMMAND: `cases`, `case_activity_log` (full timeline), `case_transport` (actual_departure/arrival), `case_gop` (issued_at/settled_at), `claims`, `providers`, `payers` — primary operational data source for TTTA/TTGP/TTDC
+  - SOSWEBSITE: `cases`, `case_status_history` (full audit trail), `case_episodes` (treatment events with timestamps), `guarantees_of_payment`, `insurer_interactions`, `providers`, `payers`, `patients` — the 39-table core operational schema and primary data source for TTTA/TTGP/TTDC
+  - SOSCOMMAND: `cases`, `case_activity_log`, `case_transport` (actual_departure/arrival), `case_gop` (issued_at/settled_at), `claims` — extended operational data
   - SOSTRAVEL: `emergency_cases`, `facilities` — patient-facing incident data
 - **AI automation preferred** — lean into AI for categorization, analysis, guidance.
 - **Swap-for-Supabase pattern** — in-memory stores are scaffolding, function signatures match Supabase queries.
