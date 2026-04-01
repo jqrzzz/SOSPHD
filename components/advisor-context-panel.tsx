@@ -2,16 +2,83 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import type { ContextSnapshot } from "@/lib/data/advisor-types";
+
+export interface AgentInsights {
+  score: number;
+  health: string;
+  corridorCoverage: string;
+  highPriorityGaps: number;
+  totalGaps: number;
+  openTasks: number;
+  actions: Array<{ area: string; action: string; severity: string }>;
+}
 
 interface ContextPanelProps {
   context: ContextSnapshot;
+  agentInsights?: AgentInsights;
 }
 
-export function AdvisorContextPanel({ context }: ContextPanelProps) {
+export function AdvisorContextPanel({ context, agentInsights }: ContextPanelProps) {
   return (
     <ScrollArea className="h-full">
       <div className="flex flex-col gap-3 p-3">
+        {/* Agent Research Health */}
+        {agentInsights && (
+          <Card className="bg-card border-primary/20">
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-primary">
+                Research Health
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              <div className="flex items-baseline gap-2">
+                <span className={`font-mono text-2xl font-bold ${
+                  agentInsights.score >= 80 ? "text-emerald-400" :
+                  agentInsights.score >= 60 ? "text-primary" :
+                  agentInsights.score >= 40 ? "text-amber-400" : "text-red-400"
+                }`}>
+                  {agentInsights.score}
+                </span>
+                <span className="text-xs text-muted-foreground">/ 100</span>
+              </div>
+              <Progress value={agentInsights.score} className="mt-1 h-1" />
+              <div className="mt-2 flex flex-col gap-1 text-[11px] text-muted-foreground">
+                <span>Corridors: {agentInsights.corridorCoverage}</span>
+                <span>Gaps: {agentInsights.highPriorityGaps} high / {agentInsights.totalGaps} total</span>
+                <span>Open tasks: {agentInsights.openTasks}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Agent Suggested Actions */}
+        {agentInsights && agentInsights.actions.length > 0 && (
+          <Card className="bg-card border-border">
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                AI Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              <div className="flex flex-col gap-2">
+                {agentInsights.actions.slice(0, 3).map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px]">
+                    <span className={`mt-1 inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
+                      a.severity === "high" ? "bg-red-400" :
+                      a.severity === "medium" ? "bg-amber-400" : "bg-muted-foreground"
+                    }`} />
+                    <span className="leading-relaxed text-muted-foreground">{a.action}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Separator />
+
         {/* Cases overview */}
         <Card className="bg-card border-border">
           <CardHeader className="px-3 py-2">

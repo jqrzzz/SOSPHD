@@ -35,6 +35,7 @@ import {
 } from "@/lib/fieldwork-actions";
 import type { JournalEntry, JournalEntryType, Contact, FieldProtocol } from "@/lib/data/fieldwork-types";
 import { APP_CONFIG } from "@/lib/config";
+import { autoCategorize } from "@/lib/agent";
 
 /* ── Entry type config ──────────────────────────────────────────────── */
 
@@ -430,6 +431,29 @@ function NewEntryDialog({
 }) {
   const [state, formAction, isPending] = useActionState(createJournalAction, null);
   const [entryType, setEntryType] = useState<JournalEntryType>("observation");
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    suggestedType: string;
+    suggestedTags: string[];
+    suggestedCorridor: string | null;
+    detectedMetrics: string[];
+  } | null>(null);
+  const [contentRef, setContentRef] = useState("");
+
+  // Auto-categorize when content changes (debounced via onBlur)
+  async function handleContentBlur() {
+    if (contentRef.length < 20) return;
+    const result = await autoCategorize(contentRef);
+    if (result) setAiSuggestions(result);
+  }
+
+  // Apply AI suggestions
+  function applySuggestions() {
+    if (!aiSuggestions) return;
+    if (aiSuggestions.suggestedType) {
+      setEntryType(aiSuggestions.suggestedType as JournalEntryType);
+    }
+    // Tags and corridor are applied via the form refs below
+  }
 
   if (state?.success) {
     onClose();
@@ -482,8 +506,50 @@ function NewEntryDialog({
               placeholder="What did you observe, hear, or learn? Include specifics — names, numbers, processes..."
               rows={6}
               required
+              onChange={(e) => setContentRef(e.target.value)}
+              onBlur={handleContentBlur}
             />
           </div>
+
+          {/* AI Suggestions */}
+          {aiSuggestions && (aiSuggestions.suggestedTags.length > 0 || aiSuggestions.suggestedCorridor || aiSuggestions.detectedMetrics.length > 0) && (
+            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-primary">AI Suggestions</span>
+                <button
+                  type="button"
+                  onClick={applySuggestions}
+                  className="text-[10px] font-medium text-primary hover:underline"
+                >
+                  Apply type suggestion
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                {aiSuggestions.suggestedType !== entryType && (
+                  <span className="text-muted-foreground">
+                    Type: <strong className="text-foreground">{ENTRY_TYPE_LABELS[aiSuggestions.suggestedType as JournalEntryType] ?? aiSuggestions.suggestedType}</strong>
+                  </span>
+                )}
+                {aiSuggestions.suggestedCorridor && (
+                  <span className="text-muted-foreground">
+                    Corridor: <strong className="text-foreground">{aiSuggestions.suggestedCorridor}</strong>
+                  </span>
+                )}
+                {aiSuggestions.suggestedTags.length > 0 && (
+                  <span className="text-muted-foreground">
+                    Tags: {aiSuggestions.suggestedTags.map((t) => (
+                      <Badge key={t} variant="secondary" className="text-[10px] px-1 py-0 mx-0.5">{t}</Badge>
+                    ))}
+                  </span>
+                )}
+                {aiSuggestions.detectedMetrics.length > 0 && (
+                  <span className="text-muted-foreground">
+                    Metrics: {aiSuggestions.detectedMetrics.join(", ")}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">

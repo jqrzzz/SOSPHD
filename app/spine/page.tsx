@@ -10,6 +10,7 @@ import {
   getUnresolvedQuestions,
 } from "@/lib/data/phd-spine";
 import type { StepStatus } from "@/lib/data/phd-spine";
+import { suggestNextActions, getResearchPulse } from "@/lib/agent";
 
 /* ── Status helpers ───────────────────────────────────────────── */
 
@@ -35,10 +36,16 @@ const STATUS_STYLES: Record<StepStatus, { label: string; className: string }> =
 
 /* ── Page ─────────────────────────────────────────────────────── */
 
-export default function SpinePage() {
+export default async function SpinePage() {
   const overall = getOverallProgress();
   const nextStep = getNextStep();
   const unresolvedQuestions = getUnresolvedQuestions();
+
+  // Agent-powered insights
+  const [nextActions, pulse] = await Promise.all([
+    suggestNextActions(3),
+    getResearchPulse(),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -52,7 +59,7 @@ export default function SpinePage() {
 
       <div className="flex flex-col gap-6 p-6">
         {/* ── Top summary row ────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           {/* Overall progress */}
           <Card>
             <CardContent className="flex flex-col gap-2 p-4">
@@ -106,7 +113,58 @@ export default function SpinePage() {
               </span>
             </CardContent>
           </Card>
+
+          {/* Research health */}
+          <Card>
+            <CardContent className="flex flex-col gap-2 p-4">
+              <span className="text-xs font-medium text-muted-foreground">
+                Research Health
+              </span>
+              <span className={`font-mono text-2xl font-semibold tabular-nums tracking-tight ${
+                pulse.score >= 80 ? "text-emerald-400" :
+                pulse.score >= 60 ? "text-primary" :
+                pulse.score >= 40 ? "text-amber-400" : "text-red-400"
+              }`}>
+                {pulse.score}
+              </span>
+              <Progress value={pulse.score} className="h-1.5" />
+              <span className="text-xs text-muted-foreground">
+                {pulse.corridorCoverage} corridors · {pulse.highPriorityGaps} gaps
+              </span>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* ── AI Suggested Actions ───────────────────────────── */}
+        {nextActions.length > 0 && (
+          <Card className="border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-medium text-primary">AI Agent</span>
+                <span className="text-xs text-muted-foreground">— What to do next</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {nextActions.map((action, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 rounded-md border border-border/50 px-3 py-2"
+                  >
+                    <span className={`mt-1 inline-block h-2 w-2 rounded-full shrink-0 ${
+                      action.severity === "high" ? "bg-red-400" :
+                      action.severity === "medium" ? "bg-amber-400" : "bg-muted-foreground"
+                    }`} />
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm text-foreground">{action.action}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                        {action.area}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── Phases ─────────────────────────────────────────── */}
         <div className="flex flex-col gap-4">

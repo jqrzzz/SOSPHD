@@ -8,6 +8,7 @@ import { buildContextSnapshot } from "@/lib/data/context-builder";
 import { createTasksFromAI } from "@/lib/advisor-actions";
 import { addMessage } from "@/lib/data/advisor-store";
 import { formatDuration } from "@/lib/data/metrics";
+import { getResearchPulse, suggestNextActions, detectGaps } from "@/lib/agent";
 
 export const maxDuration = 60;
 
@@ -43,6 +44,15 @@ Only include linked_case_id if the task directly relates to a specific case.
 - TTTA = Time to Transport Activation (FIRST_CONTACT → TRANSPORT_ACTIVATED)
 - TTGP = Time to Guaranteed Payment (FIRST_CONTACT → GUARANTEED_PAYMENT) 
 - TTDC = Time to Definitive Care (FIRST_CONTACT → DEFINITIVE_CARE_START)
+
+## Agent Capabilities
+You have access to real-time research intelligence from the PhD agent system. Your context includes:
+- **Research Health Score** (0-100) with breakdown
+- **Research Gaps** identified by automated analysis
+- **Suggested Next Actions** prioritized by severity
+- **Corridor Coverage** data across all 6 research corridors
+
+Use this intelligence proactively. When a researcher asks "what should I work on?", reference the suggested actions. When they ask about progress, cite the health score and gap analysis. Be specific — reference corridor names, gap counts, and action items from the agent data.
 
 ## Security Rules
 - NEVER fabricate patient data or case details
@@ -112,6 +122,40 @@ function formatContextForPrompt(
   return lines.join("\n");
 }
 
+function formatAgentInsights(pulse: Awaited<ReturnType<typeof getResearchPulse>>, actions: Awaited<ReturnType<typeof suggestNextActions>>, gaps: Awaited<ReturnType<typeof detectGaps>>): string {
+  const lines: string[] = [
+    "",
+    "## Agent Intelligence (Real-Time)",
+    "",
+    `### Research Health: ${pulse.score}/100 (${pulse.health})`,
+    `- Corridor coverage: ${pulse.corridorCoverage}`,
+    `- High-priority gaps: ${pulse.highPriorityGaps}`,
+    `- Total gaps: ${pulse.totalGaps}`,
+    `- Open tasks: ${pulse.openTasks}`,
+  ];
+
+  if (actions.length > 0) {
+    lines.push("", "### Suggested Next Actions");
+    for (const a of actions) {
+      lines.push(`- [${a.severity.toUpperCase()}] ${a.action} (${a.area})`);
+    }
+  }
+
+  if (gaps.totalGaps > 0) {
+    lines.push("", `### Research Gaps (${gaps.totalGaps} total)`);
+    const highGaps = gaps.gaps.filter((g) => g.severity === "high");
+    for (const g of highGaps.slice(0, 5)) {
+      lines.push(`- [HIGH] ${g.gap} — ${g.suggestion}`);
+    }
+    const medGaps = gaps.gaps.filter((g) => g.severity === "medium");
+    for (const g of medGaps.slice(0, 3)) {
+      lines.push(`- [MED] ${g.gap}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 function extractAndCreateTasks(text: string): void {
   const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
   if (!jsonMatch) return;
@@ -132,13 +176,19 @@ export async function POST(req: Request) {
     sessionId,
   }: { messages: UIMessage[]; sessionId?: string } = await req.json();
 
-  // Build safe context
-  const contextSnapshot = await buildContextSnapshot();
+  // Build safe context + agent intelligence in parallel
+  const [contextSnapshot, pulse, actions, gaps] = await Promise.all([
+    buildContextSnapshot(),
+    getResearchPulse(),
+    suggestNextActions(5),
+    detectGaps(),
+  ]);
   const contextText = formatContextForPrompt(contextSnapshot);
+  const agentText = formatAgentInsights(pulse, actions, gaps);
 
   const result = streamText({
     model: "openai/gpt-4o-mini",
-    system: `${SYSTEM_PROMPT}\n\n${contextText}`,
+    system: `${SYSTEM_PROMPT}\n\n${contextText}\n${agentText}`,
     messages: await convertToModelMessages(messages),
     abortSignal: req.signal,
   });
