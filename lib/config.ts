@@ -16,7 +16,7 @@ export const APP_CONFIG = {
     name: "SOS PHD",
     version: "0.2",
     description: "Research Automation for Tourist SOS",
-    themeColor: "#0D1017",
+    themeColor: "#0A1018",
   },
 
   /** Supabase project (matches .env.local) */

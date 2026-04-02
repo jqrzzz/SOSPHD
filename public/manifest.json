@@ -4,8 +4,8 @@
   "description": "PhD research automation for Tourist SOS — track phases, fieldwork, and measure emergency response metrics.",
   "start_url": "/spine",
   "display": "standalone",
-  "background_color": "#0D1017",
-  "theme_color": "#0D1017",
+  "background_color": "#0A1018",
+  "theme_color": "#0A1018",
   "orientation": "any",
   "icons": [
     {
