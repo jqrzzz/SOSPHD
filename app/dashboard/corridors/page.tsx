@@ -27,7 +27,7 @@ export default async function CorridorsPage() {
         </p>
       </header>
 
-      <div className="flex flex-col gap-4 p-6">
+      <div className="flex flex-col gap-4 p-3 sm:p-6">
         {/* Coverage overview */}
         <div className="flex items-center gap-4">
           <Progress
@@ -40,7 +40,7 @@ export default async function CorridorsPage() {
         </div>
 
         {/* Corridor cards */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {corridors.map((corridor) => (
             <Card
               key={corridor.id}

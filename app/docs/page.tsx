@@ -69,7 +69,7 @@ export default async function DocsPage(props: {
       />
 
       {/* Table */}
-      <div className="flex-1 overflow-auto px-6 pb-6">
+      <div className="flex-1 overflow-auto px-3 pb-6 sm:px-6">
         {docs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <p className="text-sm text-muted-foreground">
@@ -77,14 +77,15 @@ export default async function DocsPage(props: {
             </p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
-                <TableHead className="w-28">Folder</TableHead>
+                <TableHead className="w-28 hidden sm:table-cell">Folder</TableHead>
                 <TableHead className="w-28">Status</TableHead>
-                <TableHead className="w-44">Tags</TableHead>
-                <TableHead className="w-36">Updated</TableHead>
+                <TableHead className="w-44 hidden md:table-cell">Tags</TableHead>
+                <TableHead className="w-36 hidden sm:table-cell">Updated</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -98,7 +99,7 @@ export default async function DocsPage(props: {
                       {d.title}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">
                     {d.folder}
                   </TableCell>
                   <TableCell>
@@ -115,7 +116,7 @@ export default async function DocsPage(props: {
                       {d.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {d.tags.slice(0, 3).map((tag) => (
                         <Badge
@@ -133,13 +134,14 @@ export default async function DocsPage(props: {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground font-tabular">
+                  <TableCell className="font-mono text-xs text-muted-foreground font-tabular hidden sm:table-cell">
                     {formatDate(d.updated_at, "datetime")}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </div>
     </div>

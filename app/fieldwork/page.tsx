@@ -112,7 +112,7 @@ export default function FieldworkPage() {
   return (
     <div className="flex flex-1 flex-col overflow-auto">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
+      <header className="flex flex-col gap-2 border-b border-border px-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Field Journal</h1>
           <p className="text-sm text-muted-foreground">
@@ -137,7 +137,7 @@ export default function FieldworkPage() {
 
       <div className="flex flex-1 gap-0 overflow-hidden">
         {/* Main content */}
-        <div className="flex flex-1 flex-col overflow-auto p-6">
+        <div className="flex flex-1 flex-col overflow-auto p-3 sm:p-6">
           {/* Filters */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Input

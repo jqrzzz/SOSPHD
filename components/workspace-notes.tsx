@@ -114,7 +114,7 @@ export function WorkspaceNotes({
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((note) => (
             <Card key={note.id} className="flex flex-col group">
               <CardContent className="flex flex-1 flex-col gap-2 p-4">

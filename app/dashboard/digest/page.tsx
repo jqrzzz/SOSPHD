@@ -51,7 +51,7 @@ export default async function WeeklyDigestPage() {
         </p>
       </header>
 
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex flex-col gap-6 p-3 sm:p-6">
         {/* Activity summary */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard
@@ -212,7 +212,7 @@ function StatCard({
           {label}
         </span>
         <span
-          className={`font-mono text-2xl font-semibold tabular-nums ${color ?? "text-foreground"}`}
+          className={`font-mono text-xl sm:text-2xl font-semibold tabular-nums ${color ?? "text-foreground"}`}
         >
           {value}
         </span>

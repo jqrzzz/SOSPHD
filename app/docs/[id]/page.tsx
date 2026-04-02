@@ -51,12 +51,12 @@ export default async function DocDetailPage(props: {
       </div>
 
       {/* Two-column layout: editor + sidebar */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Main editor */}
         <DocEditor doc={doc} />
 
         {/* Right sidebar: AI tools + versions */}
-        <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-auto border-l border-border bg-card/50 p-4">
+        <aside className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-t border-border bg-card/50 p-4 lg:w-72 lg:border-l lg:border-t-0">
           <DocAITools docId={doc.id} />
           <DocVersions docId={doc.id} versions={versions} />
         </aside>

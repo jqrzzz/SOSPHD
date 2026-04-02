@@ -104,7 +104,7 @@ export default function ContactsPage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
+      <header className="flex items-center justify-between border-b border-border px-3 py-4 sm:px-6">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Research Network</h1>
           <p className="text-sm text-muted-foreground">
@@ -244,7 +244,7 @@ function ContactDetail({
       </div>
 
       {/* Contact info */}
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {contact.email && (
           <InfoField label="Email" value={contact.email} />
         )}

@@ -52,9 +52,9 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex flex-col gap-6 p-3 sm:p-6">
         {/* ── AI Research Pulse ──────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="flex flex-col gap-2 p-4">
               <span className="text-xs font-medium text-muted-foreground">

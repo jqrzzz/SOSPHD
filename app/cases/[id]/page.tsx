@@ -33,8 +33,8 @@ export default async function CaseDetailPage(props: {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <header className="flex flex-col gap-3 border-b border-border px-6 py-4">
-        <div className="flex items-center gap-4">
+      <header className="flex flex-col gap-3 border-b border-border px-3 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <Link
             href="/cases"
             className="text-sm text-muted-foreground hover:text-foreground"
@@ -42,8 +42,8 @@ export default async function CaseDetailPage(props: {
           >
             &larr; Cases
           </Link>
-          <Separator orientation="vertical" className="h-4" />
-          <h1 className="font-mono text-lg font-semibold tracking-tight">
+          <Separator orientation="vertical" className="hidden h-4 sm:block" />
+          <h1 className="font-mono text-base font-semibold tracking-tight sm:text-lg">
             {caseData.patient_ref}
           </h1>
           <SeverityBadge severity={caseData.severity} />
@@ -64,7 +64,7 @@ export default async function CaseDetailPage(props: {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-auto">
-        <div className="flex flex-col gap-8 p-6">
+        <div className="flex flex-col gap-8 p-3 sm:p-6">
           {/* Metric cards */}
           <section aria-label="Key metrics">
             <h2 className="mb-3 text-sm font-semibold text-muted-foreground">

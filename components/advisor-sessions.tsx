@@ -28,7 +28,7 @@ export function AdvisorSessionsList({
   }
 
   return (
-    <div className="flex h-full w-48 flex-col border-r border-border bg-sidebar">
+    <div className="hidden h-full w-48 flex-col border-r border-border bg-sidebar sm:flex">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Sessions
