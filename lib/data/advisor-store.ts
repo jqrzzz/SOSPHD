@@ -1,7 +1,9 @@
-/* ─── In-Memory Advisor Store ──────────────────────────────────────────
- *  Same pattern as store.ts — swap for Supabase client calls later.
+/* ─── Supabase-Backed Advisor Store ───────────────────────────────────
+ *  Reads/writes from research.notes, research.tasks,
+ *  research.advisor_sessions, research.advisor_messages.
  * ────────────────────────────────────────────────────────────────────── */
 
+import { createClient } from "@/lib/supabase/server";
 import type {
   ResearchNote,
   ResearchTask,
@@ -11,279 +13,205 @@ import type {
   AdvisorRole,
 } from "./advisor-types";
 
-// ── Seed data ────────────────────────────────────────────────────────
+// ── Notes ───────────────────────────────────────────────────────────
 
-const DEMO_USER_ID = "user_demo";
+export async function getNotes(limit = 10): Promise<ResearchNote[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("notes")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
-const seedNotes: ResearchNote[] = [
-  {
-    id: "note_001",
-    created_at: "2026-02-08T10:00:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: "site_001",
-    title: "TTGP delay pattern observed",
-    content:
-      "Cases 004 shows a 22-hour payment delay caused by insurer dispute over diving exclusion. This is a strong candidate for the TTGP paper — need to check if other scuba cases show similar delays.",
-    tags: ["ttgp", "payment-delay", "scuba"],
-    linked_case_id: "case_004",
-  },
-  {
-    id: "note_002",
-    created_at: "2026-02-09T14:30:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: "site_001",
-    title: "Stepped-wedge rollout plan",
-    content:
-      "Need to draft the rollout schedule for site onboarding. First 3 sites in Q2, next 5 in Q3. Each site activation = a new step in the wedge.",
-    tags: ["methodology", "rollout"],
-    linked_case_id: null,
-  },
-  {
-    id: "note_003",
-    created_at: "2026-02-10T09:15:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: null,
-    title: "IRB submission draft",
-    content:
-      "Ethics review submitted to university board. Expected response in 4-6 weeks. De-identification protocol documented.",
-    tags: ["irb", "ethics"],
-    linked_case_id: null,
-  },
-  {
-    id: "note_004",
-    created_at: "2026-02-11T16:00:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: "site_001",
-    title: null,
-    content: "Helicopter dispatch in case_001 was accepted by operator — first clean provenance chain recorded.",
-    tags: ["provenance"],
-    linked_case_id: "case_001",
-  },
-  {
-    id: "note_005",
-    created_at: "2026-02-12T08:00:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: null,
-    title: "Paper 1 outline",
-    content:
-      "Title: Measuring TTDC and TTGP in Tourist Medical Emergencies. Structure: Intro, Definitions, Measurement Framework, Data Collection Protocol, Preliminary Results.",
-    tags: ["paper-1", "writing"],
-    linked_case_id: null,
-  },
-];
-
-const seedTasks: ResearchTask[] = [
-  {
-    id: "task_001",
-    created_at: "2026-02-08T10:30:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: null,
-    status: "doing",
-    priority: 1,
-    due_date: "2026-02-20",
-    title: "Complete Paper 1 methods section",
-    description: "Draft the data collection protocol and TTDC/TTGP computation methodology for the measurement framework paper.",
-    linked_case_id: null,
-  },
-  {
-    id: "task_002",
-    created_at: "2026-02-09T15:00:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: null,
-    status: "todo",
-    priority: 1,
-    due_date: "2026-02-28",
-    title: "Prepare IRB amendment for multi-site data",
-    description: "Extend existing IRB approval to cover data from additional sites in the stepped-wedge rollout.",
-    linked_case_id: null,
-  },
-  {
-    id: "task_003",
-    created_at: "2026-02-10T11:00:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: "site_001",
-    status: "todo",
-    priority: 2,
-    due_date: null,
-    title: "Analyze payment delay patterns in diving cases",
-    description: "Pull all cases tagged with diving/scuba activities and compute TTGP distributions. Look for insurer-specific patterns.",
-    linked_case_id: "case_004",
-  },
-  {
-    id: "task_004",
-    created_at: "2026-02-11T09:00:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: null,
-    status: "todo",
-    priority: 2,
-    due_date: "2026-03-15",
-    title: "Draft site onboarding checklist",
-    description: "Create a standardized checklist for onboarding new sites into the stepped-wedge trial.",
-    linked_case_id: null,
-  },
-  {
-    id: "task_005",
-    created_at: "2026-02-12T07:00:00Z",
-    user_id: DEMO_USER_ID,
-    site_id: "site_001",
-    status: "todo",
-    priority: 3,
-    due_date: null,
-    title: "Review provenance completeness for case_002",
-    description: "Case 002 is missing GUARANTEED_PAYMENT and DEFINITIVE_CARE_START events. Follow up with operator.",
-    linked_case_id: "case_002",
-  },
-];
-
-const seedSessions: AdvisorSession[] = [
-  {
-    id: "session_001",
-    created_at: "2026-02-10T10:00:00Z",
-    user_id: DEMO_USER_ID,
-    title: "Paper 1 Planning",
-  },
-];
-
-const seedMessages: AdvisorMessage[] = [];
-
-// ── Mutable store ────────────────────────────────────────────────────
-
-const notes = [...seedNotes];
-const tasks = [...seedTasks];
-const sessions = [...seedSessions];
-const messages = [...seedMessages];
-
-let nextNoteNum = 6;
-let nextTaskNum = 6;
-let nextSessionNum = 2;
-let nextMessageNum = 1;
-
-// ── Notes ────────────────────────────────────────────────────────────
-
-export function getNotes(limit = 10): ResearchNote[] {
-  return [...notes]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, limit);
+  if (error || !data) return [];
+  return data as ResearchNote[];
 }
 
-export function createNote(data: {
+export async function createNote(data: {
   title?: string | null;
   content: string;
   tags?: string[];
   linked_case_id?: string | null;
-}): ResearchNote {
-  const note: ResearchNote = {
-    id: `note_${String(nextNoteNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    user_id: DEMO_USER_ID,
-    site_id: "site_001",
-    title: data.title ?? null,
-    content: data.content,
-    tags: data.tags ?? [],
-    linked_case_id: data.linked_case_id ?? null,
-  };
-  notes.push(note);
-  return note;
-}
+}): Promise<ResearchNote> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-// ── Tasks ────────────────────────────────────────────────────────────
+  const { data: note, error } = await supabase
+    .schema("research")
+    .from("notes")
+    .insert({
+      user_id: user?.id ?? "00000000-0000-0000-0000-000000000000",
+      title: data.title ?? null,
+      content: data.content,
+      tags: data.tags ?? [],
+      linked_case_id: data.linked_case_id ?? null,
+    })
+    .select()
+    .single();
 
-export function getTasks(filters?: {
-  status?: TaskStatus;
-  limit?: number;
-}): ResearchTask[] {
-  let result = [...tasks];
-
-  if (filters?.status) {
-    result = result.filter((t) => t.status === filters.status);
+  if (error || !note) {
+    throw new Error(`Failed to create note: ${error?.message}`);
   }
 
-  // Sort by priority (asc), then created_at (desc)
-  result.sort((a, b) => {
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  return result.slice(0, filters?.limit ?? 50);
+  return note as ResearchNote;
 }
 
-export function createTask(data: {
+// ── Tasks ───────────────────────────────────────────────────────────
+
+export async function getTasks(filters?: {
+  status?: TaskStatus;
+  limit?: number;
+}): Promise<ResearchTask[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .schema("research")
+    .from("tasks")
+    .select("*")
+    .order("priority", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(filters?.limit ?? 50);
+
+  if (filters?.status) {
+    query = query.eq("status", filters.status);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data as ResearchTask[];
+}
+
+export async function createTask(data: {
   title: string;
   description?: string | null;
   priority?: number;
   due_date?: string | null;
   linked_case_id?: string | null;
-}): ResearchTask {
-  const task: ResearchTask = {
-    id: `task_${String(nextTaskNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    user_id: DEMO_USER_ID,
-    site_id: null,
-    status: "todo",
-    priority: data.priority ?? 2,
-    due_date: data.due_date ?? null,
-    title: data.title,
-    description: data.description ?? null,
-    linked_case_id: data.linked_case_id ?? null,
-  };
-  tasks.push(task);
-  return task;
+}): Promise<ResearchTask> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: task, error } = await supabase
+    .schema("research")
+    .from("tasks")
+    .insert({
+      user_id: user?.id ?? "00000000-0000-0000-0000-000000000000",
+      title: data.title,
+      description: data.description ?? null,
+      priority: data.priority ?? 2,
+      due_date: data.due_date ?? null,
+      status: "todo",
+      linked_case_id: data.linked_case_id ?? null,
+    })
+    .select()
+    .single();
+
+  if (error || !task) {
+    throw new Error(`Failed to create task: ${error?.message}`);
+  }
+
+  return task as ResearchTask;
 }
 
-export function updateTaskStatus(id: string, status: TaskStatus): ResearchTask | null {
-  const task = tasks.find((t) => t.id === id);
-  if (!task) return null;
-  task.status = status;
-  return task;
+export async function updateTaskStatus(id: string, status: TaskStatus): Promise<ResearchTask | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("tasks")
+    .update({ status })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error || !data) return null;
+  return data as ResearchTask;
 }
 
-// ── Sessions ─────────────────────────────────────────────────────────
+// ── Sessions ────────────────────────────────────────────────────────
 
-export function getSessions(): AdvisorSession[] {
-  return [...sessions].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+export async function getSessions(): Promise<AdvisorSession[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("advisor_sessions")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+  return data as AdvisorSession[];
 }
 
-export function createSession(title?: string): AdvisorSession {
-  const session: AdvisorSession = {
-    id: `session_${String(nextSessionNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    user_id: DEMO_USER_ID,
-    title: title ?? "New Session",
-  };
-  sessions.push(session);
-  return session;
+export async function createSession(title?: string): Promise<AdvisorSession> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: session, error } = await supabase
+    .schema("research")
+    .from("advisor_sessions")
+    .insert({
+      user_id: user?.id ?? "00000000-0000-0000-0000-000000000000",
+      title: title ?? "New Session",
+    })
+    .select()
+    .single();
+
+  if (error || !session) {
+    throw new Error(`Failed to create session: ${error?.message}`);
+  }
+
+  return session as AdvisorSession;
 }
 
-export function getSessionById(id: string): AdvisorSession | undefined {
-  return sessions.find((s) => s.id === id);
+export async function getSessionById(id: string): Promise<AdvisorSession | undefined> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("advisor_sessions")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return undefined;
+  return data as AdvisorSession;
 }
 
-// ── Messages ─────────────────────────────────────────────────────────
+// ── Messages ────────────────────────────────────────────────────────
 
-export function getMessagesBySessionId(sessionId: string): AdvisorMessage[] {
-  return messages
-    .filter((m) => m.session_id === sessionId)
-    .sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-    );
+export async function getMessagesBySessionId(sessionId: string): Promise<AdvisorMessage[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("advisor_messages")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+  return data as AdvisorMessage[];
 }
 
-export function addMessage(data: {
+export async function addMessage(data: {
   session_id: string;
   role: AdvisorRole;
   content: string;
   context_snapshot?: Record<string, unknown> | null;
-}): AdvisorMessage {
-  const msg: AdvisorMessage = {
-    id: `msg_${String(nextMessageNum++).padStart(3, "0")}`,
-    created_at: new Date().toISOString(),
-    session_id: data.session_id,
-    role: data.role,
-    content: data.content,
-    context_snapshot: data.context_snapshot ?? null,
-  };
-  messages.push(msg);
-  return msg;
+}): Promise<AdvisorMessage> {
+  const supabase = await createClient();
+  const { data: msg, error } = await supabase
+    .schema("research")
+    .from("advisor_messages")
+    .insert({
+      session_id: data.session_id,
+      role: data.role,
+      content: data.content,
+      context_snapshot: data.context_snapshot ?? null,
+    })
+    .select()
+    .single();
+
+  if (error || !msg) {
+    throw new Error(`Failed to add message: ${error?.message}`);
+  }
+
+  return msg as AdvisorMessage;
 }

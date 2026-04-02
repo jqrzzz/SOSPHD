@@ -120,7 +120,7 @@ export async function POST(req: Request) {
   }
 
   const { section, custom_instructions } = parsed.data;
-  const paperCtx = buildPaperContext();
+  const paperCtx = await buildPaperContext();
 
   const dataContext = `
 ## Data Context (use these numbers in the paper)

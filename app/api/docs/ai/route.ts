@@ -77,7 +77,7 @@ export async function POST(req: Request) {
 
   const { doc_id, mode, selection_text } = parsed.data;
 
-  const doc = getDocById(doc_id);
+  const doc = await getDocById(doc_id);
   if (!doc) {
     return Response.json({ error: "Document not found" }, { status: 404 });
   }
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
       try {
         const taskData = JSON.parse(jsonMatch[1]);
         if (taskData.tasks && Array.isArray(taskData.tasks)) {
-          const createdTasks = taskData.tasks.map(
+          const createdTasks = await Promise.all(taskData.tasks.map(
             (t: { title: string; description?: string; priority?: number }) =>
               createTask({
                 title: t.title,
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
                 priority: t.priority ?? 2,
                 linked_case_id: doc.linked_case_id ?? null,
               }),
-          );
+          ));
           return Response.json({
             mode,
             tasks_created: createdTasks.length,

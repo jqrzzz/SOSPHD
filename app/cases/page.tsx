@@ -26,10 +26,15 @@ export default async function CasesPage(props: {
     | undefined;
   const searchQuery = searchParams.q;
 
-  const cases = getCases({
+  const cases = await getCases({
     status: statusFilter,
     search: searchQuery,
   });
+
+  const eventCounts = await Promise.all(
+    cases.map((c) => getEventCountByCaseId(c.id)),
+  );
+  const eventCountMap = new Map(cases.map((c, i) => [c.id, eventCounts[i]]));
 
   return (
     <div className="flex flex-1 flex-col">
@@ -76,7 +81,7 @@ export default async function CasesPage(props: {
             </TableHeader>
             <TableBody>
               {cases.map((c) => {
-                const eventCount = getEventCountByCaseId(c.id);
+                const eventCount = eventCountMap.get(c.id) ?? 0;
                 return (
                   <TableRow key={c.id} className="group">
                     <TableCell>

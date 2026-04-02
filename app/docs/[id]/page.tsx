@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getDocById, getVersionsByDocId } from "@/lib/data/docs-store";
+import { getCases } from "@/lib/data/store";
 import { DocEditor } from "@/components/doc-editor";
 import { DocAITools } from "@/components/doc-ai-tools";
 import { DocVersions } from "@/components/doc-versions";
@@ -9,13 +10,16 @@ export default async function DocDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {
   const params = await props.params;
-  const doc = getDocById(params.id);
+  const doc = await getDocById(params.id);
 
   if (!doc) {
     notFound();
   }
 
-  const versions = getVersionsByDocId(doc.id);
+  const [versions, cases] = await Promise.all([
+    getVersionsByDocId(doc.id),
+    getCases(),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -38,7 +42,7 @@ export default async function DocDetailPage(props: {
       {/* Two-column layout: editor + sidebar */}
       <div className="flex flex-1 overflow-hidden">
         {/* Main editor */}
-        <DocEditor doc={doc} />
+        <DocEditor doc={doc} cases={cases} />
 
         {/* Right sidebar: AI tools + versions */}
         <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-auto border-l border-border bg-card/50 p-4">

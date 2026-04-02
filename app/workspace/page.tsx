@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function WorkspacePage() {
-  const notes = getNotes(50);
-  const tasks = getTasks({ limit: 50 });
-  const uploads = getUploads();
-  const mindMaps = getMindMaps();
+  const notes = await getNotes(50);
+  const tasks = await getTasks({ limit: 50 });
+  const uploads = await getUploads();
+  const mindMaps = await getMindMaps();
 
   return (
     <div className="flex flex-1 flex-col overflow-auto">

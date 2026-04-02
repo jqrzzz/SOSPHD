@@ -4,8 +4,8 @@ import { DashboardMetricChart } from "@/components/dashboard-metric-chart";
 import { DashboardCaseTable } from "@/components/dashboard-case-table";
 
 export default async function DashboardPage() {
-  const summary = getDashboardSummary();
-  const rows = getCaseMetricRows();
+  const summary = await getDashboardSummary();
+  const rows = await getCaseMetricRows();
 
   return (
     <div className="flex flex-col gap-6 overflow-y-auto p-6">
