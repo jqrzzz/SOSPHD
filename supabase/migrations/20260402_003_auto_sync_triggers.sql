@@ -147,24 +147,24 @@ BEGIN
      AND NEW.status = 'in_progress' THEN
 
     -- Hospitalization/surgery/emergency -> FACILITY_ARRIVAL
-    IF NEW.type IN ('hospitalization', 'surgery', 'emergency_visit') THEN
+    IF NEW.episode_type IN ('hospitalization', 'surgery', 'emergency_visit') THEN
       PERFORM research.upsert_case_event(
         NEW.case_id,
         'FACILITY_ARRIVAL',
-        COALESCE(NEW.actual_start, now()),
+        COALESCE(NEW.start_date, now()),
         'system',
-        'Auto-synced: episode ' || NEW.type || ' started'
+        'Auto-synced: episode ' || NEW.episode_type || ' started'
       );
     END IF;
 
     -- Transport -> TRANSPORT_ACTIVATED
-    IF NEW.type IN ('transport_ground', 'transport_air', 'repatriation') THEN
+    IF NEW.episode_type IN ('transport_ground', 'transport_air', 'repatriation') THEN
       PERFORM research.upsert_case_event(
-        NEW.id,  -- use case_id from episode
+        NEW.case_id,
         'TRANSPORT_ACTIVATED',
-        COALESCE(NEW.actual_start, now()),
+        COALESCE(NEW.start_date, now()),
         'system',
-        'Auto-synced: transport episode ' || NEW.type || ' started'
+        'Auto-synced: transport episode ' || NEW.episode_type || ' started'
       );
     END IF;
 
