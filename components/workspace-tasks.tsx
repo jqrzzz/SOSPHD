@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,8 +44,26 @@ export function WorkspaceTasks({
   initialTasks: ResearchTask[];
 }) {
   const [open, setOpen] = useState(false);
-  const [createState, createAction, createPending] = useActionState(createTaskAction, null);
-  const [, statusAction] = useActionState(updateTaskStatusAction, null);
+  const router = useRouter();
+  const [createState, createAction, createPending] = useActionState(
+    async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
+      const result = await createTaskAction(prev, formData);
+      if (result?.success) {
+        setOpen(false);
+        router.refresh();
+      }
+      return result;
+    },
+    null,
+  );
+  const [, statusAction] = useActionState(
+    async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
+      const result = await updateTaskStatusAction(prev, formData);
+      if (result?.success) router.refresh();
+      return result;
+    },
+    null,
+  );
 
   return (
     <div className="flex flex-col gap-4">

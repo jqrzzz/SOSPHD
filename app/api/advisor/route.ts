@@ -127,6 +127,13 @@ async function extractAndCreateTasks(text: string): Promise<void> {
 }
 
 export async function POST(req: Request) {
+  if (!process.env.OPENAI_API_KEY) {
+    return Response.json(
+      { error: "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file." },
+      { status: 503 },
+    );
+  }
+
   const {
     messages,
     sessionId,

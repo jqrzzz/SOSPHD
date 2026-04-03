@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,7 +74,19 @@ export function WorkspaceUploads({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(createUploadAction, null);
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(
+    async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
+      const result = await createUploadAction(prev, formData);
+      if (result?.success) {
+        setOpen(false);
+        setSelectedFile(null);
+        router.refresh();
+      }
+      return result;
+    },
+    null,
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -208,8 +221,11 @@ export function WorkspaceUploads({
               {state?.error && (
                 <p className="text-sm text-destructive" role="alert">{state.error}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Saves file metadata for reference tracking. File content is not uploaded.
+              </p>
               <Button type="submit" disabled={pending || !selectedFile}>
-                {pending ? "Uploading..." : "Save Upload"}
+                {pending ? "Saving..." : "Save Reference"}
               </Button>
             </form>
           </DialogContent>

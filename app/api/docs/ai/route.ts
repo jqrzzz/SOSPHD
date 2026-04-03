@@ -65,6 +65,13 @@ Keep it under 500 words. Use clear, persuasive academic prose. Output in Markdow
 };
 
 export async function POST(req: Request) {
+  if (!process.env.OPENAI_API_KEY) {
+    return Response.json(
+      { error: "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file." },
+      { status: 503 },
+    );
+  }
+
   const body = await req.json();
   const parsed = requestSchema.safeParse(body);
 

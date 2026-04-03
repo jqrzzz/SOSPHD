@@ -191,7 +191,7 @@ export function PaperBuilder({ totalCases, closedCases }: PaperBuilderProps) {
               <div className="flex justify-between">
                 <span>Status</span>
                 <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                  In-memory
+                  Live
                 </Badge>
               </div>
             </div>
