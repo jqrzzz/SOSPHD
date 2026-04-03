@@ -25,6 +25,7 @@ import {
 import { createTaskAction, updateTaskStatusAction } from "@/lib/advisor-actions";
 import type { ResearchTask, TaskStatus } from "@/lib/data/advisor-types";
 import { cn, formatDate } from "@/lib/utils";
+import { toast } from "sonner";
 
 const STATUS_COLUMNS: { status: TaskStatus; label: string }[] = [
   { status: "todo", label: "To Do" },
@@ -50,6 +51,7 @@ export function WorkspaceTasks({
       const result = await createTaskAction(prev, formData);
       if (result?.success) {
         setOpen(false);
+        toast.success("Task created");
         router.refresh();
       }
       return result;
@@ -59,7 +61,10 @@ export function WorkspaceTasks({
   const [, statusAction] = useActionState(
     async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
       const result = await updateTaskStatusAction(prev, formData);
-      if (result?.success) router.refresh();
+      if (result?.success) {
+        toast.success("Task updated");
+        router.refresh();
+      }
       return result;
     },
     null,

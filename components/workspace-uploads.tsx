@@ -33,6 +33,7 @@ import {
 import { createUploadAction, deleteUploadAction } from "@/lib/workspace-actions";
 import type { Upload, UploadCategory } from "@/lib/data/workspace-types";
 import { cn, formatDate } from "@/lib/utils";
+import { toast } from "sonner";
 
 const CATEGORY_ICONS: Record<UploadCategory, string> = {
   transcript: "TXT",
@@ -81,6 +82,7 @@ export function WorkspaceUploads({
       if (result?.success) {
         setOpen(false);
         setSelectedFile(null);
+        toast.success("File reference saved");
         router.refresh();
       }
       return result;
@@ -292,16 +294,20 @@ export function WorkspaceUploads({
                     {formatDate(upload.created_at, "short")}
                   </TableCell>
                   <TableCell>
-                    <form action={() => deleteUploadAction(upload.id)}>
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                      >
-                        Delete
-                      </Button>
-                    </form>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (window.confirm(`Delete "${upload.filename}"?`)) {
+                          deleteUploadAction(upload.id);
+                          toast.success("File reference deleted");
+                          router.refresh();
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

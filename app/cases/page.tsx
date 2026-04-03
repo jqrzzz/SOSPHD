@@ -62,10 +62,25 @@ export default async function CasesPage(props: {
       {/* Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
         {cases.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">
-              No cases match your filters.
-            </p>
+          <div className="flex flex-col items-center justify-center gap-4 py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary">
+              <span className="text-2xl text-muted-foreground">+</span>
+            </div>
+            <div className="flex flex-col items-center gap-1 text-center">
+              <p className="text-sm font-medium text-foreground">
+                {statusFilter || searchQuery ? "No cases match your filters" : "No cases yet"}
+              </p>
+              <p className="max-w-xs text-xs text-muted-foreground">
+                {statusFilter || searchQuery
+                  ? "Try adjusting your search or status filter."
+                  : "Create your first case to start tracking provenance events and computing TTDC/TTGP metrics."}
+              </p>
+            </div>
+            {!statusFilter && !searchQuery && (
+              <Button asChild size="sm">
+                <Link href="/cases/new">Create First Case</Link>
+              </Button>
+            )}
           </div>
         ) : (
           <Table>

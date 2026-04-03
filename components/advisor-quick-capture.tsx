@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { createNoteAction, createTaskAction } from "@/lib/advisor-actions";
+import { toast } from "sonner";
 
 export function QuickCaptureNote() {
   const [open, setOpen] = useState(false);
@@ -30,6 +31,7 @@ export function QuickCaptureNote() {
       const result = await createNoteAction(prev, formData);
       if (result?.success) {
         setOpen(false);
+        toast.success("Note saved");
         router.refresh();
       }
       return result;
@@ -107,6 +109,7 @@ export function QuickCaptureTask() {
       const result = await createTaskAction(prev, formData);
       if (result?.success) {
         setOpen(false);
+        toast.success("Task created");
         router.refresh();
       }
       return result;

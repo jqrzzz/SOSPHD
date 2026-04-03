@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
 function getNowLocalISO(): string {
   const now = new Date();
@@ -30,6 +31,7 @@ export function EventForm({ caseId }: { caseId: string }) {
   useEffect(() => {
     if (state?.success) {
       formRef.current?.reset();
+      toast.success("Event added to timeline");
     }
   }, [state]);
 

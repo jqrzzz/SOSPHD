@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
 import { createNoteAction } from "@/lib/advisor-actions";
+import { toast } from "sonner";
 import type { ResearchNote } from "@/lib/data/advisor-types";
 
 export function WorkspaceNotes({
@@ -32,6 +33,7 @@ export function WorkspaceNotes({
       const result = await createNoteAction(prev, formData);
       if (result?.success) {
         setOpen(false);
+        toast.success("Note saved");
         router.refresh();
       }
       return result;
