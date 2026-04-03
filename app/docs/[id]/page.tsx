@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDocById, getVersionsByDocId } from "@/lib/data/docs-store";
 import { getCases } from "@/lib/data/store";
@@ -23,11 +24,15 @@ export default async function DocDetailPage(props: {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* No-PHI banner */}
-      <div
-        className="flex items-center gap-2 border-b border-[hsl(142_71%_45%)]/20 bg-[hsl(142_71%_45%)]/5 px-4 py-1.5"
-        role="status"
-      >
+      {/* Header with back link + NO-PHI banner */}
+      <div className="flex items-center gap-3 border-b border-[hsl(142_71%_45%)]/20 bg-[hsl(142_71%_45%)]/5 px-4 py-1.5">
+        <Link
+          href="/docs"
+          className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+          aria-label="Back to documents"
+        >
+          &larr; Docs
+        </Link>
         <span className="text-[11px] leading-tight text-[hsl(142_71%_45%)]">
           Document workspace -- no PHI stored or processed. Safe for research writing.
         </span>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { createDocAction } from "@/lib/docs-actions";
 import { Button } from "@/components/ui/button";
@@ -176,9 +177,14 @@ export function DocCreateForm() {
         />
       </div>
 
-      <Button type="submit" disabled={isPending} className="self-end">
-        {isPending ? "Creating..." : "Create Document"}
-      </Button>
+      <div className="flex justify-end gap-3">
+        <Button variant="outline" asChild>
+          <Link href="/docs">Cancel</Link>
+        </Button>
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Creating..." : "Create Document"}
+        </Button>
+      </div>
     </form>
   );
 }
