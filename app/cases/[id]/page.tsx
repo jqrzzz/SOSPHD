@@ -19,15 +19,15 @@ export default async function CaseDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {
   const params = await props.params;
-  const caseData = getCaseById(params.id);
+  const caseData = await getCaseById(params.id);
 
   if (!caseData) {
     notFound();
   }
 
-  const events = getEventsByCaseId(params.id);
+  const events = await getEventsByCaseId(params.id);
   const metrics = computeAllMetrics(events);
-  const recommendations = getRecommendationsByCaseId(params.id);
+  const recommendations = await getRecommendationsByCaseId(params.id);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

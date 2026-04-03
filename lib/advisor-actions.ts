@@ -46,7 +46,7 @@ export async function createNoteAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  createNote({
+  await createNote({
     title: parsed.data.title || null,
     content: parsed.data.content,
     linked_case_id: parsed.data.linked_case_id || null,
@@ -72,7 +72,7 @@ export async function createTaskAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  createTask({
+  await createTask({
     title: parsed.data.title,
     description: parsed.data.description || null,
     priority: parsed.data.priority,
@@ -84,7 +84,7 @@ export async function createTaskAction(
 }
 
 export async function createSessionAction(): Promise<{ id: string }> {
-  const session = createSession();
+  const session = await createSession();
   revalidatePath("/advisor");
   return { id: session.id };
 }
@@ -103,7 +103,7 @@ export async function updateTaskStatusAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const result = updateTaskStatus(parsed.data.id, parsed.data.status);
+  const result = await updateTaskStatus(parsed.data.id, parsed.data.status);
   if (!result) {
     return { error: "Task not found" };
   }
@@ -122,7 +122,7 @@ export async function createTasksFromAI(
   }>,
 ) {
   for (const t of taskList) {
-    createTask({
+    await createTask({
       title: t.title,
       description: t.description ?? null,
       priority: t.priority ?? 2,

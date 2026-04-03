@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
+  { href: "/guide", label: "How to Use", icon: HelpCircleIcon },
   { href: "/cases", label: "Cases", icon: ClipboardIcon },
   { href: "/dashboard", label: "Dashboard", icon: ChartIcon },
   { href: "/docs", label: "Docs", icon: FileTextIcon },
@@ -19,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -26,6 +28,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setUserEmail(user?.email ?? null);
     });
   }, []);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -37,8 +44,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
+      {/* Mobile header */}
+      <div className="fixed inset-x-0 top-0 z-40 flex h-12 items-center gap-3 border-b border-border bg-background px-4 md:hidden">
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-secondary"
+          aria-label="Toggle menu"
+        >
+          <MenuIcon className="h-5 w-5" />
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
+            <span className="text-[10px] font-bold text-primary-foreground">R</span>
+          </div>
+          <span className="text-sm font-semibold text-foreground">ResearchOS</span>
+        </div>
+      </div>
+
+      {/* Backdrop (mobile) */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="flex w-56 flex-col border-r border-border bg-sidebar">
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-56 flex-col border-r border-border bg-sidebar transition-transform duration-200 md:static md:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
         <div className="flex h-14 items-center gap-2 border-b border-border px-4">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
             <span className="text-xs font-bold text-primary-foreground">R</span>
@@ -92,12 +130,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex flex-1 flex-col overflow-hidden">{children}</main>
+      <main className="flex flex-1 flex-col overflow-hidden pt-12 md:pt-0">{children}</main>
     </div>
   );
 }
 
 /* ── Inline icons ──── */
+
+function MenuIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <line x1="4" x2="20" y1="12" y2="12" />
+      <line x1="4" x2="20" y1="6" y2="6" />
+      <line x1="4" x2="20" y1="18" y2="18" />
+    </svg>
+  );
+}
 
 function FileTextIcon({ className }: { className?: string }) {
   return (
@@ -151,6 +199,16 @@ function FolderIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
       <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+    </svg>
+  );
+}
+
+function HelpCircleIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
     </svg>
   );
 }

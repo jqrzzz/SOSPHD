@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ import {
 import { createUploadAction, deleteUploadAction } from "@/lib/workspace-actions";
 import type { Upload, UploadCategory } from "@/lib/data/workspace-types";
 import { cn, formatDate } from "@/lib/utils";
+import { toast } from "sonner";
 
 const CATEGORY_ICONS: Record<UploadCategory, string> = {
   transcript: "TXT",
@@ -73,7 +75,20 @@ export function WorkspaceUploads({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(createUploadAction, null);
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(
+    async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
+      const result = await createUploadAction(prev, formData);
+      if (result?.success) {
+        setOpen(false);
+        setSelectedFile(null);
+        toast.success("File reference saved");
+        router.refresh();
+      }
+      return result;
+    },
+    null,
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -208,8 +223,11 @@ export function WorkspaceUploads({
               {state?.error && (
                 <p className="text-sm text-destructive" role="alert">{state.error}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Saves file metadata for reference tracking. File content is not uploaded.
+              </p>
               <Button type="submit" disabled={pending || !selectedFile}>
-                {pending ? "Uploading..." : "Save Upload"}
+                {pending ? "Saving..." : "Save Reference"}
               </Button>
             </form>
           </DialogContent>
@@ -276,16 +294,20 @@ export function WorkspaceUploads({
                     {formatDate(upload.created_at, "short")}
                   </TableCell>
                   <TableCell>
-                    <form action={() => deleteUploadAction(upload.id)}>
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                      >
-                        Delete
-                      </Button>
-                    </form>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (window.confirm(`Delete "${upload.filename}"?`)) {
+                          deleteUploadAction(upload.id);
+                          toast.success("File reference deleted");
+                          router.refresh();
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

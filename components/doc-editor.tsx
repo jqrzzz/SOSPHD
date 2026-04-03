@@ -15,13 +15,13 @@ import {
 } from "@/components/ui/select";
 import { DOC_FOLDERS } from "@/lib/data/docs-types";
 import type { Doc } from "@/lib/data/docs-types";
-import { getCases } from "@/lib/data/store";
+import type { Case } from "@/lib/data/types";
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 const DEBOUNCE_MS = 1500;
 
-export function DocEditor({ doc }: { doc: Doc }) {
+export function DocEditor({ doc, cases }: { doc: Doc; cases: Case[] }) {
   const [title, setTitle] = useState(doc.title);
   const [content, setContent] = useState(doc.content_md);
   const [folder, setFolder] = useState(doc.folder);
@@ -30,7 +30,6 @@ export function DocEditor({ doc }: { doc: Doc }) {
   const [isSaving, startSaving] = useTransition();
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cases = getCases();
 
   // Sync if doc prop changes (e.g., after version restore)
   useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
 import { createNoteAction } from "@/lib/advisor-actions";
+import { toast } from "sonner";
 import type { ResearchNote } from "@/lib/data/advisor-types";
 
 export function WorkspaceNotes({
@@ -25,7 +27,19 @@ export function WorkspaceNotes({
 }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(createNoteAction, null);
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(
+    async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
+      const result = await createNoteAction(prev, formData);
+      if (result?.success) {
+        setOpen(false);
+        toast.success("Note saved");
+        router.refresh();
+      }
+      return result;
+    },
+    null,
+  );
 
   const filtered = initialNotes.filter((n) => {
     if (!search) return true;

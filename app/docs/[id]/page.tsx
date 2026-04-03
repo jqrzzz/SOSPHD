@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDocById, getVersionsByDocId } from "@/lib/data/docs-store";
+import { getCases } from "@/lib/data/store";
 import { DocEditor } from "@/components/doc-editor";
 import { DocAITools } from "@/components/doc-ai-tools";
 import { DocVersions } from "@/components/doc-versions";
@@ -9,21 +11,28 @@ export default async function DocDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {
   const params = await props.params;
-  const doc = getDocById(params.id);
+  const doc = await getDocById(params.id);
 
   if (!doc) {
     notFound();
   }
 
-  const versions = getVersionsByDocId(doc.id);
+  const [versions, cases] = await Promise.all([
+    getVersionsByDocId(doc.id),
+    getCases(),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* No-PHI banner */}
-      <div
-        className="flex items-center gap-2 border-b border-[hsl(142_71%_45%)]/20 bg-[hsl(142_71%_45%)]/5 px-4 py-1.5"
-        role="status"
-      >
+      {/* Header with back link + NO-PHI banner */}
+      <div className="flex items-center gap-3 border-b border-[hsl(142_71%_45%)]/20 bg-[hsl(142_71%_45%)]/5 px-4 py-1.5">
+        <Link
+          href="/docs"
+          className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+          aria-label="Back to documents"
+        >
+          &larr; Docs
+        </Link>
         <span className="text-[11px] leading-tight text-[hsl(142_71%_45%)]">
           Document workspace -- no PHI stored or processed. Safe for research writing.
         </span>
@@ -38,7 +47,7 @@ export default async function DocDetailPage(props: {
       {/* Two-column layout: editor + sidebar */}
       <div className="flex flex-1 overflow-hidden">
         {/* Main editor */}
-        <DocEditor doc={doc} />
+        <DocEditor doc={doc} cases={cases} />
 
         {/* Right sidebar: AI tools + versions */}
         <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-auto border-l border-border bg-card/50 p-4">

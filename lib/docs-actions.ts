@@ -61,7 +61,7 @@ export async function createDocAction(
         .filter(Boolean)
     : [];
 
-  const doc = createDoc({
+  const doc = await createDoc({
     title: parsed.data.title,
     folder: parsed.data.folder,
     tags,
@@ -94,7 +94,7 @@ export async function updateDocAction(data: {
     updates.linked_case_id = parsed.data.linked_case_id || null;
   }
 
-  const result = updateDoc(parsed.data.id, updates);
+  const result = await updateDoc(parsed.data.id, updates);
   if (!result) {
     return { error: "Document not found" };
   }
@@ -118,12 +118,12 @@ export async function saveVersionAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const doc = getDocById(parsed.data.doc_id);
+  const doc = await getDocById(parsed.data.doc_id);
   if (!doc) {
     return { error: "Document not found" };
   }
 
-  createVersion({
+  await createVersion({
     doc_id: parsed.data.doc_id,
     content_md: doc.content_md,
     note: parsed.data.note || null,
@@ -138,16 +138,16 @@ export async function restoreVersionAction(data: {
   version_content: string;
 }): Promise<{ error?: string; success?: boolean }> {
   // Save current state as a version before restoring
-  const doc = getDocById(data.doc_id);
+  const doc = await getDocById(data.doc_id);
   if (!doc) return { error: "Document not found" };
 
-  createVersion({
+  await createVersion({
     doc_id: data.doc_id,
     content_md: doc.content_md,
     note: "Auto-saved before version restore",
   });
 
-  const result = updateDoc(data.doc_id, { content_md: data.version_content });
+  const result = await updateDoc(data.doc_id, { content_md: data.version_content });
   if (!result) return { error: "Failed to restore version" };
 
   revalidatePath(`/docs/${data.doc_id}`);
