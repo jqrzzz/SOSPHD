@@ -4,14 +4,17 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { APP_CONFIG } from "@/lib/config";
 import { useEffect, useState } from "react";
+import { CommandPalette } from "@/components/command-palette";
+import { QuickCaptureNote, QuickCaptureTask } from "@/components/advisor-quick-capture";
 
 const NAV_ITEMS = [
-  { href: "/guide", label: "How to Use", icon: HelpCircleIcon },
+
   { href: "/cases", label: "Cases", icon: ClipboardIcon },
-  { href: "/dashboard", label: "Dashboard", icon: ChartIcon },
   { href: "/docs", label: "Docs", icon: FileTextIcon },
   { href: "/workspace", label: "Workspace", icon: FolderIcon },
+  { href: "/dashboard", label: "Dashboard", icon: ChartIcon },
   { href: "/advisor", label: "Advisor", icon: BrainIcon },
 ] as const;
 
@@ -19,17 +22,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserEmail(user?.email ?? null);
+      setUserEmail(user?.email ?? APP_CONFIG.owner.email);
+      setUserName(
+        user?.user_metadata?.full_name ?? APP_CONFIG.owner.name,
+      );
     });
   }, []);
 
-  // Close sidebar on route change (mobile)
+
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
@@ -44,29 +51,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      {/* Mobile header */}
-      <div className="fixed inset-x-0 top-0 z-40 flex h-12 items-center gap-3 border-b border-border bg-background px-4 md:hidden">
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-secondary"
-          aria-label="Toggle menu"
-        >
-          <MenuIcon className="h-5 w-5" />
-        </button>
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
-            <span className="text-[10px] font-bold text-primary-foreground">R</span>
-          </div>
-          <span className="text-sm font-semibold text-foreground">ResearchOS</span>
-        </div>
-      </div>
 
-      {/* Backdrop (mobile) */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
+
         />
       )}
 
@@ -79,10 +69,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className="flex h-14 items-center gap-2 border-b border-border px-4">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-            <span className="text-xs font-bold text-primary-foreground">R</span>
+            <span className="text-xs font-bold text-primary-foreground">S</span>
           </div>
           <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
-            ResearchOS
+            SOS PHD
           </span>
         </div>
 
@@ -111,9 +101,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex flex-col gap-2 border-t border-border p-3">
           {userEmail && (
-            <p className="truncate text-xs text-muted-foreground" title={userEmail}>
-              {userEmail}
-            </p>
+            <div className="flex flex-col gap-0.5">
+              {userName && (
+                <p className="truncate text-xs font-medium text-sidebar-foreground/80" title={userName}>
+                  {userName}
+                </p>
+              )}
+              <p className="truncate text-xs text-muted-foreground" title={userEmail}>
+                {userEmail}
+              </p>
+            </div>
           )}
           <button
             onClick={handleSignOut}
@@ -124,25 +121,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {isSigningOut ? "Signing out..." : "Sign Out"}
           </button>
           <p className="text-xs text-muted-foreground/60">
-            Decision Provenance v0.1
+            {APP_CONFIG.app.name} v{APP_CONFIG.app.version}
           </p>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="flex flex-1 flex-col overflow-hidden pt-12 md:pt-0">{children}</main>
+
     </div>
   );
 }
 
 /* ── Inline icons ──── */
 
-function MenuIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <line x1="4" x2="20" y1="12" y2="12" />
-      <line x1="4" x2="20" y1="6" y2="6" />
-      <line x1="4" x2="20" y1="18" y2="18" />
+
     </svg>
   );
 }
@@ -203,12 +195,7 @@ function FolderIcon({ className }: { className?: string }) {
   );
 }
 
-function HelpCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-      <path d="M12 17h.01" />
+
     </svg>
   );
 }

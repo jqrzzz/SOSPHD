@@ -1,4 +1,5 @@
 import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buildPaperContext } from "@/lib/data/analytics";
 
@@ -156,8 +157,15 @@ ${paperCtx.rows
     ? `${dataContext}\n\n## Additional Instructions\n${custom_instructions}`
     : dataContext;
 
+  if (!process.env.OPENAI_API_KEY) {
+    return Response.json(
+      { error: "OPENAI_API_KEY not configured. Add it to .env.local to enable paper generation." },
+      { status: 503 },
+    );
+  }
+
   const result = await generateText({
-    model: "openai/gpt-4o-mini",
+    model: openai("gpt-4o-mini"),
     system: systemPrompt,
     prompt: userPrompt,
     abortSignal: req.signal,

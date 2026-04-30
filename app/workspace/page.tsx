@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { QuickLinks } from "@/components/quick-links";
 
 export default async function WorkspacePage() {
   const notes = await getNotes(50);
@@ -27,7 +28,10 @@ export default async function WorkspacePage() {
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="flex flex-1 flex-col gap-6 p-3 sm:p-6">
+        {/* Quick Links */}
+        <QuickLinks />
+
         {/* Mind Maps quick access */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">

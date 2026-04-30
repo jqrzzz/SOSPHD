@@ -5,22 +5,24 @@ export default async function PaperBuilderPage() {
   const summary = await getDashboardSummary();
 
   return (
-    <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-balance text-xl font-semibold tracking-tight text-foreground">
+    <div className="flex flex-1 flex-col overflow-y-auto">
+      {/* Header */}
+      <header className="border-b border-border px-6 py-4">
+        <h1 className="text-lg font-semibold tracking-tight">
           Paper Builder
         </h1>
         <p className="text-sm text-muted-foreground">
           Generate academic paper sections from live provenance data. Each
           section uses computed TTDC, TTGP, and TTTA metrics.
         </p>
-      </div>
+      </header>
 
+      <div className="p-6">
       <PaperBuilder
         totalCases={summary.total_cases}
         closedCases={summary.closed_cases}
       />
+      </div>
     </div>
   );
 }

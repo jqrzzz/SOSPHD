@@ -1,10 +1,25 @@
 import { getSessions } from "@/lib/data/advisor-store";
 import { buildContextSnapshot } from "@/lib/data/context-builder";
 import { AdvisorPageClient } from "@/components/advisor-page-client";
+import { getResearchPulse, suggestNextActions } from "@/lib/agent";
 
-export default async function AdvisorPage() {
-  const sessions = await getSessions();
-  const context = await buildContextSnapshot();
+export default async function AdvisorPage() 
 
-  return <AdvisorPageClient sessions={sessions} context={context} />;
+  const agentInsights = {
+    score: pulse.score,
+    health: pulse.health,
+    corridorCoverage: pulse.corridorCoverage,
+    highPriorityGaps: pulse.highPriorityGaps,
+    totalGaps: pulse.totalGaps,
+    openTasks: pulse.openTasks,
+    actions,
+  };
+
+  return (
+    <AdvisorPageClient
+      sessions={sessions}
+      context={context}
+      agentInsights={agentInsights}
+    />
+  );
 }

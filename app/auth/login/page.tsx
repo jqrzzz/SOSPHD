@@ -34,7 +34,7 @@ export default function LoginPage() {
         password,
       });
       if (error) throw error;
-      router.push("/cases");
+      router.push("/spine");
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -50,7 +50,7 @@ export default function LoginPage() {
           <CardHeader>
             <CardTitle className="text-2xl text-foreground">Sign In</CardTitle>
             <CardDescription>
-              Enter your email and password to access ResearchOS
+              Enter your email and password to access SOS PHD
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -60,7 +60,7 @@ export default async function CasesPage(props: {
       </Suspense>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto px-6 pb-6">
+      <div className="flex-1 overflow-auto px-3 pb-6 sm:px-6">
         {cases.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-4 py-16">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary">
@@ -83,15 +83,16 @@ export default async function CasesPage(props: {
             )}
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-36">Patient Ref</TableHead>
-                <TableHead className="w-28">Severity</TableHead>
+                <TableHead className="w-28 hidden sm:table-cell">Severity</TableHead>
                 <TableHead>Chief Complaint</TableHead>
                 <TableHead className="w-24">Status</TableHead>
-                <TableHead className="w-36">Created</TableHead>
-                <TableHead className="w-20 text-right">Events</TableHead>
+                <TableHead className="w-36 hidden md:table-cell">Created</TableHead>
+                <TableHead className="w-20 text-right hidden sm:table-cell">Events</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -107,19 +108,19 @@ export default async function CasesPage(props: {
                         {c.patient_ref}
                       </Link>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <SeverityBadge severity={c.severity} />
                     </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
                       {c.chief_complaint}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={c.status} />
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground font-tabular">
+                    <TableCell className="font-mono text-xs text-muted-foreground font-tabular hidden md:table-cell">
                       {formatDate(c.created_at, "datetime")}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm font-tabular">
+                    <TableCell className="text-right font-mono text-sm font-tabular hidden sm:table-cell">
                       {eventCount}
                     </TableCell>
                   </TableRow>
@@ -127,6 +128,7 @@ export default async function CasesPage(props: {
               })}
             </TableBody>
           </Table>
+          </div>
         )}
       </div>
     </div>

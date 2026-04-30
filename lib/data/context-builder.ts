@@ -27,7 +27,7 @@ async function getMissingMilestones(caseId: string): Promise<string[]> {
 }
 
 export async function buildContextSnapshot(): Promise<ContextSnapshot> {
-  const allCases = await getCases();
+  const allCases = getCases();
 
   const recentCases = allCases.slice(0, 10).map((c) => ({
     id: c.id,
@@ -69,14 +69,17 @@ export async function buildContextSnapshot(): Promise<ContextSnapshot> {
     }
   }
 
-  const topTasks = (await getTasks({ limit: 5 })).map((t) => ({
+  // Tasks and notes
+  const topTasksRaw = await getTasks({ limit: 5 });
+  const topTasks = topTasksRaw.map((t) => ({
     id: t.id,
     title: t.title,
     status: t.status,
     priority: t.priority,
   }));
 
-  const recentNotes = (await getNotes(5)).map((n) => ({
+  const recentNotesRaw = await getNotes(5);
+  const recentNotes = recentNotesRaw.map((n) => ({
     id: n.id,
     title: n.title,
     content: n.content.slice(0, 200),

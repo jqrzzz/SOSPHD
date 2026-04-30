@@ -17,22 +17,7 @@ export default async function DocDetailPage(props: {
     notFound();
   }
 
-  const [versions, cases] = await Promise.all([
-    getVersionsByDocId(doc.id),
-    getCases(),
-  ]);
 
-  return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Header with back link + NO-PHI banner */}
-      <div className="flex items-center gap-3 border-b border-[hsl(142_71%_45%)]/20 bg-[hsl(142_71%_45%)]/5 px-4 py-1.5">
-        <Link
-          href="/docs"
-          className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
-          aria-label="Back to documents"
-        >
-          &larr; Docs
-        </Link>
         <span className="text-[11px] leading-tight text-[hsl(142_71%_45%)]">
           Document workspace -- no PHI stored or processed. Safe for research writing.
         </span>
@@ -45,12 +30,12 @@ export default async function DocDetailPage(props: {
       </div>
 
       {/* Two-column layout: editor + sidebar */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Main editor */}
         <DocEditor doc={doc} cases={cases} />
 
         {/* Right sidebar: AI tools + versions */}
-        <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-auto border-l border-border bg-card/50 p-4">
+        <aside className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-t border-border bg-card/50 p-4 lg:w-72 lg:border-l lg:border-t-0">
           <DocAITools docId={doc.id} />
           <DocVersions docId={doc.id} versions={versions} />
         </aside>

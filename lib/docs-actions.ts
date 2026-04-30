@@ -69,7 +69,7 @@ export async function createDocAction(
     linked_case_id: parsed.data.linked_case_id || null,
   });
 
-  redirect(`/docs/${doc.id}`);
+  redirect(`/docs/${doc?.id}`);
 }
 
 export async function updateDocAction(data: {

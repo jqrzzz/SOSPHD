@@ -7,6 +7,10 @@ import {
   createTask,
   createSession,
   updateTaskStatus,
+  updateNote,
+  deleteNote,
+  updateTask,
+  deleteTask,
 } from "@/lib/data/advisor-store";
 
 // ── Schemas ──────────────────────────────────────────────────────────
@@ -86,7 +90,7 @@ export async function createTaskAction(
 export async function createSessionAction(): Promise<{ id: string }> {
   const session = await createSession();
   revalidatePath("/advisor");
-  return { id: session.id };
+  return { id: session?.id ?? "" };
 }
 
 export async function updateTaskStatusAction(
@@ -109,6 +113,60 @@ export async function updateTaskStatusAction(
   }
 
   revalidatePath("/advisor");
+  return { success: true };
+}
+
+// ── Note update/delete ──────────────────────────────────────────────
+
+export async function updateNoteAction(
+  _prevState: { error?: string; success?: boolean } | null,
+  formData: FormData,
+) {
+  const id = formData.get("id") as string;
+  if (!id) return { error: "Missing note ID" };
+
+  const title = (formData.get("title") as string) || null;
+  const content = formData.get("content") as string;
+  if (!content) return { error: "Content is required" };
+
+  const result = await updateNote(id, { title, content });
+  if (!result) return { error: "Note not found" };
+
+  revalidatePath("/workspace");
+  return { success: true };
+}
+
+export async function deleteNoteAction(id: string) {
+  await deleteNote(id);
+  revalidatePath("/workspace");
+  return { success: true };
+}
+
+// ── Task update/delete ──────────────────────────────────────────────
+
+export async function updateTaskAction(
+  _prevState: { error?: string; success?: boolean } | null,
+  formData: FormData,
+) {
+  const id = formData.get("id") as string;
+  if (!id) return { error: "Missing task ID" };
+
+  const title = formData.get("title") as string;
+  if (!title) return { error: "Title is required" };
+
+  const description = (formData.get("description") as string) || null;
+  const priority = parseInt(formData.get("priority") as string) || 2;
+
+  const result = await updateTask(id, { title, description, priority });
+  if (!result) return { error: "Task not found" };
+
+  revalidatePath("/workspace");
+  return { success: true };
+}
+
+export async function deleteTaskAction(id: string) {
+  await deleteTask(id);
+  revalidatePath("/workspace");
   return { success: true };
 }
 

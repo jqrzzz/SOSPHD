@@ -1,4 +1,5 @@
 import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { getDocById, updateDoc } from "@/lib/data/docs-store";
 import { createTask } from "@/lib/data/advisor-store";
@@ -100,8 +101,15 @@ export async function POST(req: Request) {
 
   const systemPrompt = MODE_PROMPTS[mode];
 
+  if (!process.env.OPENAI_API_KEY) {
+    return Response.json(
+      { error: "OPENAI_API_KEY not configured. Add it to .env.local to enable AI features." },
+      { status: 503 },
+    );
+  }
+
   const result = await generateText({
-    model: "openai/gpt-4o-mini",
+    model: openai("gpt-4o-mini"),
     system: systemPrompt,
     prompt: `Document title: "${doc.title}"\n\nContent:\n${contentToProcess}`,
     abortSignal: req.signal,
@@ -116,15 +124,7 @@ export async function POST(req: Request) {
       try {
         const taskData = JSON.parse(jsonMatch[1]);
         if (taskData.tasks && Array.isArray(taskData.tasks)) {
-          const createdTasks = await Promise.all(taskData.tasks.map(
-            (t: { title: string; description?: string; priority?: number }) =>
-              createTask({
-                title: t.title,
-                description: t.description ?? null,
-                priority: t.priority ?? 2,
-                linked_case_id: doc.linked_case_id ?? null,
-              }),
-          ));
+
           return Response.json({
             mode,
             tasks_created: createdTasks.length,

@@ -10,15 +10,18 @@ import {
   QuickCaptureTask,
 } from "@/components/advisor-quick-capture";
 import type { AdvisorSession, ContextSnapshot } from "@/lib/data/advisor-types";
+import type { AgentInsights } from "@/components/advisor-context-panel";
 
 interface AdvisorPageClientProps {
   sessions: AdvisorSession[];
   context: ContextSnapshot;
+  agentInsights?: AgentInsights;
 }
 
 export function AdvisorPageClient({
   sessions,
   context,
+  agentInsights,
 }: AdvisorPageClientProps) {
   const [activeSessionId, setActiveSessionId] = useState<string>(
     sessions[0]?.id ?? "",
@@ -63,7 +66,7 @@ export function AdvisorPageClient({
 
         {/* Right: Context panel */}
         <div className="hidden w-64 border-l border-border lg:block">
-          <AdvisorContextPanel context={context} />
+          <AdvisorContextPanel context={context} agentInsights={agentInsights} />
         </div>
       </div>
     </div>

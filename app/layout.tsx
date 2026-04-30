@@ -1,23 +1,26 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
-})
-
 export const metadata: Metadata = {
-  title: 'ResearchOS - Decision Provenance for Tourist SOS',
+  title: 'SOS PHD | Research Automation for Tourist SOS',
   description:
-    'Audit-grade incident timeline and case management with provenance tracking for publishable research.',
+    'PhD research automation — track phases, generate papers, and measure TTDC/TTGP/TTTA from Tourist SOS operational data.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'SOS PHD',
+  },
+  icons: [
+    { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+  ],
 }
 
 export const viewport: Viewport = {
-  themeColor: '#111318',
+  themeColor: '#0A1018',
 }
 
 export default function RootLayout({
@@ -28,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className="font-sans antialiased"
       >
         {children}
         <Toaster />

@@ -8,17 +8,17 @@ export default function LandingPage() {
         {/* Logo */}
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">R</span>
+            <span className="text-lg font-bold text-primary-foreground">S</span>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            ResearchOS
+            SOS PHD
           </h1>
         </div>
 
         {/* Tagline */}
         <p className="text-balance text-muted-foreground leading-relaxed">
-          Decision provenance for tourist SOS. Track cases, measure TTDC and
-          TTGP, and turn operational data into publishable research.
+          PhD research automation for Tourist SOS. Track phases, generate
+          papers, and measure TTDC/TTGP/TTTA from operational data.
         </p>
 
         {/* Auth buttons */}

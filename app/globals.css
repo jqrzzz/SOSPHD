@@ -4,40 +4,56 @@
 
 @layer base {
   :root {
-    /* Dark-first: operational command center aesthetic */
-    --background: 240 6% 7%;
+    /* ── SOS PHD Design System ─────────────────────────────
+     *  Brand: Tourist SOS teal — hsl(170 50% 38%)
+     *  Dark mode: blue-tinted backgrounds — hsl(220 20% 6%)
+     * ──────────────────────────────────────────────────────── */
+
+    /* Backgrounds — blue-tinted dark */
+    --background: 220 20% 6%;
     --foreground: 210 20% 95%;
-    --card: 240 5% 10%;
+    --card: 220 16% 9%;
     --card-foreground: 210 20% 95%;
-    --popover: 240 5% 10%;
+    --popover: 220 16% 9%;
     --popover-foreground: 210 20% 95%;
-    --primary: 213 94% 56%;
+
+    /* Brand teal */
+    --primary: 170 50% 38%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 16%;
+
+    /* Neutral surfaces */
+    --secondary: 220 12% 14%;
     --secondary-foreground: 210 20% 90%;
-    --muted: 240 4% 16%;
+    --muted: 220 12% 14%;
     --muted-foreground: 215 14% 55%;
-    --accent: 240 4% 16%;
+    --accent: 220 12% 14%;
     --accent-foreground: 210 20% 95%;
+
+    /* System */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 4% 18%;
-    --input: 240 4% 18%;
-    --ring: 213 94% 56%;
-    --chart-1: 213 94% 56%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --border: 220 12% 16%;
+    --input: 220 12% 16%;
+    --ring: 170 50% 38%;
+
+    /* Charts */
+    --chart-1: 170 50% 38%;
+    --chart-2: 38 92% 50%;
+    --chart-3: 280 65% 60%;
+    --chart-4: 340 75% 55%;
+    --chart-5: 213 94% 56%;
+
     --radius: 0.5rem;
-    --sidebar-background: 240 6% 6%;
+
+    /* Sidebar */
+    --sidebar-background: 220 20% 5%;
     --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 213 94% 56%;
+    --sidebar-primary: 170 50% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 4% 14%;
+    --sidebar-accent: 220 12% 12%;
     --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 240 4% 18%;
-    --sidebar-ring: 213 94% 56%;
+    --sidebar-border: 220 12% 16%;
+    --sidebar-ring: 170 50% 38%;
 
     /* Semantic status colors */
     --status-open: 213 94% 56%;

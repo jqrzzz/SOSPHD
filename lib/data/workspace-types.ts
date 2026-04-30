@@ -29,6 +29,14 @@ export interface Upload {
 
 // ── Mind Maps ────────────────────────────────────────────────────────
 
+export type MindMapNodeType =
+  | "idea"
+  | "paper"
+  | "data"
+  | "method"
+  | "question"
+  | "milestone";
+
 export interface MindMapNode {
   id: string;
   x: number;
@@ -36,12 +44,14 @@ export interface MindMapNode {
   label: string;
   color: string; // hex
   radius: number;
+  nodeType?: MindMapNodeType;
 }
 
 export interface MindMapEdge {
   id: string;
   from: string; // node id
   to: string; // node id
+  label?: string;
 }
 
 export interface MindMap {

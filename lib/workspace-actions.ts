@@ -88,7 +88,7 @@ export async function deleteUploadAction(id: string) {
 export async function createMindMapAction(title: string) {
   const mm = await createMindMap(title || "Untitled Map");
   revalidatePath("/workspace");
-  return { id: mm.id };
+  return { id: mm?.id ?? "" };
 }
 
 export async function saveMindMapAction(
