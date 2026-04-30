@@ -298,11 +298,14 @@ export function WorkspaceUploads({
                       variant="ghost"
                       size="sm"
                       className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        if (window.confirm(`Delete "${upload.filename}"?`)) {
-                          deleteUploadAction(upload.id);
+                      onClick={async () => {
+                        if (!window.confirm(`Delete "${upload.filename}"?`)) return;
+                        try {
+                          await deleteUploadAction(upload.id);
                           toast.success("File reference deleted");
                           router.refresh();
+                        } catch {
+                          toast.error("Failed to delete file");
                         }
                       }}
                     >

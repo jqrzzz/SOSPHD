@@ -29,7 +29,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);

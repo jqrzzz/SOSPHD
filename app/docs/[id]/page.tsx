@@ -24,7 +24,6 @@ export default async function DocDetailPage(props: {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Header with back link + NO-PHI banner */}
       <div className="flex items-center gap-3 border-b border-[hsl(142_71%_45%)]/20 bg-[hsl(142_71%_45%)]/5 px-4 py-1.5">
         <Link
           href="/docs"

@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import { z } from "zod";
 import { getDocById, updateDoc } from "@/lib/data/docs-store";
 import { createTask } from "@/lib/data/advisor-store";
+import { requireOpenAIKey } from "@/lib/utils";
 
 export const maxDuration = 60;
 
@@ -65,12 +66,8 @@ Keep it under 500 words. Use clear, persuasive academic prose. Output in Markdow
 };
 
 export async function POST(req: Request) {
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json(
-      { error: "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file." },
-      { status: 503 },
-    );
-  }
+  const guard = requireOpenAIKey();
+  if (guard) return guard;
 
   const body = await req.json();
   const parsed = requestSchema.safeParse(body);

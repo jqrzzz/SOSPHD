@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getDocs, getAllTags } from "@/lib/data/docs-store";
 import { DocListFilters } from "@/components/doc-list-filters";
+import { EmptyState } from "@/components/empty-state";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,29 +69,25 @@ export default async function DocsPage(props: {
         availableTags={allTags}
       />
 
-      {/* Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
         {docs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-16">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary">
-              <span className="text-2xl text-muted-foreground">+</span>
-            </div>
-            <div className="flex flex-col items-center gap-1 text-center">
-              <p className="text-sm font-medium text-foreground">
-                {folderFilter || searchQuery || tagFilter ? "No documents match your filters" : "No documents yet"}
-              </p>
-              <p className="max-w-xs text-xs text-muted-foreground">
-                {folderFilter || searchQuery || tagFilter
-                  ? "Try adjusting your filters."
-                  : "Create a document to start writing papers, field logs, or research notes."}
-              </p>
-            </div>
-            {!folderFilter && !searchQuery && !tagFilter && (
-              <Button asChild size="sm">
-                <Link href="/docs/new">Create First Document</Link>
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            title={
+              folderFilter || searchQuery || tagFilter
+                ? "No documents match your filters"
+                : "No documents yet"
+            }
+            description={
+              folderFilter || searchQuery || tagFilter
+                ? "Try adjusting your filters."
+                : "Create a document to start writing papers, field logs, or research notes."
+            }
+            action={
+              !folderFilter && !searchQuery && !tagFilter
+                ? { href: "/docs/new", label: "Create First Document" }
+                : undefined
+            }
+          />
         ) : (
           <Table>
             <TableHeader>

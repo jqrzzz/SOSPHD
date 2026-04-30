@@ -4,6 +4,7 @@ import { getCases, getEventCountByCaseId } from "@/lib/data/store";
 import { SeverityBadge } from "@/components/severity-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { CaseListFilters } from "@/components/case-list-filters";
+import { EmptyState } from "@/components/empty-state";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,29 +60,21 @@ export default async function CasesPage(props: {
         />
       </Suspense>
 
-      {/* Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
         {cases.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-16">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary">
-              <span className="text-2xl text-muted-foreground">+</span>
-            </div>
-            <div className="flex flex-col items-center gap-1 text-center">
-              <p className="text-sm font-medium text-foreground">
-                {statusFilter || searchQuery ? "No cases match your filters" : "No cases yet"}
-              </p>
-              <p className="max-w-xs text-xs text-muted-foreground">
-                {statusFilter || searchQuery
-                  ? "Try adjusting your search or status filter."
-                  : "Create your first case to start tracking provenance events and computing TTDC/TTGP metrics."}
-              </p>
-            </div>
-            {!statusFilter && !searchQuery && (
-              <Button asChild size="sm">
-                <Link href="/cases/new">Create First Case</Link>
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            title={statusFilter || searchQuery ? "No cases match your filters" : "No cases yet"}
+            description={
+              statusFilter || searchQuery
+                ? "Try adjusting your search or status filter."
+                : "Create your first case to start tracking provenance events and computing TTDC/TTGP metrics."
+            }
+            action={
+              !statusFilter && !searchQuery
+                ? { href: "/cases/new", label: "Create First Case" }
+                : undefined
+            }
+          />
         ) : (
           <Table>
             <TableHeader>

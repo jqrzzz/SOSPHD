@@ -39,6 +39,13 @@ export function CaseListFilters({
     [router, searchParams],
   );
 
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    [],
+  );
+
   return (
     <div className="flex items-center gap-4 border-b border-border px-6 py-3">
       {/* Status tabs */}

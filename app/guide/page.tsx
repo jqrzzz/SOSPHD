@@ -51,7 +51,6 @@ const STEPS = [
 export default function GuidePage() {
   return (
     <div className="flex flex-1 flex-col overflow-auto">
-      {/* Header */}
       <header className="border-b border-border px-6 py-5">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           How to Use ResearchOS
@@ -61,7 +60,6 @@ export default function GuidePage() {
         </p>
       </header>
 
-      {/* Overview card */}
       <div className="px-6 pt-6">
         <div className="rounded-lg border border-border bg-card p-5">
           <h2 className="text-sm font-semibold text-foreground">What is this app?</h2>
@@ -85,14 +83,12 @@ export default function GuidePage() {
         </div>
       </div>
 
-      {/* Steps */}
       <div className="flex flex-col gap-4 px-6 py-6">
         {STEPS.map((step) => (
           <div
             key={step.number}
             className="relative rounded-lg border border-border bg-card p-5 pl-14"
           >
-            {/* Step number */}
             <div className="absolute left-4 top-5 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
               {step.number}
             </div>
@@ -125,7 +121,6 @@ export default function GuidePage() {
         ))}
       </div>
 
-      {/* Footer tip */}
       <div className="border-t border-border px-6 py-4">
         <p className="text-xs text-muted-foreground">
           Tip: You can always get back here from the sidebar. If something feels broken, check the

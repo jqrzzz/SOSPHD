@@ -5,6 +5,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function requireOpenAIKey(): Response | null {
+  if (process.env.OPENAI_API_KEY) return null;
+  return Response.json(
+    { error: "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file." },
+    { status: 503 },
+  );
+}
+
 /**
  * Formats a date string/Date consistently between server and client
  * by pinning to UTC, avoiding hydration mismatches.

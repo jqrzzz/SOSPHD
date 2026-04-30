@@ -8,6 +8,7 @@ import { buildContextSnapshot } from "@/lib/data/context-builder";
 import { createTasksFromAI } from "@/lib/advisor-actions";
 import { addMessage } from "@/lib/data/advisor-store";
 import { formatDuration } from "@/lib/data/metrics";
+import { requireOpenAIKey } from "@/lib/utils";
 
 export const maxDuration = 60;
 
@@ -127,12 +128,8 @@ async function extractAndCreateTasks(text: string): Promise<void> {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json(
-      { error: "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file." },
-      { status: 503 },
-    );
-  }
+  const guard = requireOpenAIKey();
+  if (guard) return guard;
 
   const {
     messages,
