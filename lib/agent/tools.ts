@@ -202,13 +202,13 @@ async function identifyResearchGaps() {
 // ── Tool: Compute Case Metrics ──────────────────────────────────────
 
 async function computeCaseMetrics(params: { case_id?: string }) {
-  const cases = getCases();
+  const cases = await getCases();
   const targetCases = params.case_id
     ? cases.filter((c) => c.id === params.case_id)
     : cases;
 
-  const results = targetCases.map((c) => {
-    const events = getEventsByCaseId(c.id);
+  const results = await Promise.all(targetCases.map(async (c) => {
+    const events = await getEventsByCaseId(c.id);
     const metrics = computeAllMetrics(events);
 
     const present = new Set(events.map((e) => e.event_type));
@@ -229,7 +229,7 @@ async function computeCaseMetrics(params: { case_id?: string }) {
         minutes: m.value_ms ? Math.round(m.value_ms / 60000) : null,
       })),
     };
-  });
+  }));
 
   // Aggregate stats
   const completeCases = results.filter((r) => r.provenanceComplete);

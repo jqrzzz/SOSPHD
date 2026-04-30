@@ -27,7 +27,7 @@ async function getMissingMilestones(caseId: string): Promise<string[]> {
 }
 
 export async function buildContextSnapshot(): Promise<ContextSnapshot> {
-  const allCases = getCases();
+  const allCases = await getCases();
 
   const recentCases = allCases.slice(0, 10).map((c) => ({
     id: c.id,

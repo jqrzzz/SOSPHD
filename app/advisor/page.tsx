@@ -3,7 +3,13 @@ import { buildContextSnapshot } from "@/lib/data/context-builder";
 import { AdvisorPageClient } from "@/components/advisor-page-client";
 import { getResearchPulse, suggestNextActions } from "@/lib/agent";
 
-export default async function AdvisorPage() 
+export default async function AdvisorPage() {
+  const [sessions, context, pulse, actions] = await Promise.all([
+    getSessions(),
+    buildContextSnapshot(),
+    getResearchPulse(),
+    suggestNextActions(5),
+  ]);
 
   const agentInsights = {
     score: pulse.score,

@@ -13,6 +13,11 @@ import {
   updateProtocol,
 } from "@/lib/data/fieldwork-store";
 import type { JournalEntryType, ContactRole } from "@/lib/data/fieldwork-types";
+import { autoCategorize as runAutoCategorize } from "@/lib/agent";
+
+export async function autoCategorizeAction(text: string) {
+  return runAutoCategorize(text);
+}
 
 // ── Schemas ─────────────────────────────────────────────────────────
 

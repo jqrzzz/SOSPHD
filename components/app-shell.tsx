@@ -10,7 +10,9 @@ import { CommandPalette } from "@/components/command-palette";
 import { QuickCaptureNote, QuickCaptureTask } from "@/components/advisor-quick-capture";
 
 const NAV_ITEMS = [
-
+  { href: "/spine", label: "PhD Spine", icon: SpineIcon },
+  { href: "/fieldwork", label: "Field Journal", icon: JournalIcon },
+  { href: "/contacts", label: "Contacts", icon: UsersIcon },
   { href: "/cases", label: "Cases", icon: ClipboardIcon },
   { href: "/docs", label: "Docs", icon: FileTextIcon },
   { href: "/workspace", label: "Workspace", icon: FolderIcon },
@@ -36,7 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-
+  // Close sidebar on navigation
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
@@ -51,12 +53,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
-
         />
       )}
 
@@ -127,14 +128,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
+      <main className="flex flex-1 flex-col overflow-hidden">
+        {/* Top bar — mobile nav toggle + quick actions */}
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent md:hidden"
+            aria-label="Open navigation"
+          >
+            <MenuIcon className="h-5 w-5" />
+          </button>
+          <span className="text-sm font-semibold text-foreground md:hidden">SOS PHD</span>
 
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+              className="hidden items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent transition-colors sm:flex"
+            >
+              <SearchIcon className="h-3.5 w-3.5" />
+              <span>Search</span>
+              <kbd className="ml-1 rounded border border-border bg-background px-1 py-0.5 text-[10px] font-mono">
+                {typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent) ? "⌘" : "Ctrl+"}K
+              </kbd>
+            </button>
+            <QuickCaptureNote />
+            <QuickCaptureTask />
+          </div>
+        </div>
+        {children}
+      </main>
+
+      {/* Command Palette (Cmd+K) */}
+      <CommandPalette />
     </div>
   );
 }
 
 /* ── Inline icons ──── */
 
-
+function SpineIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 2v20" />
+      <path d="M8 6h8" />
+      <path d="M7 10h10" />
+      <path d="M8 14h8" />
+      <path d="M9 18h6" />
     </svg>
   );
 }
@@ -195,7 +234,42 @@ function FolderIcon({ className }: { className?: string }) {
   );
 }
 
+function JournalIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+      <path d="M8 7h6" />
+      <path d="M8 11h8" />
+    </svg>
+  );
+}
 
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function MenuIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <line x1="4" x2="20" y1="12" y2="12" />
+      <line x1="4" x2="20" y1="6" y2="6" />
+      <line x1="4" x2="20" y1="18" y2="18" />
     </svg>
   );
 }
