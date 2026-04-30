@@ -121,7 +121,7 @@ export async function getUploads(filters?: {
       (u) =>
         u.filename.toLowerCase().includes(q) ||
         u.notes.toLowerCase().includes(q) ||
-        u.tags.some((t) => t.toLowerCase().includes(q)),
+        u.tags.some((t: string) => t.toLowerCase().includes(q)),
     );
   }
   return result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -172,7 +172,15 @@ export async function deleteUpload(id: string): Promise<boolean> {
   return false;
 }
 
-// ── Mind Maps ────────────────────────────────────────────────────────
+// ── Mind Maps ───────────────────────────────────────────────────────
+
+export async function getMindMaps(): Promise<MindMap[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("mind_maps")
+    .select("*")
+    .order("updated_at", { ascending: false });
 
 export async function getMindMaps(): Promise<MindMap[]> {
   const sb = getSupabase();

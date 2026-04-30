@@ -71,10 +71,25 @@ export default async function DocsPage(props: {
       {/* Table */}
       <div className="flex-1 overflow-auto px-3 pb-6 sm:px-6">
         {docs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">
-              No documents match your filters.
-            </p>
+          <div className="flex flex-col items-center justify-center gap-4 py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary">
+              <span className="text-2xl text-muted-foreground">+</span>
+            </div>
+            <div className="flex flex-col items-center gap-1 text-center">
+              <p className="text-sm font-medium text-foreground">
+                {folderFilter || searchQuery || tagFilter ? "No documents match your filters" : "No documents yet"}
+              </p>
+              <p className="max-w-xs text-xs text-muted-foreground">
+                {folderFilter || searchQuery || tagFilter
+                  ? "Try adjusting your filters."
+                  : "Create a document to start writing papers, field logs, or research notes."}
+              </p>
+            </div>
+            {!folderFilter && !searchQuery && !tagFilter && (
+              <Button asChild size="sm">
+                <Link href="/docs/new">Create First Document</Link>
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
-import { createNoteAction, updateNoteAction, deleteNoteAction } from "@/lib/advisor-actions";
+
 import { toast } from "sonner";
 import type { ResearchNote } from "@/lib/data/advisor-types";
 
@@ -26,24 +27,6 @@ export function WorkspaceNotes({
 }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [editNote, setEditNote] = useState<ResearchNote | null>(null);
-  const [state, formAction, pending] = useActionState(async (prev: { error?: string; success?: boolean } | null, fd: FormData) => {
-    const result = await createNoteAction(prev, fd);
-    if (result?.success) {
-      setOpen(false);
-      toast.success("Note created");
-    }
-    return result;
-  }, null);
-
-  const [editState, editAction, editPending] = useActionState(async (prev: { error?: string; success?: boolean } | null, fd: FormData) => {
-    const result = await updateNoteAction(prev, fd);
-    if (result?.success) {
-      setEditNote(null);
-      toast.success("Note updated");
-    }
-    return result;
-  }, null);
 
   const filtered = initialNotes.filter((n) => {
     if (!search) return true;

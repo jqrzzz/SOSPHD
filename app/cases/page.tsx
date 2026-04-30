@@ -26,10 +26,15 @@ export default async function CasesPage(props: {
     | undefined;
   const searchQuery = searchParams.q;
 
-  const cases = getCases({
+  const cases = await getCases({
     status: statusFilter,
     search: searchQuery,
   });
+
+  const eventCounts = await Promise.all(
+    cases.map((c) => getEventCountByCaseId(c.id)),
+  );
+  const eventCountMap = new Map(cases.map((c, i) => [c.id, eventCounts[i]]));
 
   return (
     <div className="flex flex-1 flex-col">
@@ -57,10 +62,25 @@ export default async function CasesPage(props: {
       {/* Table */}
       <div className="flex-1 overflow-auto px-3 pb-6 sm:px-6">
         {cases.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">
-              No cases match your filters.
-            </p>
+          <div className="flex flex-col items-center justify-center gap-4 py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary">
+              <span className="text-2xl text-muted-foreground">+</span>
+            </div>
+            <div className="flex flex-col items-center gap-1 text-center">
+              <p className="text-sm font-medium text-foreground">
+                {statusFilter || searchQuery ? "No cases match your filters" : "No cases yet"}
+              </p>
+              <p className="max-w-xs text-xs text-muted-foreground">
+                {statusFilter || searchQuery
+                  ? "Try adjusting your search or status filter."
+                  : "Create your first case to start tracking provenance events and computing TTDC/TTGP metrics."}
+              </p>
+            </div>
+            {!statusFilter && !searchQuery && (
+              <Button asChild size="sm">
+                <Link href="/cases/new">Create First Case</Link>
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -77,7 +97,7 @@ export default async function CasesPage(props: {
             </TableHeader>
             <TableBody>
               {cases.map((c) => {
-                const eventCount = getEventCountByCaseId(c.id);
+                const eventCount = eventCountMap.get(c.id) ?? 0;
                 return (
                   <TableRow key={c.id} className="group">
                     <TableCell>

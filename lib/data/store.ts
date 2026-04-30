@@ -1,136 +1,84 @@
-/* ─── In-Memory Data Store ────────────────────────────────────────────
- *  Swap this single file for Supabase client calls when connected.
- *  Every function signature is designed to match a Supabase query.
+/* ─── Supabase-Backed Data Store ─────────────────────────────────────
+ *  Reads cases from public schema (operational).
+ *  Reads/writes events & recommendations from research schema.
+ *  All functions are async — consumers must await.
  * ────────────────────────────────────────────────────────────────────── */
 
+import { createClient } from "@/lib/supabase/server";
 import type { Case, CaseEvent, CaseStatus, Severity, Recommendation } from "./types";
 
-// ── Seed data ────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────
 
-const DEMO_SITE_ID = "site_001";
+/** Map operational case_status to SOSPHD's simpler 3-state model */
+function mapStatus(opStatus: string): CaseStatus {
+  switch (opStatus) {
+    case "intake":
+    case "pending_info":
+    case "pending_authorization":
+      return "open";
+    case "active":
+    case "in_treatment":
+    case "transport_arranged":
+      return "active";
+    case "discharged":
+    case "billing":
+    case "claims":
+    case "closed":
+    case "cancelled":
+      return "closed";
+    default:
+      return "open";
+  }
+}
 
-const seedCases: Case[] = [
-  {
-    id: "case_001",
-    site_id: DEMO_SITE_ID,
-    created_at: "2026-02-01T08:30:00Z",
-    status: "closed",
-    severity: 4,
-    chief_complaint: "Severe dehydration and suspected heat stroke during desert tour",
-    patient_ref: "PT-2026-0401",
-    notes: "Tourist on guided excursion, found unresponsive by group leader.",
-  },
-  {
-    id: "case_002",
-    site_id: DEMO_SITE_ID,
-    created_at: "2026-02-05T14:15:00Z",
-    status: "active",
-    severity: 3,
-    chief_complaint: "Open fracture lower leg from hiking fall",
-    patient_ref: "PT-2026-0402",
-    notes: "Fall from approximately 3m height on unmarked trail. Conscious, oriented.",
-  },
-  {
-    id: "case_003",
-    site_id: DEMO_SITE_ID,
-    created_at: "2026-02-10T22:00:00Z",
-    status: "open",
-    severity: 2,
-    chief_complaint: "Allergic reaction to local food, facial swelling",
-    patient_ref: "PT-2026-0403",
-    notes: "First-time visitor, unknown allergen. No history of anaphylaxis.",
-  },
-  {
-    id: "case_004",
-    site_id: DEMO_SITE_ID,
-    created_at: "2026-02-03T11:00:00Z",
-    status: "closed",
-    severity: 5,
-    chief_complaint: "Chest pain and dyspnea during scuba diving excursion",
-    patient_ref: "PT-2026-0404",
-    notes: "Possible decompression sickness. Payment clearance delayed by insurer.",
-  },
-];
+/** Map operational case_priority to SOSPHD severity (1-5) */
+function mapPriority(priority: string): Severity {
+  switch (priority) {
+    case "low": return 1;
+    case "normal": return 2;
+    case "high": return 3;
+    case "critical": return 4;
+    default: return 2;
+  }
+}
 
-const seedEvents: CaseEvent[] = [
-  // Case 1: Full resolution (all events)
-  { id: "evt_001", case_id: "case_001", occurred_at: "2026-02-01T08:30:00Z", event_type: "FIRST_CONTACT", actor_id: "op_001", payload: "Distress call received from tour guide. Patient unresponsive." },
-  { id: "evt_002", case_id: "case_001", occurred_at: "2026-02-01T08:42:00Z", event_type: "TRIAGE_COMPLETE", actor_id: "op_001", payload: "Severity 4 confirmed. Vitals: HR 120, BP 80/50, Temp 40.2C." },
-  { id: "evt_003", case_id: "case_001", occurred_at: "2026-02-01T08:48:00Z", event_type: "TRANSPORT_ACTIVATED", actor_id: "op_001", payload: "Helicopter dispatched from Regional Medical Center. ETA 25 min." },
-  { id: "evt_004", case_id: "case_001", occurred_at: "2026-02-01T09:05:00Z", event_type: "GUARANTEED_PAYMENT", actor_id: "op_002", payload: "Travel insurance verified. Policy AXA-TRV-29481. Pre-auth confirmed." },
-  { id: "evt_005", case_id: "case_001", occurred_at: "2026-02-01T09:15:00Z", event_type: "FACILITY_ARRIVAL", actor_id: "op_001", payload: "Patient arrived at Regional Medical Center ED." },
-  { id: "evt_006", case_id: "case_001", occurred_at: "2026-02-01T09:22:00Z", event_type: "DEFINITIVE_CARE_START", actor_id: "op_001", payload: "IV rehydration and active cooling initiated. ED physician Dr. Alvarez." },
-  { id: "evt_007", case_id: "case_001", occurred_at: "2026-02-02T16:00:00Z", event_type: "DISCHARGE", actor_id: "op_002", payload: "Patient discharged, stable. Follow-up with home physician recommended." },
-
-  // Case 2: In-progress (FIRST_CONTACT + TRANSPORT_ACTIVATED only)
-  { id: "evt_008", case_id: "case_002", occurred_at: "2026-02-05T14:15:00Z", event_type: "FIRST_CONTACT", actor_id: "op_001", payload: "Call from hiking guide. Patient conscious, compound fracture visible." },
-  { id: "evt_009", case_id: "case_002", occurred_at: "2026-02-05T14:22:00Z", event_type: "TRIAGE_COMPLETE", actor_id: "op_001", payload: "Severity 3. Open fracture tibia. Bleeding controlled with tourniquet." },
-  { id: "evt_010", case_id: "case_002", occurred_at: "2026-02-05T14:30:00Z", event_type: "TRANSPORT_ACTIVATED", actor_id: "op_001", payload: "Ground ambulance dispatched. Trail access via service road. ETA 40 min." },
-  { id: "evt_011", case_id: "case_002", occurred_at: "2026-02-05T15:10:00Z", event_type: "NOTE", actor_id: "op_002", payload: "Insurance company requesting additional documentation before pre-auth. Escalating." },
-
-  // Case 3: Just opened (FIRST_CONTACT only)
-  { id: "evt_012", case_id: "case_003", occurred_at: "2026-02-10T22:00:00Z", event_type: "FIRST_CONTACT", actor_id: "op_001", payload: "Hotel concierge reports guest with facial swelling after dinner. Guest is breathing normally." },
-
-  // Case 4: Payment delay scenario (TTGP > TTDC)
-  { id: "evt_013", case_id: "case_004", occurred_at: "2026-02-03T11:00:00Z", event_type: "FIRST_CONTACT", actor_id: "op_001", payload: "Dive operator emergency call. Tourist surfaced with chest pain, difficulty breathing." },
-  { id: "evt_014", case_id: "case_004", occurred_at: "2026-02-03T11:08:00Z", event_type: "TRANSPORT_ACTIVATED", actor_id: "op_001", payload: "Coast guard boat + ambulance coordinated. Nearest hyperbaric chamber 45 min." },
-  { id: "evt_015", case_id: "case_004", occurred_at: "2026-02-03T11:55:00Z", event_type: "FACILITY_ARRIVAL", actor_id: "op_001", payload: "Arrived at Coastal Medical hyperbaric unit." },
-  { id: "evt_016", case_id: "case_004", occurred_at: "2026-02-03T12:10:00Z", event_type: "DEFINITIVE_CARE_START", actor_id: "op_001", payload: "Hyperbaric oxygen therapy initiated. Dive medicine specialist Dr. Chen." },
-  { id: "evt_017", case_id: "case_004", occurred_at: "2026-02-03T14:30:00Z", event_type: "NOTE", actor_id: "op_002", payload: "Insurer disputing coverage. Claim that diving was excluded activity. Escalated to supervisor." },
-  { id: "evt_018", case_id: "case_004", occurred_at: "2026-02-04T09:00:00Z", event_type: "GUARANTEED_PAYMENT", actor_id: "op_002", payload: "Payment finally guaranteed after supervisor intervention. Insurer agreed to cover. 22h delay." },
-  { id: "evt_019", case_id: "case_004", occurred_at: "2026-02-05T11:00:00Z", event_type: "DISCHARGE", actor_id: "op_001", payload: "Patient cleared after two HBO sessions. Fit to fly in 72h." },
-];
-
-const seedRecommendations: Recommendation[] = [
-  {
-    id: "rec_001",
-    case_id: "case_001",
-    created_at: "2026-02-01T08:43:00Z",
-    engine_type: "rule_based",
-    engine_version: "v0.1.0",
-    confidence_type: "categorical",
-    confidence_value: 0.92,
-    recommendation: "Dispatch helicopter to Regional Medical Center (closest level-2 facility with capacity)",
-    explanation: "Patient severity 4 in remote desert location. Ground transport ETA >90min exceeds clinical window. Helicopter ETA 25min from Regional Medical, which has 3 available ED beds and heat-stroke protocol.",
-    accepted: true,
-    override_reason: null,
-  },
-  {
-    id: "rec_002",
-    case_id: "case_004",
-    created_at: "2026-02-03T11:05:00Z",
-    engine_type: "rule_based",
-    engine_version: "v0.1.0",
-    confidence_type: "probability",
-    confidence_value: 0.87,
-    recommendation: "Route to Coastal Medical hyperbaric unit via coast guard + ambulance relay",
-    explanation: "Suspected DCS requires hyperbaric oxygen. Coastal Medical is the only facility within 100km with a functional chamber. Coast guard vessel + ambulance relay is fastest multimodal option.",
-    accepted: true,
-    override_reason: null,
-  },
-];
-
-// ── Mutable store (arrays are mutated in-place for simplicity) ──────
-
-const cases = [...seedCases];
-const events = [...seedEvents];
-const recommendations = [...seedRecommendations];
-
-let nextCaseNum = 5;
-let nextEventNum = 20;
+/** Transform an operational case row + patient into SOSPHD's Case type */
+function toCase(row: Record<string, unknown>): Case {
+  const patient = row.patients as Record<string, unknown> | null;
+  return {
+    id: row.id as string,
+    site_id: (row.country as string) ?? "unknown",
+    created_at: row.created_at as string,
+    status: mapStatus(row.status as string),
+    severity: mapPriority(row.priority as string),
+    chief_complaint: (row.incident_description as string) ?? "",
+    patient_ref: (patient?.medical_id as string) ?? (row.case_number as string) ?? "Unknown",
+    notes: (row.notes as string) ?? "",
+  };
+}
 
 // ── Query functions ─────────────────────────────────────────────────
 
-export function getCases(filters?: {
+export async function getCases(filters?: {
   status?: CaseStatus;
   search?: string;
-}): Case[] {
-  let result = [...cases];
+}): Promise<Case[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("cases")
+    .select("*, patients(full_name, medical_id)")
+    .order("created_at", { ascending: false });
+
+  // We filter in JS since operational statuses don't map 1:1
+  const { data, error } = await query;
+  if (error || !data) return [];
+
+  let result = data.map(toCase);
 
   if (filters?.status) {
     result = result.filter((c) => c.status === filters.status);
   }
-
   if (filters?.search) {
     const q = filters.search.toLowerCase();
     result = result.filter(
@@ -140,81 +88,146 @@ export function getCases(filters?: {
     );
   }
 
-  // Sort newest first
-  return result.sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+  return result;
 }
 
-export function getCaseById(id: string): Case | undefined {
-  return cases.find((c) => c.id === id);
+export async function getCaseById(id: string): Promise<Case | undefined> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cases")
+    .select("*, patients(full_name, medical_id)")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return undefined;
+  return toCase(data);
 }
 
-export function createCase(data: {
+export async function createCase(data: {
   severity: Severity;
   chief_complaint: string;
   patient_ref: string;
   notes: string;
-}): Case {
-  const newCase: Case = {
-    id: `case_${String(nextCaseNum++).padStart(3, "0")}`,
-    site_id: DEMO_SITE_ID,
-    created_at: new Date().toISOString(),
-    status: "open",
-    severity: data.severity,
-    chief_complaint: data.chief_complaint,
-    patient_ref: data.patient_ref,
-    notes: data.notes,
-  };
-  cases.push(newCase);
-  return newCase;
+}): Promise<Case> {
+  // Creating a case in the operational system is complex (requires patient_id, etc.)
+  // For the research layer, we create a minimal case entry.
+  // In production, cases originate from SOSCOMMAND — SOSPHD is read-mostly.
+  const supabase = await createClient();
+  const caseNumber = `SOS-${Date.now().toString(36).toUpperCase()}`;
+
+  const { data: newCase, error } = await supabase
+    .from("cases")
+    .insert({
+      case_number: caseNumber,
+      patient_id: "00000000-0000-0000-0000-000000000000", // placeholder
+      status: "intake",
+      priority: data.severity >= 4 ? "critical" : data.severity >= 3 ? "high" : "normal",
+      incident_description: data.chief_complaint,
+      notes: data.notes,
+    })
+    .select("*, patients(full_name, medical_id)")
+    .single();
+
+  if (error || !newCase) {
+    throw new Error(`Failed to create case: ${error?.message}`);
+  }
+
+  return toCase(newCase);
 }
 
-export function getEventsByCaseId(caseId: string): CaseEvent[] {
-  return events
-    .filter((e) => e.case_id === caseId)
-    .sort(
-      (a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime(),
-    );
+// ── Events (research schema) ────────────────────────────────────────
+
+export async function getEventsByCaseId(caseId: string): Promise<CaseEvent[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("case_events")
+    .select("*")
+    .eq("case_id", caseId)
+    .order("occurred_at", { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id: row.id as string,
+    case_id: row.case_id as string,
+    occurred_at: row.occurred_at as string,
+    event_type: row.event_type as CaseEvent["event_type"],
+    actor_id: row.actor_id as string,
+    payload: row.payload as string,
+  }));
 }
 
-export function addEvent(data: {
+export async function addEvent(data: {
   case_id: string;
   event_type: CaseEvent["event_type"];
   occurred_at: string;
   payload: string;
-}): CaseEvent {
-  const newEvent: CaseEvent = {
-    id: `evt_${String(nextEventNum++).padStart(3, "0")}`,
-    case_id: data.case_id,
-    occurred_at: data.occurred_at,
-    event_type: data.event_type,
-    actor_id: "op_demo",
-    payload: data.payload,
-  };
-  events.push(newEvent);
+}): Promise<CaseEvent> {
+  const supabase = await createClient();
+  const { data: newEvent, error } = await supabase
+    .schema("research")
+    .from("case_events")
+    .insert({
+      case_id: data.case_id,
+      event_type: data.event_type,
+      occurred_at: data.occurred_at,
+      actor_id: "op_demo",
+      payload: data.payload,
+    })
+    .select()
+    .single();
 
-  // Auto-update case status based on event
-  const c = cases.find((cs) => cs.id === data.case_id);
-  if (c) {
-    if (data.event_type === "DISCHARGE") {
-      c.status = "closed";
-    } else if (c.status === "open" && data.event_type !== "NOTE") {
-      c.status = "active";
-    }
+  if (error || !newEvent) {
+    throw new Error(`Failed to add event: ${error?.message}`);
   }
 
-  return newEvent;
+  return {
+    id: newEvent.id,
+    case_id: newEvent.case_id,
+    occurred_at: newEvent.occurred_at,
+    event_type: newEvent.event_type,
+    actor_id: newEvent.actor_id,
+    payload: newEvent.payload,
+  };
 }
 
-export function getRecommendationsByCaseId(caseId: string): Recommendation[] {
-  return recommendations
-    .filter((r) => r.case_id === caseId)
-    .sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-    );
+// ── Recommendations (research schema) ───────────────────────────────
+
+export async function getRecommendationsByCaseId(caseId: string): Promise<Recommendation[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("recommendations")
+    .select("*")
+    .eq("case_id", caseId)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id: row.id as string,
+    case_id: row.case_id as string,
+    created_at: row.created_at as string,
+    engine_type: row.engine_type as Recommendation["engine_type"],
+    engine_version: row.engine_version as string,
+    confidence_type: row.confidence_type as Recommendation["confidence_type"],
+    confidence_value: row.confidence_value as number,
+    recommendation: row.recommendation as string,
+    explanation: row.explanation as string,
+    accepted: row.accepted as boolean | null,
+    override_reason: row.override_reason as string | null,
+  }));
 }
 
-export function getEventCountByCaseId(caseId: string): number {
-  return events.filter((e) => e.case_id === caseId).length;
+export async function getEventCountByCaseId(caseId: string): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .schema("research")
+    .from("case_events")
+    .select("*", { count: "exact", head: true })
+    .eq("case_id", caseId);
+
+  if (error) return 0;
+  return count ?? 0;
 }

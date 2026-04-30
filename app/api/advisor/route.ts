@@ -123,48 +123,13 @@ function formatContextForPrompt(
   return lines.join("\n");
 }
 
-function formatAgentInsights(pulse: Awaited<ReturnType<typeof getResearchPulse>>, actions: Awaited<ReturnType<typeof suggestNextActions>>, gaps: Awaited<ReturnType<typeof detectGaps>>): string {
-  const lines: string[] = [
-    "",
-    "## Agent Intelligence (Real-Time)",
-    "",
-    `### Research Health: ${pulse.score}/100 (${pulse.health})`,
-    `- Corridor coverage: ${pulse.corridorCoverage}`,
-    `- High-priority gaps: ${pulse.highPriorityGaps}`,
-    `- Total gaps: ${pulse.totalGaps}`,
-    `- Open tasks: ${pulse.openTasks}`,
-  ];
-
-  if (actions.length > 0) {
-    lines.push("", "### Suggested Next Actions");
-    for (const a of actions) {
-      lines.push(`- [${a.severity.toUpperCase()}] ${a.action} (${a.area})`);
-    }
-  }
-
-  if (gaps.totalGaps > 0) {
-    lines.push("", `### Research Gaps (${gaps.totalGaps} total)`);
-    const highGaps = gaps.gaps.filter((g) => g.severity === "high");
-    for (const g of highGaps.slice(0, 5)) {
-      lines.push(`- [HIGH] ${g.gap} — ${g.suggestion}`);
-    }
-    const medGaps = gaps.gaps.filter((g) => g.severity === "medium");
-    for (const g of medGaps.slice(0, 3)) {
-      lines.push(`- [MED] ${g.gap}`);
-    }
-  }
-
-  return lines.join("\n");
-}
-
-function extractAndCreateTasks(text: string): void {
   const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
   if (!jsonMatch) return;
 
   try {
     const parsed = JSON.parse(jsonMatch[1]);
     if (parsed.tasks && Array.isArray(parsed.tasks)) {
-      createTasksFromAI(parsed.tasks);
+      await createTasksFromAI(parsed.tasks);
     }
   } catch {
     // Invalid JSON — skip task creation silently
@@ -174,7 +139,6 @@ function extractAndCreateTasks(text: string): void {
 export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return Response.json(
-      { error: "OPENAI_API_KEY not configured. Add it to .env.local to enable the advisor." },
       { status: 503 },
     );
   }
@@ -184,13 +148,6 @@ export async function POST(req: Request) {
     sessionId,
   }: { messages: UIMessage[]; sessionId?: string } = await req.json();
 
-  // Build safe context + agent intelligence in parallel
-  const [contextSnapshot, pulse, actions, gaps] = await Promise.all([
-    buildContextSnapshot(),
-    getResearchPulse(),
-    suggestNextActions(5),
-    detectGaps(),
-  ]);
   const contextText = formatContextForPrompt(contextSnapshot);
   const agentText = formatAgentInsights(pulse, actions, gaps);
 
@@ -214,7 +171,7 @@ export async function POST(req: Request) {
           .map((p) => p.text)
           .join("");
 
-        extractAndCreateTasks(textContent);
+        await extractAndCreateTasks(textContent);
 
         // Persist assistant message with context snapshot
         if (sessionId) {

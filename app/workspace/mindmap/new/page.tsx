@@ -46,9 +46,14 @@ export default function NewMindMapPage() {
                 placeholder="e.g. TTDC Factors, Research Connections..."
               />
             </div>
-            <Button onClick={handleCreate} disabled={loading}>
-              {loading ? "Creating..." : "Create Map"}
-            </Button>
+            <div className="flex gap-3">
+              <Button onClick={handleCreate} disabled={loading}>
+                {loading ? "Creating..." : "Create Map"}
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/workspace">Cancel</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

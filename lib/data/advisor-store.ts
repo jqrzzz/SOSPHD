@@ -218,7 +218,7 @@ export async function deleteNote(id: string): Promise<boolean> {
   return false;
 }
 
-// ── Tasks ────────────────────────────────────────────────────────────
+// ── Tasks ───────────────────────────────────────────────────────────
 
 export async function getTasks(filters?: {
   status?: TaskStatus;
@@ -322,7 +322,7 @@ export async function deleteTask(id: string): Promise<boolean> {
   return false;
 }
 
-// ── Sessions ─────────────────────────────────────────────────────────
+// ── Sessions ────────────────────────────────────────────────────────
 
 export async function getSessions(): Promise<AdvisorSession[]> {
   const sb = getSupabase();
@@ -373,7 +373,7 @@ export async function getSessionById(id: string): Promise<AdvisorSession | null>
   return seedSessions.find((s) => s.id === id) ?? null;
 }
 
-// ── Messages ─────────────────────────────────────────────────────────
+// ── Messages ────────────────────────────────────────────────────────
 
 export async function getMessagesBySessionId(sessionId: string): Promise<AdvisorMessage[]> {
   const sb = getSupabase();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
@@ -22,6 +22,7 @@ export function CaseListFilters({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(currentSearch ?? "");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -66,9 +67,17 @@ export function CaseListFilters({
           type="search"
           placeholder="Search patient ref or complaint..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setSearch(val);
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(() => {
+              updateParams({ q: val || undefined });
+            }, 400);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
+              if (debounceRef.current) clearTimeout(debounceRef.current);
               updateParams({ q: search || undefined });
             }
           }}

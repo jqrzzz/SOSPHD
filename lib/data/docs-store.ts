@@ -270,7 +270,7 @@ export async function getDocs(filters?: {
       (d) =>
         d.title.toLowerCase().includes(q) ||
         d.content_md.toLowerCase().includes(q) ||
-        d.tags.some((t) => t.toLowerCase().includes(q)),
+        d.tags.some((t: string) => t.toLowerCase().includes(q)),
     );
   }
   return result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -343,7 +343,7 @@ export async function updateDoc(
   return null;
 }
 
-// ── Versions ─────────────────────────────────────────────────────────
+// ── Versions ────────────────────────────────────────────────────────
 
 export async function getVersionsByDocId(docId: string): Promise<DocVersion[]> {
   const sb = getSupabase();
@@ -398,13 +398,22 @@ export async function getVersionById(id: string): Promise<DocVersion | null> {
   return seedVersions.find((v) => v.id === id) ?? null;
 }
 
-// ── Unique tags across all docs ──────────────────────────────────────
+// ── Unique tags ─────────────────────────────────────────────────────
+
+export async function getAllTags(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("docs")
+    .select("tags");
+
+  if (error || !data) return [];
 
 export async function getAllTags(): Promise<string[]> {
   const docs = await getDocs();
   const tagSet = new Set<string>();
-  for (const doc of docs) {
-    for (const tag of doc.tags) {
+  for (const doc of data) {
+    for (const tag of (doc.tags as string[]) ?? []) {
       tagSet.add(tag);
     }
   }

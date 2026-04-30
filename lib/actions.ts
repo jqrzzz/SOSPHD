@@ -41,7 +41,7 @@ export async function createCaseAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const newCase = createCase({
+  const newCase = await createCase({
     severity: parsed.data.severity as 1 | 2 | 3 | 4 | 5,
     chief_complaint: parsed.data.chief_complaint,
     patient_ref: parsed.data.patient_ref,
@@ -68,7 +68,7 @@ export async function addEventAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  addEvent(parsed.data);
+  await addEvent(parsed.data);
 
   revalidatePath(`/cases/${parsed.data.case_id}`);
   return { success: true };

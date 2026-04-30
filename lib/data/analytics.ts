@@ -5,8 +5,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { getCases, getEventsByCaseId, getRecommendationsByCaseId } from "./store";
-import { computeAllMetrics, computeTTTA, computeTTGP, computeTTDC, formatDuration } from "./metrics";
-import type { Case, CaseEvent, MetricResult } from "./types";
+import { computeTTTA, computeTTGP, computeTTDC, formatDuration } from "./metrics";
 
 // ── Summary stats ────────────────────────────────────────────────────
 
@@ -40,8 +39,8 @@ function average(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-export function getDashboardSummary(): DashboardSummary {
-  const allCases = getCases();
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const allCases = await getCases();
 
   const tttas: number[] = [];
   const ttgps: number[] = [];
@@ -51,17 +50,16 @@ export function getDashboardSummary(): DashboardSummary {
   let overriddenRecs = 0;
 
   for (const c of allCases) {
-    const events = getEventsByCaseId(c.id);
+    const events = await getEventsByCaseId(c.id);
     const ttta = computeTTTA(events);
     const ttgp = computeTTGP(events);
     const ttdc = computeTTDC(events);
 
-    // Only include completed (non-running) metrics in averages
     if (ttta.value_ms !== null && !ttta.is_running) tttas.push(ttta.value_ms);
     if (ttgp.value_ms !== null && !ttgp.is_running) ttgps.push(ttgp.value_ms);
     if (ttdc.value_ms !== null && !ttdc.is_running) ttdcs.push(ttdc.value_ms);
 
-    const recs = getRecommendationsByCaseId(c.id);
+    const recs = await getRecommendationsByCaseId(c.id);
     totalRecs += recs.length;
     acceptedRecs += recs.filter((r) => r.accepted === true).length;
     overriddenRecs += recs.filter((r) => r.accepted === false).length;
@@ -84,7 +82,7 @@ export function getDashboardSummary(): DashboardSummary {
   };
 }
 
-// ── Per-case metric table (for charts and export) ────────────────────
+// ── Per-case metric table ───────────────────────────────────────────
 
 export interface CaseMetricRow {
   case_id: string;
@@ -98,29 +96,29 @@ export interface CaseMetricRow {
   ttta_complete: boolean;
   ttgp_complete: boolean;
   ttdc_complete: boolean;
-  /** TTGP arrived after TTDC — payment delayed care */
   payment_delayed: boolean;
   recommendation_count: number;
   accepted_count: number;
   override_count: number;
 }
 
-export function getCaseMetricRows(): CaseMetricRow[] {
-  const allCases = getCases();
+export async function getCaseMetricRows(): Promise<CaseMetricRow[]> {
+  const allCases = await getCases();
 
-  return allCases.map((c) => {
-    const events = getEventsByCaseId(c.id);
+  const rows: CaseMetricRow[] = [];
+  for (const c of allCases) {
+    const events = await getEventsByCaseId(c.id);
     const ttta = computeTTTA(events);
     const ttgp = computeTTGP(events);
     const ttdc = computeTTDC(events);
-    const recs = getRecommendationsByCaseId(c.id);
+    const recs = await getRecommendationsByCaseId(c.id);
 
     const ttgpComplete = ttgp.value_ms !== null && !ttgp.is_running;
     const ttdcComplete = ttdc.value_ms !== null && !ttdc.is_running;
     const paymentDelayed =
       ttgpComplete && ttdcComplete && (ttgp.value_ms ?? 0) > (ttdc.value_ms ?? 0);
 
-    return {
+    rows.push({
       case_id: c.id,
       patient_ref: c.patient_ref,
       severity: c.severity,
@@ -136,16 +134,17 @@ export function getCaseMetricRows(): CaseMetricRow[] {
       recommendation_count: recs.length,
       accepted_count: recs.filter((r) => r.accepted === true).length,
       override_count: recs.filter((r) => r.accepted === false).length,
-    };
-  });
+    });
+  }
+
+  return rows;
 }
 
-// ── Paper builder context ────────────────────────────────────────────
+// ── Paper builder context ───────────────────────────────────────────
 
 export interface PaperBuilderContext {
   summary: DashboardSummary;
   rows: CaseMetricRow[];
-  /** Pre-formatted strings for direct insertion into methods/results */
   formatted: {
     sample_size: string;
     metric_summary: string;
@@ -155,14 +154,13 @@ export interface PaperBuilderContext {
   };
 }
 
-export function buildPaperContext(): PaperBuilderContext {
-  const summary = getDashboardSummary();
-  const rows = getCaseMetricRows();
+export async function buildPaperContext(): Promise<PaperBuilderContext> {
+  const summary = await getDashboardSummary();
+  const rows = await getCaseMetricRows();
 
   const completedCases = rows.filter((r) => r.status === "closed");
   const delayedCases = rows.filter((r) => r.payment_delayed);
 
-  // Severity distribution
   const sevCounts: Record<number, number> = {};
   for (const r of rows) {
     sevCounts[r.severity] = (sevCounts[r.severity] ?? 0) + 1;
@@ -198,7 +196,7 @@ export function buildPaperContext(): PaperBuilderContext {
         ? `The AI recommendation engine generated ${summary.total_recommendations} recommendations across all cases. Of these, ${summary.accepted_recommendations} (${Math.round((summary.accepted_recommendations / summary.total_recommendations) * 100)}%) were accepted by operators and ${summary.overridden_recommendations} (${Math.round((summary.overridden_recommendations / summary.total_recommendations) * 100)}%) were overridden.`
         : "No AI recommendations were recorded in the current dataset.",
 
-      severity_distribution: `Cases were distributed across severity levels: ${sevParts}.`,
+      severity_distribution: `Cases were distributed across severity levels: ${sevParts || "none recorded"}.`,
     },
   };
 }

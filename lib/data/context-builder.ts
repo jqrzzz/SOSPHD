@@ -8,9 +8,8 @@ import type { ContextSnapshot, MissingMilestones } from "./advisor-types";
 import { getCases, getEventsByCaseId } from "./store";
 import { getNotes, getTasks } from "./advisor-store";
 import { computeAllMetrics } from "./metrics";
-import { EVENT_TYPES, type EventType } from "./types";
+import type { EventType } from "./types";
 
-/** Milestone events that should eventually appear for a complete case */
 const MILESTONE_EVENTS: EventType[] = [
   "FIRST_CONTACT",
   "TRIAGE_COMPLETE",
@@ -21,8 +20,8 @@ const MILESTONE_EVENTS: EventType[] = [
   "DISCHARGE",
 ];
 
-function getMissingMilestones(caseId: string): string[] {
-  const events = getEventsByCaseId(caseId);
+async function getMissingMilestones(caseId: string): Promise<string[]> {
+  const events = await getEventsByCaseId(caseId);
   const present = new Set(events.map((e) => e.event_type));
   return MILESTONE_EVENTS.filter((m) => !present.has(m));
 }
@@ -30,7 +29,6 @@ function getMissingMilestones(caseId: string): string[] {
 export async function buildContextSnapshot(): Promise<ContextSnapshot> {
   const allCases = getCases();
 
-  // Recent 10 cases as safe summaries
   const recentCases = allCases.slice(0, 10).map((c) => ({
     id: c.id,
     status: c.status,
@@ -41,12 +39,11 @@ export async function buildContextSnapshot(): Promise<ContextSnapshot> {
     patient_ref: c.patient_ref,
   }));
 
-  // Most recent active case with full metrics
   const activeCase = allCases.find((c) => c.status === "active") ?? allCases[0];
   let activeCaseMetrics: ContextSnapshot["active_case_metrics"] = null;
 
   if (activeCase) {
-    const events = getEventsByCaseId(activeCase.id);
+    const events = await getEventsByCaseId(activeCase.id);
     const metrics = computeAllMetrics(events);
     const ttta = metrics.find((m) => m.abbreviation === "TTTA");
     const ttgp = metrics.find((m) => m.abbreviation === "TTGP");
@@ -60,19 +57,17 @@ export async function buildContextSnapshot(): Promise<ContextSnapshot> {
       ttta_running: ttta?.is_running ?? false,
       ttgp_running: ttgp?.is_running ?? false,
       ttdc_running: ttdc?.is_running ?? false,
-      missing_milestones: getMissingMilestones(activeCase.id),
+      missing_milestones: await getMissingMilestones(activeCase.id),
     };
   }
 
-  // Missing milestones for all open/active cases
-  const missingAll: MissingMilestones[] = allCases
-    .filter((c) => c.status !== "closed")
-    .map((c) => ({
-      case_id: c.id,
-      patient_ref: c.patient_ref,
-      missing: getMissingMilestones(c.id),
-    }))
-    .filter((m) => m.missing.length > 0);
+  const missingAll: MissingMilestones[] = [];
+  for (const c of allCases.filter((c) => c.status !== "closed")) {
+    const missing = await getMissingMilestones(c.id);
+    if (missing.length > 0) {
+      missingAll.push({ case_id: c.id, patient_ref: c.patient_ref, missing });
+    }
+  }
 
   // Tasks and notes
   const topTasksRaw = await getTasks({ limit: 5 });

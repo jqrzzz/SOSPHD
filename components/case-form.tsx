@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { createCaseAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
@@ -84,9 +85,12 @@ export function CaseForm() {
         />
       </div>
 
-      <div>
+      <div className="flex gap-3">
         <Button type="submit" disabled={isPending}>
           {isPending ? "Creating..." : "Create Case"}
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/cases">Cancel</Link>
         </Button>
       </div>
     </form>

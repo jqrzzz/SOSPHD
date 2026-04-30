@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,13 +21,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { createNoteAction, createTaskAction } from "@/lib/advisor-actions";
+import { toast } from "sonner";
 
 export function QuickCaptureNote() {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(
     async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
       const result = await createNoteAction(prev, formData);
-      if (result?.success) setOpen(false);
+      if (result?.success) {
+        setOpen(false);
+        toast.success("Note saved");
+        router.refresh();
+      }
       return result;
     },
     null,
@@ -96,10 +103,15 @@ export function QuickCaptureNote() {
 export function QuickCaptureTask() {
   const [open, setOpen] = useState(false);
   const [priority, setPriority] = useState("2");
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(
     async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
       const result = await createTaskAction(prev, formData);
-      if (result?.success) setOpen(false);
+      if (result?.success) {
+        setOpen(false);
+        toast.success("Task created");
+        router.refresh();
+      }
       return result;
     },
     null,

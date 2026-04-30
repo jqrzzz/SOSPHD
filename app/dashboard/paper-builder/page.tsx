@@ -2,7 +2,7 @@ import { getDashboardSummary } from "@/lib/data/analytics";
 import { PaperBuilder } from "@/components/paper-builder";
 
 export default async function PaperBuilderPage() {
-  const summary = getDashboardSummary();
+  const summary = await getDashboardSummary();
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
