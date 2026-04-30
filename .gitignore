@@ -8,3 +8,9 @@ node_modules
 .next/
 .env*.local
 .DS_Store
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# Instructor memory (user state — keep local, not in git)
+lib/instructor/memory.md
