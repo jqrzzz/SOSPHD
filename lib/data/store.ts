@@ -187,11 +187,14 @@ export async function addEvent(data: {
   event_type: CaseEvent["event_type"];
   occurred_at: string;
   payload: string;
+  actor_id?: string;
 }): Promise<CaseEvent> {
   const supabase = await tryCreateClient();
   if (!supabase) {
     throw new Error("Supabase is not configured. Cannot add event.");
   }
+  const { data: userData } = await supabase.auth.getUser();
+  const actorId = data.actor_id ?? userData.user?.id ?? "system";
   const { data: newEvent, error } = await supabase
     .schema("research")
     .from("case_events")
@@ -199,7 +202,7 @@ export async function addEvent(data: {
       case_id: data.case_id,
       event_type: data.event_type,
       occurred_at: data.occurred_at,
-      actor_id: "op_demo",
+      actor_id: actorId,
       payload: data.payload,
     })
     .select()
@@ -221,6 +224,22 @@ export async function addEvent(data: {
 
 // ── Recommendations (research schema) ───────────────────────────────
 
+function toRecommendation(row: Record<string, unknown>): Recommendation {
+  return {
+    id: row.id as string,
+    case_id: row.case_id as string,
+    created_at: row.created_at as string,
+    engine_type: row.engine_type as Recommendation["engine_type"],
+    engine_version: row.engine_version as string,
+    confidence_type: row.confidence_type as Recommendation["confidence_type"],
+    confidence_value: row.confidence_value as number,
+    recommendation: row.recommendation as string,
+    explanation: row.explanation as string,
+    accepted: row.accepted as boolean | null,
+    override_reason: row.override_reason as string | null,
+  };
+}
+
 export async function getRecommendationsByCaseId(caseId: string): Promise<Recommendation[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
@@ -233,19 +252,82 @@ export async function getRecommendationsByCaseId(caseId: string): Promise<Recomm
 
   if (error || !data) return [];
 
-  return data.map((row) => ({
-    id: row.id as string,
-    case_id: row.case_id as string,
-    created_at: row.created_at as string,
-    engine_type: row.engine_type as Recommendation["engine_type"],
-    engine_version: row.engine_version as string,
-    confidence_type: row.confidence_type as Recommendation["confidence_type"],
-    confidence_value: row.confidence_value as number,
-    recommendation: row.recommendation as string,
-    explanation: row.explanation as string,
-    accepted: row.accepted as boolean | null,
-    override_reason: row.override_reason as string | null,
-  }));
+  return data.map((row) => toRecommendation(row as Record<string, unknown>));
+}
+
+export async function getRecommendationById(
+  id: string,
+): Promise<Recommendation | null> {
+  const supabase = await tryCreateClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .schema("research")
+    .from("recommendations")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !data) return null;
+  return toRecommendation(data as Record<string, unknown>);
+}
+
+export async function createRecommendation(data: {
+  case_id: string;
+  engine_type: Recommendation["engine_type"];
+  engine_version: string;
+  confidence_type: Recommendation["confidence_type"];
+  confidence_value: number;
+  recommendation: string;
+  explanation: string;
+}): Promise<Recommendation> {
+  const supabase = await tryCreateClient();
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Cannot create recommendation.");
+  }
+  const { data: row, error } = await supabase
+    .schema("research")
+    .from("recommendations")
+    .insert({
+      case_id: data.case_id,
+      engine_type: data.engine_type,
+      engine_version: data.engine_version,
+      confidence_type: data.confidence_type,
+      confidence_value: data.confidence_value,
+      recommendation: data.recommendation,
+      explanation: data.explanation,
+      accepted: null,
+      override_reason: null,
+    })
+    .select()
+    .single();
+  if (error || !row) {
+    throw new Error(`Failed to create recommendation: ${error?.message}`);
+  }
+  return toRecommendation(row as Record<string, unknown>);
+}
+
+export async function decideRecommendation(
+  id: string,
+  accepted: boolean,
+  overrideReason: string | null,
+): Promise<Recommendation> {
+  const supabase = await tryCreateClient();
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Cannot record decision.");
+  }
+  const { data: row, error } = await supabase
+    .schema("research")
+    .from("recommendations")
+    .update({
+      accepted,
+      override_reason: overrideReason,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error || !row) {
+    throw new Error(`Failed to record decision: ${error?.message}`);
+  }
+  return toRecommendation(row as Record<string, unknown>);
 }
 
 export async function getEventCountByCaseId(caseId: string): Promise<number> {

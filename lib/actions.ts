@@ -3,7 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createCase, addEvent } from "@/lib/data/store";
+import {
+  createCase,
+  addEvent,
+  decideRecommendation,
+  getRecommendationById,
+} from "@/lib/data/store";
 import { EVENT_TYPES } from "@/lib/data/types";
 
 // ── Schemas ──────────────────────────────────────────────────────────
@@ -72,4 +77,100 @@ export async function addEventAction(
 
   revalidatePath(`/cases/${parsed.data.case_id}`);
   return { success: true };
+}
+
+// ── Recommendations: operator decision flow (Paper 2) ───────────────
+
+/**
+ * Operator accepts or overrides an AI recommendation.
+ *
+ * Writes:
+ * 1. recommendation.accepted (true/false), override_reason
+ * 2. a NOTE event on the case timeline so the decision is part of the
+ *    provenance chain (occurred_at + actor_id = who/when)
+ *
+ * Paper 2's intervention measurement is the difference in TTDC / TTGP
+ * for cases where coordination decisions went through this flow vs
+ * baseline. The NOTE-on-timeline is what gives us the timestamped
+ * decision audit a viva will demand.
+ */
+export async function decideRecommendationAction(
+  recommendationId: string,
+  decision: "accept" | "override",
+  overrideReason?: string,
+): Promise<{ error?: string; success?: boolean }> {
+  if (!recommendationId) {
+    return { error: "Missing recommendation id" };
+  }
+
+  const existing = await getRecommendationById(recommendationId);
+  if (!existing) {
+    return { error: "Recommendation not found" };
+  }
+  if (existing.accepted !== null) {
+    return { error: "Decision has already been recorded for this recommendation" };
+  }
+  if (decision === "override" && (!overrideReason || !overrideReason.trim())) {
+    return { error: "Override requires a reason" };
+  }
+
+  const accepted = decision === "accept";
+  try {
+    await decideRecommendation(
+      recommendationId,
+      accepted,
+      accepted ? null : overrideReason!.trim(),
+    );
+
+    // Log the decision on the case timeline as a NOTE — this is the
+    // timestamped audit row Paper 2 cites.
+    await addEvent({
+      case_id: existing.case_id,
+      event_type: "NOTE",
+      occurred_at: new Date().toISOString(),
+      payload: JSON.stringify({
+        kind: "rec_decision",
+        recommendation_id: recommendationId,
+        engine_type: existing.engine_type,
+        engine_version: existing.engine_version,
+        confidence_value: existing.confidence_value,
+        decision: accepted ? "accepted" : "overridden",
+        override_reason: accepted ? null : overrideReason!.trim(),
+        recommendation_text: existing.recommendation,
+      }),
+    });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to record decision",
+    };
+  }
+
+  revalidatePath(`/cases/${existing.case_id}`);
+  return { success: true };
+}
+
+export async function generateRecommendationsAction(
+  caseId: string,
+  count: number = 3,
+): Promise<{ error?: string; success?: boolean; count?: number }> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const res = await fetch(`${baseUrl}/api/recommendations/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ case_id: caseId, count }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { error: body.error ?? `Failed (${res.status})` };
+    }
+    const body = await res.json();
+    revalidatePath(`/cases/${caseId}`);
+    return { success: true, count: body.count };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Generation request failed",
+    };
+  }
 }
