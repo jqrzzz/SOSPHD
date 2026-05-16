@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPaper2Coordination } from "@/lib/data/analytics";
 import { formatDate } from "@/lib/utils";
 import { formatDuration } from "@/lib/data/metrics";
+import { PROTOCOL_VERSION } from "@/app/protocol/page";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,9 +62,23 @@ export default async function Paper2DashboardPage() {
         title="Human-AI Coordination"
         description="Every AI recommendation, every operator decision, every override reason. This is the provenance figure-set Paper 2 cites."
         actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/cases">Open cases →</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link
+                href="/protocol"
+                className="inline-flex items-center gap-1.5"
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px_0_hsl(170_50%_38%/0.6)]"
+                />
+                Protocol {PROTOCOL_VERSION}
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/cases">Open cases →</Link>
+            </Button>
+          </div>
         }
       />
 

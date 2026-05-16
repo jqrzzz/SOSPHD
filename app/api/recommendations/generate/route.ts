@@ -25,6 +25,7 @@ import type { Recommendation } from "@/lib/data/types";
 
 export const maxDuration = 60;
 
+const PROTOCOL_VERSION = "v0.1";
 const ENGINE_VERSION = "llm-paper2-v0.1";
 
 const requestSchema = z.object({
@@ -56,15 +57,24 @@ const recommendationSchema = z.object({
     .max(5),
 });
 
-const SYSTEM_PROMPT = `You are the SOS PHD recommendation engine for Paper 2 of the research program.
+const SYSTEM_PROMPT = `You are the SOS PHD recommendation engine for Paper 2 of the research program. You operate under SOSPHD Intervention Protocol ${PROTOCOL_VERSION}.
 
 Your task: given the current state of a tourist medical emergency case, produce 1-3 actionable, narrowly-scoped recommendations that a Tourist SOS operator could plausibly act on right now.
 
-## Rules
+## Protocol §1 — Scope
+Allowed categories: transport, payment, triage, facility, follow_up, data_capture, other.
+Out of scope: clinical orders, drug dosing, definitive diagnosis, patient-side advice. The intervention coordinates the system around the patient; it does not replace the clinician.
+
+## Protocol §2 — Confidence policy
+Confidence is your honest estimate in [0,1]:
+- 0.80-1.00 (High): evidence in the timeline is unambiguous.
+- 0.50-0.79 (Medium): default operating zone for well-supported coordination suggestions.
+- 0.00-0.49 (Low): use when milestones are missing or evidence is sparse.
+Be calibrated — Paper 2's reliability diagram depends on it.
+
+## Output rules
 - Output strictly valid JSON matching the requested schema. No prose outside the JSON.
 - Each recommendation must reference observable case state (specific events, missing milestones, computed metrics). NEVER invent patient details.
-- Categories you may use: transport, payment, triage, facility, follow_up, data_capture, other.
-- Confidence is your honest estimate in [0,1]: be calibrated. Reserve >=0.85 for cases where the evidence in the timeline is unambiguous. Reserve <=0.5 for cases with missing milestones or sparse evidence.
 - Each "explanation" is one short paragraph (<= 60 words) citing the specific events / metric values that justified the recommendation.
 - Recommendations should be coordination-oriented: payer triggers, transport activation, facility escalation, data-capture gaps. NOT clinical orders.
 

@@ -132,9 +132,9 @@ export const PHD_PHASES: Phase[] = [
         id: "step-7",
         label: "Intervention Protocol",
         description:
-          "What changes operationally vs baseline. Human-in-loop rules, override policy, uncertainty labeling. Decision provenance requirements.",
-        status: "pending",
-        deliverable: "Intervention Protocol v1.0",
+          "What changes operationally vs baseline. Human-in-loop rules, override policy, uncertainty labeling. Decision provenance requirements. Drafted as v0.1 at /protocol — recommendation generator cites it; dashboard pins it.",
+        status: "in_progress",
+        deliverable: "Intervention Protocol v0.1 (drafted, /protocol)",
       },
       {
         id: "step-8",
