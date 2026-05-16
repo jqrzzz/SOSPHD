@@ -64,20 +64,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-56 flex-col border-r border-border bg-sidebar transition-transform duration-200 md:static md:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-sidebar-border/80 bg-sidebar transition-transform duration-200 md:static md:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-            <span className="text-xs font-bold text-primary-foreground">S</span>
+        <div className="relative flex h-14 items-center gap-2.5 border-b border-sidebar-border/80 px-4">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+          />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-[0_4px_12px_-4px_hsl(170_50%_38%/0.5)]">
+            <span className="font-mono text-[11px] font-bold tracking-tight">
+              S
+            </span>
           </div>
-          <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
-            SOS PHD
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-[13px] font-semibold tracking-tight text-sidebar-foreground">
+              SOS PHD
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-sidebar-foreground/40">
+              Research
+            </span>
+          </div>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 p-3" aria-label="Main navigation">
+        <nav
+          className="flex flex-1 flex-col gap-0.5 p-3"
+          aria-label="Main navigation"
+        >
           {NAV_ITEMS.map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -86,43 +100,71 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150",
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                    ? "bg-gradient-to-r from-sidebar-accent to-sidebar-accent/40 text-sidebar-accent-foreground shadow-[inset_0_1px_0_0_hsl(0_0%_100%/0.04)]"
+                    : "text-sidebar-foreground/65 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground",
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
-                <item.icon className="h-4 w-4" />
+                {/* Active rail */}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-primary transition-opacity",
+                    isActive
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-30",
+                  )}
+                />
+                <item.icon
+                  className={cn(
+                    "h-4 w-4 shrink-0 transition-colors",
+                    isActive
+                      ? "text-primary"
+                      : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground/80",
+                  )}
+                />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="flex flex-col gap-2 border-t border-border p-3">
+        <div className="flex flex-col gap-1.5 border-t border-sidebar-border/80 p-3">
           {userEmail && (
-            <div className="flex flex-col gap-0.5">
-              {userName && (
-                <p className="truncate text-xs font-medium text-sidebar-foreground/80" title={userName}>
-                  {userName}
+            <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 font-mono text-[11px] font-semibold text-primary ring-1 ring-primary/20">
+                {(userName ?? userEmail).charAt(0).toUpperCase()}
+              </div>
+              <div className="flex min-w-0 flex-col leading-tight">
+                {userName && (
+                  <p
+                    className="truncate text-[12px] font-medium text-sidebar-foreground/90"
+                    title={userName}
+                  >
+                    {userName}
+                  </p>
+                )}
+                <p
+                  className="truncate text-[11px] text-sidebar-foreground/45"
+                  title={userEmail}
+                >
+                  {userEmail}
                 </p>
-              )}
-              <p className="truncate text-xs text-muted-foreground" title={userEmail}>
-                {userEmail}
-              </p>
+              </div>
             </div>
           )}
           <button
             onClick={handleSignOut}
             disabled={isSigningOut}
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/40 hover:text-sidebar-foreground disabled:opacity-50"
           >
             <LogOutIcon className="h-4 w-4" />
             {isSigningOut ? "Signing out..." : "Sign Out"}
           </button>
-          <p className="text-xs text-muted-foreground/60">
-            {APP_CONFIG.app.name} v{APP_CONFIG.app.version}
+          <p className="px-3 pt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-sidebar-foreground/30">
+            {APP_CONFIG.app.name} · v{APP_CONFIG.app.version}
           </p>
         </div>
       </aside>
@@ -130,25 +172,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar — mobile nav toggle + quick actions */}
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <div className="flex items-center gap-2 border-b border-border/60 bg-background/60 px-3 py-2 backdrop-blur-md">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent md:hidden"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
             aria-label="Open navigation"
           >
             <MenuIcon className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold text-foreground md:hidden">SOS PHD</span>
+          <span className="text-sm font-semibold text-foreground md:hidden">
+            SOS PHD
+          </span>
 
           <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
-              className="hidden items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent transition-colors sm:flex"
+              onClick={() =>
+                document.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", metaKey: true }),
+                )
+              }
+              className="group hidden items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-accent/80 hover:text-foreground sm:flex"
             >
               <SearchIcon className="h-3.5 w-3.5" />
-              <span>Search</span>
-              <kbd className="ml-1 rounded border border-border bg-background px-1 py-0.5 text-[10px] font-mono">
-                {typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent) ? "⌘" : "Ctrl+"}K
+              <span>Search anything…</span>
+              <kbd className="ml-2 rounded border border-border/70 bg-background/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/70">
+                {typeof navigator !== "undefined" &&
+                /Mac/.test(navigator.userAgent)
+                  ? "⌘"
+                  : "Ctrl+"}
+                K
               </kbd>
             </button>
             <QuickCaptureNote />
