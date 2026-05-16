@@ -4,7 +4,7 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { modelFor, requireAIKey, MissingAIKeyError } from "@/lib/ai/config";
 import { buildContextSnapshot } from "@/lib/data/context-builder";
 import { createTasksFromAI } from "@/lib/advisor-actions";
 import { addMessage } from "@/lib/data/advisor-store";
@@ -174,14 +174,13 @@ async function extractAndCreateTasks(text: string): Promise<void> {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json(
-      {
-        error:
-          "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file.",
-      },
-      { status: 503 },
-    );
+  try {
+    requireAIKey("advisor");
+  } catch (err) {
+    if (err instanceof MissingAIKeyError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
   }
 
   const {
@@ -199,7 +198,7 @@ export async function POST(req: Request) {
   const agentText = formatAgentInsights(pulse, actions, gaps);
 
   const result = streamText({
-    model: openai("gpt-4o-mini"),
+    model: modelFor("advisor"),
     system: `${SYSTEM_PROMPT}\n\n${contextText}\n${agentText}`,
     messages: await convertToModelMessages(messages),
     abortSignal: req.signal,
