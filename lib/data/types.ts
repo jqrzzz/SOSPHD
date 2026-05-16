@@ -73,6 +73,10 @@ export interface Recommendation {
   explanation: string;
   accepted: boolean | null; // null = pending
   override_reason: string | null;
+  /** Auth user id of operator who decided. NULL until decided. */
+  decided_by: string | null;
+  /** ISO timestamp of decision. NULL until decided. */
+  decided_at: string | null;
 }
 
 // ── Site ──────────────────────────────────────────────────────────────
