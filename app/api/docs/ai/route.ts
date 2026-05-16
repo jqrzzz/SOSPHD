@@ -2,7 +2,13 @@ import { generateText } from "ai";
 import { z } from "zod";
 import { getDocById, updateDoc } from "@/lib/data/docs-store";
 import { createTask } from "@/lib/data/advisor-store";
-import { modelFor, requireAIKey, MissingAIKeyError } from "@/lib/ai/config";
+import {
+  modelFor,
+  requireAIKey,
+  MissingAIKeyError,
+  requireAuthenticatedUser,
+  UnauthenticatedError,
+} from "@/lib/ai/config";
 
 export const maxDuration = 60;
 
@@ -67,9 +73,10 @@ Keep it under 500 words. Use clear, persuasive academic prose. Output in Markdow
 
 export async function POST(req: Request) {
   try {
+    await requireAuthenticatedUser();
     requireAIKey("doc_assistant");
   } catch (err) {
-    if (err instanceof MissingAIKeyError) {
+    if (err instanceof UnauthenticatedError || err instanceof MissingAIKeyError) {
       return Response.json({ error: err.message }, { status: err.status });
     }
     throw err;

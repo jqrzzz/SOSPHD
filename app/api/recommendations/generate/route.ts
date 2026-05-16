@@ -13,6 +13,10 @@ import {
   generateRecommendationsForCase,
   RecommendationError,
 } from "@/lib/recommendations";
+import {
+  requireAuthenticatedUser,
+  UnauthenticatedError,
+} from "@/lib/ai/config";
 
 export const maxDuration = 60;
 
@@ -22,6 +26,15 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  try {
+    await requireAuthenticatedUser();
+  } catch (err) {
+    if (err instanceof UnauthenticatedError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {

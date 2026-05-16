@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getPaper2Coordination } from "@/lib/data/analytics";
 import { formatDate } from "@/lib/utils";
 import { formatDuration } from "@/lib/data/metrics";
-import { PROTOCOL_VERSION } from "@/app/protocol/page";
+import { PROTOCOL_VERSION } from "@/lib/protocol";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

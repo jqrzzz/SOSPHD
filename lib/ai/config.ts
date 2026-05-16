@@ -66,3 +66,43 @@ export function requireAIKey(surface: AISurface): void {
     throw new MissingAIKeyError(surface);
   }
 }
+
+export class UnauthenticatedError extends Error {
+  status = 401;
+  constructor(message: string = "Authentication required") {
+    super(message);
+    this.name = "UnauthenticatedError";
+  }
+}
+
+/**
+ * Gate every LLM-cost endpoint behind authentication so the OpenAI
+ * budget can't be drained by unauthenticated callers. Throws
+ * UnauthenticatedError when no session is present.
+ *
+ * Throws (rather than returns) so routes can use a single try/catch
+ * block alongside the AI-key check and other validation.
+ *
+ * Mirrors the middleware's local-dev pattern (lib/supabase/proxy.ts):
+ * when Supabase env vars are not configured, treat as dev mode and
+ * return a fake user. This keeps `npm run dev` usable in clean
+ * checkouts where no Supabase project is wired up yet. In production
+ * the env vars MUST be set, so this path is never reached.
+ */
+export async function requireAuthenticatedUser(): Promise<{ id: string }> {
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return { id: "dev_user" };
+  }
+  // Dynamic import — keeps this module callable from non-Next contexts
+  // (e.g. test runners) where '@/lib/supabase/server' isn't available.
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data?.user) {
+    throw new UnauthenticatedError();
+  }
+  return { id: data.user.id };
+}

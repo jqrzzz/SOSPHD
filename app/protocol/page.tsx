@@ -2,9 +2,12 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  PROTOCOL_VERSION,
+  PROTOCOL_EFFECTIVE_DATE,
+} from "@/lib/protocol";
 
-export const PROTOCOL_VERSION = "v0.1";
-export const PROTOCOL_EFFECTIVE_DATE = "2026-05-16";
+export { PROTOCOL_VERSION, PROTOCOL_EFFECTIVE_DATE };
 
 export const metadata = {
   title: "Intervention Protocol · SOSPHD",
@@ -406,21 +409,26 @@ function DefList({
 }
 
 function Ol({ items }: { items: React.ReactNode[] }) {
+  // Items are static at render time (protocol §3/§5 enumerations), so
+  // an index key is acceptable here — no reordering, no insertion.
   return (
     <ol className="flex flex-col gap-2">
-      {items.map((item, i) => (
-        <li
-          key={i}
-          className="flex gap-3 rounded-lg border border-border/40 bg-background/40 px-3 py-2"
-        >
-          <span className="flex-shrink-0 font-mono text-xs tabular-nums text-muted-foreground/70">
-            {i + 1}.
-          </span>
-          <span className="text-xs leading-relaxed text-foreground/90">
-            {item}
-          </span>
-        </li>
-      ))}
+      {items.map((item, i) => {
+        const key = `${i}`;
+        return (
+          <li
+            key={key}
+            className="flex gap-3 rounded-lg border border-border/40 bg-background/40 px-3 py-2"
+          >
+            <span className="flex-shrink-0 font-mono text-xs tabular-nums text-muted-foreground/70">
+              {i + 1}.
+            </span>
+            <span className="text-xs leading-relaxed text-foreground/90">
+              {item}
+            </span>
+          </li>
+        );
+      })}
     </ol>
   );
 }

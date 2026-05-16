@@ -17,9 +17,9 @@ import {
 } from "@/lib/data/store";
 import { computeAllMetrics, formatDuration } from "@/lib/data/metrics";
 import { modelFor, requireAIKey, MissingAIKeyError } from "@/lib/ai/config";
+import { PROTOCOL_VERSION } from "@/lib/protocol";
 import type { Recommendation } from "@/lib/data/types";
 
-export const PROTOCOL_VERSION = "v0.1";
 export const ENGINE_VERSION = "llm-paper2-v0.1";
 
 export type RecommendationCategory =

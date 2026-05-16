@@ -373,6 +373,20 @@ export async function createRecommendation(data: {
   return toRecommendation(row as Record<string, unknown>);
 }
 
+export class RecommendationAlreadyDecidedError extends Error {
+  constructor() {
+    super("This recommendation has already been decided");
+    this.name = "RecommendationAlreadyDecidedError";
+  }
+}
+
+/**
+ * Atomic check-and-update: the WHERE clause includes `accepted IS NULL`
+ * so two concurrent decisions can't both succeed. The first writer
+ * wins; the loser sees 0 rows updated and throws
+ * RecommendationAlreadyDecidedError, which the action surfaces as a
+ * 409-style "already decided" message in the UI.
+ */
 export async function decideRecommendation(
   id: string,
   accepted: boolean,
@@ -394,10 +408,20 @@ export async function decideRecommendation(
       decided_at: decidedAt,
     })
     .eq("id", id)
+    .is("accepted", null) // <-- atomic guard: only update if still pending
     .select()
-    .single();
-  if (error || !row) {
-    throw new Error(`Failed to record decision: ${error?.message}`);
+    .maybeSingle();
+  if (error) {
+    throw new Error(`Failed to record decision: ${error.message}`);
+  }
+  if (!row) {
+    // Either id doesn't exist, or accepted was already set (lost race).
+    // Distinguish by re-reading.
+    const existing = await getRecommendationById(id);
+    if (existing && existing.accepted !== null) {
+      throw new RecommendationAlreadyDecidedError();
+    }
+    throw new Error("Recommendation not found");
   }
   return toRecommendation(row as Record<string, unknown>);
 }
