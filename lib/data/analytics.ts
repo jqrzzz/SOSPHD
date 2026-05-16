@@ -2,11 +2,27 @@
  *  Pure functions that compute dashboard-level stats from the store.
  *  All computations use the same metric functions as the case detail
  *  page for consistency.
+ *
+ *  Performance contract: every aggregator function in this file uses
+ *  exactly THREE database round-trips (cases, all_events, all_recs)
+ *  regardless of dataset size. Per-case fetches are forbidden here.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getCases, getEventsByCaseId, getRecommendationsByCaseId } from "./store";
+import { getCases, getAllCaseEvents, getAllRecommendations } from "./store";
 import { computeTTTA, computeTTGP, computeTTDC, formatDuration } from "./metrics";
-import type { Recommendation, CaseEvent } from "./types";
+import type { Recommendation } from "./types";
+
+function groupByCaseId<T extends { case_id: string }>(
+  items: T[],
+): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const arr = map.get(item.case_id) ?? [];
+    arr.push(item);
+    map.set(item.case_id, arr);
+  }
+  return map;
+}
 
 // ── Summary stats ────────────────────────────────────────────────────
 
@@ -41,7 +57,15 @@ function average(values: number[]): number | null {
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const allCases = await getCases();
+  // 3 parallel queries, regardless of case count.
+  const [allCases, allEvents, allRecs] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+    getAllRecommendations(),
+  ]);
+
+  const eventsByCaseId = groupByCaseId(allEvents);
+  const recsByCaseId = groupByCaseId(allRecs);
 
   const tttas: number[] = [];
   const ttgps: number[] = [];
@@ -51,7 +75,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   let overriddenRecs = 0;
 
   for (const c of allCases) {
-    const events = await getEventsByCaseId(c.id);
+    const events = eventsByCaseId.get(c.id) ?? [];
     const ttta = computeTTTA(events);
     const ttgp = computeTTGP(events);
     const ttdc = computeTTDC(events);
@@ -60,7 +84,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     if (ttgp.value_ms !== null && !ttgp.is_running) ttgps.push(ttgp.value_ms);
     if (ttdc.value_ms !== null && !ttdc.is_running) ttdcs.push(ttdc.value_ms);
 
-    const recs = await getRecommendationsByCaseId(c.id);
+    const recs = recsByCaseId.get(c.id) ?? [];
     totalRecs += recs.length;
     acceptedRecs += recs.filter((r) => r.accepted === true).length;
     overriddenRecs += recs.filter((r) => r.accepted === false).length;
@@ -104,15 +128,22 @@ export interface CaseMetricRow {
 }
 
 export async function getCaseMetricRows(): Promise<CaseMetricRow[]> {
-  const allCases = await getCases();
+  const [allCases, allEvents, allRecs] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+    getAllRecommendations(),
+  ]);
+
+  const eventsByCaseId = groupByCaseId(allEvents);
+  const recsByCaseId = groupByCaseId(allRecs);
 
   const rows: CaseMetricRow[] = [];
   for (const c of allCases) {
-    const events = await getEventsByCaseId(c.id);
+    const events = eventsByCaseId.get(c.id) ?? [];
     const ttta = computeTTTA(events);
     const ttgp = computeTTGP(events);
     const ttdc = computeTTDC(events);
-    const recs = await getRecommendationsByCaseId(c.id);
+    const recs = recsByCaseId.get(c.id) ?? [];
 
     const ttgpComplete = ttgp.value_ms !== null && !ttgp.is_running;
     const ttdcComplete = ttdc.value_ms !== null && !ttdc.is_running;
@@ -142,28 +173,6 @@ export async function getCaseMetricRows(): Promise<CaseMetricRow[]> {
 }
 
 // ── Paper 2: human-AI coordination analytics ─────────────────────────
-
-interface DecisionPayload {
-  kind: "rec_decision";
-  recommendation_id: string;
-  engine_type: string;
-  engine_version: string;
-  confidence_value: number;
-  decision: "accepted" | "overridden";
-  override_reason: string | null;
-  recommendation_text: string;
-}
-
-function tryParseDecisionPayload(payload: string): DecisionPayload | null {
-  if (!payload || !payload.trim().startsWith("{")) return null;
-  try {
-    const parsed = JSON.parse(payload);
-    if (parsed?.kind === "rec_decision") return parsed as DecisionPayload;
-  } catch {
-    /* fall through */
-  }
-  return null;
-}
 
 export interface EngineStat {
   engine_version: string;
@@ -226,72 +235,58 @@ function bucketLabel(lo: number, hi: number): string {
 }
 
 /**
- * Aggregates every recommendation across every case, joins each rec to
- * its decision NOTE (matched by recommendation_id in the payload), and
- * produces the figure-set Paper 2 cites.
+ * Aggregates every recommendation across every case using the
+ * decided_at column directly (added in migration 20260516_005).
+ * Two parallel queries regardless of dataset size.
  */
 export async function getPaper2Coordination(): Promise<Paper2Coordination> {
-  const allCases = await getCases();
+  const [allCases, allRecs] = await Promise.all([
+    getCases(),
+    getAllRecommendations(),
+  ]);
 
-  type DecidedRec = {
+  // Index cases by id for O(1) severity / patient_ref lookups.
+  const caseById = new Map(allCases.map((c) => [c.id, c]));
+
+  // Decorated rec with the joining fields we need.
+  type DecoratedRec = {
     rec: Recommendation;
     case_id: string;
     patient_ref: string;
     severity: number;
-    decision_event: CaseEvent | null;
-    decision_payload: DecisionPayload | null;
   };
-
-  const decidedRecs: DecidedRec[] = [];
-  let casesWithRecs = 0;
-
-  for (const c of allCases) {
-    const recs = await getRecommendationsByCaseId(c.id);
-    if (recs.length === 0) continue;
-    casesWithRecs += 1;
-    const events = await getEventsByCaseId(c.id);
-
-    // Index decision NOTEs by rec id for O(1) join
-    const decisionByRecId = new Map<
-      string,
-      { event: CaseEvent; payload: DecisionPayload }
-    >();
-    for (const e of events) {
-      const dp = tryParseDecisionPayload(e.payload);
-      if (dp) decisionByRecId.set(dp.recommendation_id, { event: e, payload: dp });
-    }
-
-    for (const rec of recs) {
-      const decision = decisionByRecId.get(rec.id);
-      decidedRecs.push({
-        rec,
-        case_id: c.id,
-        patient_ref: c.patient_ref,
-        severity: c.severity,
-        decision_event: decision?.event ?? null,
-        decision_payload: decision?.payload ?? null,
-      });
-    }
+  const decoratedRecs: DecoratedRec[] = [];
+  const seenCaseIds = new Set<string>();
+  for (const rec of allRecs) {
+    const c = caseById.get(rec.case_id);
+    if (!c) continue; // rec orphaned from operational case — skip
+    decoratedRecs.push({
+      rec,
+      case_id: rec.case_id,
+      patient_ref: c.patient_ref,
+      severity: c.severity,
+    });
+    seenCaseIds.add(rec.case_id);
   }
 
-  const total = decidedRecs.length;
-  const accepted = decidedRecs.filter((d) => d.rec.accepted === true).length;
-  const overridden = decidedRecs.filter((d) => d.rec.accepted === false).length;
-  const pending = decidedRecs.filter((d) => d.rec.accepted === null).length;
+  const total = decoratedRecs.length;
+  const accepted = decoratedRecs.filter((d) => d.rec.accepted === true).length;
+  const overridden = decoratedRecs.filter((d) => d.rec.accepted === false).length;
+  const pending = decoratedRecs.filter((d) => d.rec.accepted === null).length;
   const decided = accepted + overridden;
 
   const overall_accept_rate = decided > 0 ? accepted / decided : null;
   const avg_confidence =
     total > 0
-      ? decidedRecs.reduce((sum, d) => sum + d.rec.confidence_value, 0) / total
+      ? decoratedRecs.reduce((sum, d) => sum + d.rec.confidence_value, 0) / total
       : null;
 
-  // Time-to-decision distribution
+  // Time-to-decision now comes straight from decided_at - created_at.
   const decisionTimes: number[] = [];
-  for (const d of decidedRecs) {
-    if (!d.decision_event) continue;
+  for (const d of decoratedRecs) {
+    if (!d.rec.decided_at) continue;
     const created = Date.parse(d.rec.created_at);
-    const decidedAt = Date.parse(d.decision_event.occurred_at);
+    const decidedAt = Date.parse(d.rec.decided_at);
     if (!Number.isFinite(created) || !Number.isFinite(decidedAt)) continue;
     const diff = decidedAt - created;
     if (diff >= 0) decisionTimes.push(diff);
@@ -300,8 +295,8 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
   const median_time_to_decision_ms = median(decisionTimes);
 
   // By engine_version
-  const engineMap = new Map<string, DecidedRec[]>();
-  for (const d of decidedRecs) {
+  const engineMap = new Map<string, DecoratedRec[]>();
+  for (const d of decoratedRecs) {
     const key = d.rec.engine_version;
     const arr = engineMap.get(key) ?? [];
     arr.push(d);
@@ -315,8 +310,8 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
     const dec = acc + ovr;
     const times: number[] = [];
     for (const d of recs) {
-      if (!d.decision_event) continue;
-      const t = Date.parse(d.decision_event.occurred_at) - Date.parse(d.rec.created_at);
+      if (!d.rec.decided_at) continue;
+      const t = Date.parse(d.rec.decided_at) - Date.parse(d.rec.created_at);
       if (Number.isFinite(t) && t >= 0) times.push(t);
     }
     by_engine.push({
@@ -333,14 +328,13 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
   }
   by_engine.sort((a, b) => b.total - a.total);
 
-  // Confidence calibration buckets (only decided recs — calibration is
-  // meaningless for pending)
-  const decidedOnly = decidedRecs.filter((d) => d.rec.accepted !== null);
+  // Confidence calibration buckets (only decided recs)
+  const decidedOnly = decoratedRecs.filter((d) => d.rec.accepted !== null);
   const buckets: { lo: number; hi: number }[] = [
     { lo: 0.0, hi: 0.25 },
     { lo: 0.25, hi: 0.5 },
     { lo: 0.5, hi: 0.75 },
-    { lo: 0.75, hi: 1.0001 }, // include 1.0
+    { lo: 0.75, hi: 1.0001 },
   ];
   const by_confidence: ConfidenceBucket[] = buckets.map((b) => {
     const inBucket = decidedOnly.filter(
@@ -361,7 +355,7 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
   });
 
   // By severity
-  const sevMap = new Map<number, DecidedRec[]>();
+  const sevMap = new Map<number, DecoratedRec[]>();
   for (const d of decidedOnly) {
     const arr = sevMap.get(d.severity) ?? [];
     arr.push(d);
@@ -383,8 +377,8 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
 
   // Override reasons (recent first, max 20)
   const override_reasons: OverrideReason[] = [];
-  for (const d of decidedRecs) {
-    if (d.rec.accepted === false && d.rec.override_reason && d.decision_event) {
+  for (const d of decoratedRecs) {
+    if (d.rec.accepted === false && d.rec.override_reason && d.rec.decided_at) {
       override_reasons.push({
         case_id: d.case_id,
         patient_ref: d.patient_ref,
@@ -392,7 +386,7 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
         reason: d.rec.override_reason,
         engine_version: d.rec.engine_version,
         confidence: d.rec.confidence_value,
-        decided_at: d.decision_event.occurred_at,
+        decided_at: d.rec.decided_at,
       });
     }
   }
@@ -414,7 +408,7 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
     by_severity,
     override_reasons: override_reasons.slice(0, 20),
     unique_engines: engineMap.size,
-    cases_with_recommendations: casesWithRecs,
+    cases_with_recommendations: seenCaseIds.size,
   };
 }
 

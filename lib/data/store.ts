@@ -163,6 +163,18 @@ export async function createCase(data: {
 export async function getEventsByCaseId(caseId: string): Promise<CaseEvent[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
+
+  // Materialize any new SOSCOMMAND timestamps before reading. Idempotent
+  // and best-effort: if the sync fails, we still return the events we
+  // have. This is what makes Paper 1's TTTA/TTGP/TTDC numbers come
+  // from operational reality rather than operator data entry.
+  try {
+    const { syncCaseFromOperational } = await import("./sync");
+    await syncCaseFromOperational(caseId);
+  } catch {
+    // Sync failure should never block reading existing events.
+  }
+
   const { data, error } = await supabase
     .schema("research")
     .from("case_events")
@@ -237,6 +249,8 @@ function toRecommendation(row: Record<string, unknown>): Recommendation {
     explanation: row.explanation as string,
     accepted: row.accepted as boolean | null,
     override_reason: row.override_reason as string | null,
+    decided_by: (row.decided_by as string | null) ?? null,
+    decided_at: (row.decided_at as string | null) ?? null,
   };
 }
 
@@ -253,6 +267,60 @@ export async function getRecommendationsByCaseId(caseId: string): Promise<Recomm
   if (error || !data) return [];
 
   return data.map((row) => toRecommendation(row as Record<string, unknown>));
+}
+
+/**
+ * Fetch ALL recommendations across the research schema in a single
+ * query, optionally filtered to a set of case ids. This is the
+ * O(1)-roundtrips replacement for looping per-case fetches in
+ * dashboard aggregators.
+ */
+export async function getAllRecommendations(
+  caseIds?: string[],
+): Promise<Recommendation[]> {
+  const supabase = await tryCreateClient();
+  if (!supabase) return [];
+  let query = supabase
+    .schema("research")
+    .from("recommendations")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (caseIds && caseIds.length > 0) {
+    query = query.in("case_id", caseIds);
+  }
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => toRecommendation(row as Record<string, unknown>));
+}
+
+/**
+ * Fetch ALL case events across the research schema in a single query,
+ * optionally filtered to a set of case ids. Replacement for
+ * per-case getEventsByCaseId loops in aggregators.
+ */
+export async function getAllCaseEvents(
+  caseIds?: string[],
+): Promise<CaseEvent[]> {
+  const supabase = await tryCreateClient();
+  if (!supabase) return [];
+  let query = supabase
+    .schema("research")
+    .from("case_events")
+    .select("*")
+    .order("occurred_at", { ascending: true });
+  if (caseIds && caseIds.length > 0) {
+    query = query.in("case_id", caseIds);
+  }
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id as string,
+    case_id: row.case_id as string,
+    occurred_at: row.occurred_at as string,
+    event_type: row.event_type as CaseEvent["event_type"],
+    actor_id: row.actor_id as string,
+    payload: row.payload as string,
+  }));
 }
 
 export async function getRecommendationById(
@@ -309,6 +377,8 @@ export async function decideRecommendation(
   id: string,
   accepted: boolean,
   overrideReason: string | null,
+  decidedBy: string,
+  decidedAt: string = new Date().toISOString(),
 ): Promise<Recommendation> {
   const supabase = await tryCreateClient();
   if (!supabase) {
@@ -320,6 +390,8 @@ export async function decideRecommendation(
     .update({
       accepted,
       override_reason: overrideReason,
+      decided_by: decidedBy,
+      decided_at: decidedAt,
     })
     .eq("id", id)
     .select()

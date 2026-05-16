@@ -9,6 +9,11 @@ import {
   decideRecommendation,
   getRecommendationById,
 } from "@/lib/data/store";
+import { createClient } from "@/lib/supabase/server";
+import {
+  generateRecommendationsForCase,
+  RecommendationError,
+} from "@/lib/recommendations";
 import { EVENT_TYPES } from "@/lib/data/types";
 
 // ── Schemas ──────────────────────────────────────────────────────────
@@ -114,20 +119,47 @@ export async function decideRecommendationAction(
     return { error: "Override requires a reason" };
   }
 
+  // Resolve the authenticated user once — the same id goes onto both the
+  // recommendation row (decided_by) and the audit NOTE (actor_id) so the
+  // two records stay consistent.
+  let actorId: string;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      return {
+        error:
+          "Not authenticated — sign in before deciding recommendations. Paper 2 provenance requires a real operator id.",
+      };
+    }
+    actorId = data.user.id;
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? `Auth check failed: ${err.message}`
+          : "Auth check failed",
+    };
+  }
+
   const accepted = decision === "accept";
+  const decidedAt = new Date().toISOString();
   try {
     await decideRecommendation(
       recommendationId,
       accepted,
       accepted ? null : overrideReason!.trim(),
+      actorId,
+      decidedAt,
     );
 
-    // Log the decision on the case timeline as a NOTE — this is the
-    // timestamped audit row Paper 2 cites.
+    // Log the decision on the case timeline as a NOTE — denormalized
+    // mirror of the columns, kept for the immutable timeline view.
     await addEvent({
       case_id: existing.case_id,
       event_type: "NOTE",
-      occurred_at: new Date().toISOString(),
+      occurred_at: decidedAt,
+      actor_id: actorId,
       payload: JSON.stringify({
         kind: "rec_decision",
         recommendation_id: recommendationId,
@@ -154,21 +186,16 @@ export async function generateRecommendationsAction(
   count: number = 3,
 ): Promise<{ error?: string; success?: boolean; count?: number }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/recommendations/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ case_id: caseId, count }),
-      cache: "no-store",
+    const recommendations = await generateRecommendationsForCase({
+      caseId,
+      count,
     });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      return { error: body.error ?? `Failed (${res.status})` };
-    }
-    const body = await res.json();
     revalidatePath(`/cases/${caseId}`);
-    return { success: true, count: body.count };
+    return { success: true, count: recommendations.length };
   } catch (err) {
+    if (err instanceof RecommendationError) {
+      return { error: err.message };
+    }
     return {
       error: err instanceof Error ? err.message : "Generation request failed",
     };
