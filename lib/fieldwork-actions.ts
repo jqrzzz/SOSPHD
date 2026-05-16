@@ -71,19 +71,24 @@ export async function createJournalAction(
     ? parsed.data.contact_ids.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const entry = await createJournalEntry({
-    entry_type: parsed.data.entry_type as JournalEntryType,
-    title: parsed.data.title,
-    content: parsed.data.content,
-    location: parsed.data.location || null,
-    corridor: parsed.data.corridor || null,
-    tags: tagList,
-    contact_ids: contactIdList,
-    linked_case_id: parsed.data.linked_case_id || null,
-  });
-
-  revalidatePath("/fieldwork");
-  return { success: true, id: entry?.id };
+  try {
+    const entry = await createJournalEntry({
+      entry_type: parsed.data.entry_type as JournalEntryType,
+      title: parsed.data.title,
+      content: parsed.data.content,
+      location: parsed.data.location || null,
+      corridor: parsed.data.corridor || null,
+      tags: tagList,
+      contact_ids: contactIdList,
+      linked_case_id: parsed.data.linked_case_id || null,
+    });
+    revalidatePath("/fieldwork");
+    return { success: true, id: entry.id };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to create entry",
+    };
+  }
 }
 
 export async function updateJournalAction(
@@ -145,23 +150,28 @@ export async function createContactAction(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const contact = await createContact({
-    name: parsed.data.name,
-    role: parsed.data.role as ContactRole,
-    organization: parsed.data.organization || null,
-    title: parsed.data.title || null,
-    email: parsed.data.email || null,
-    phone: parsed.data.phone || null,
-    whatsapp: parsed.data.whatsapp || null,
-    location: parsed.data.location || null,
-    corridor: parsed.data.corridor || null,
-    tags: tagList,
-    notes: parsed.data.notes,
-  });
-
-  revalidatePath("/fieldwork");
-  revalidatePath("/contacts");
-  return { success: true, id: contact?.id };
+  try {
+    const contact = await createContact({
+      name: parsed.data.name,
+      role: parsed.data.role as ContactRole,
+      organization: parsed.data.organization || null,
+      title: parsed.data.title || null,
+      email: parsed.data.email || null,
+      phone: parsed.data.phone || null,
+      whatsapp: parsed.data.whatsapp || null,
+      location: parsed.data.location || null,
+      corridor: parsed.data.corridor || null,
+      tags: tagList,
+      notes: parsed.data.notes,
+    });
+    revalidatePath("/fieldwork");
+    revalidatePath("/contacts");
+    return { success: true, id: contact.id };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to create contact",
+    };
+  }
 }
 
 export async function updateContactAction(

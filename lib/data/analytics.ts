@@ -244,7 +244,18 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
     getCases(),
     getAllRecommendations(),
   ]);
+  return computePaper2Coordination(allCases, allRecs);
+}
 
+/**
+ * Pure aggregator: given the full set of cases + recommendations,
+ * produce the Paper 2 figure-set. Extracted from getPaper2Coordination
+ * so it can be unit-tested without a database.
+ */
+export function computePaper2Coordination(
+  allCases: { id: string; patient_ref: string; severity: number }[],
+  allRecs: Recommendation[],
+): Paper2Coordination {
   // Index cases by id for O(1) severity / patient_ref lookups.
   const caseById = new Map(allCases.map((c) => [c.id, c]));
 
@@ -281,7 +292,7 @@ export async function getPaper2Coordination(): Promise<Paper2Coordination> {
       ? decoratedRecs.reduce((sum, d) => sum + d.rec.confidence_value, 0) / total
       : null;
 
-  // Time-to-decision now comes straight from decided_at - created_at.
+  // Time-to-decision comes straight from decided_at - created_at.
   const decisionTimes: number[] = [];
   for (const d of decoratedRecs) {
     if (!d.rec.decided_at) continue;

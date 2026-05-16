@@ -6,7 +6,12 @@
  *  DB has no `site_id` or `user_id` on doc_versions — handled in mapping.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
+import {
+  getSupabase,
+  getCurrentUserId,
+  requireAuthOrThrow,
+  warnDegradedMode,
+} from "@/lib/supabase/db";
 import type { Doc, DocVersion, DocStatus } from "./docs-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────
@@ -257,7 +262,15 @@ export async function getDocs(filters?: {
 
       const { data, error } = await query;
       if (!error && data) return data.map((r) => mapDbDoc(r as Record<string, unknown>));
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getDocs", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getDocs",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getDocs", "supabase env vars missing");
   }
 
   let result = [...seedDocs];
@@ -297,33 +310,32 @@ export async function createDoc(data: {
   tags?: string[];
   content_md?: string;
   linked_case_id?: string | null;
-}): Promise<Doc | null> {
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
+}): Promise<Doc> {
+  const { supabase: sb, userId } = await requireAuthOrThrow();
 
   const slug = data.title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .from("phd_docs")
-      .insert({
-        user_id: userId,
-        title: data.title,
-        slug,
-        folder: data.folder ?? "General",
-        tags: data.tags ?? [],
-        content_md: data.content_md ?? "",
-        status: "draft",
-        linked_case_id: data.linked_case_id ?? null,
-      })
-      .select()
-      .single();
-    if (!error && row) return mapDbDoc(row as Record<string, unknown>);
+  const { data: row, error } = await sb
+    .from("phd_docs")
+    .insert({
+      user_id: userId,
+      title: data.title,
+      slug,
+      folder: data.folder ?? "General",
+      tags: data.tags ?? [],
+      content_md: data.content_md ?? "",
+      status: "draft",
+      linked_case_id: data.linked_case_id ?? null,
+    })
+    .select()
+    .single();
+  if (error || !row) {
+    throw new Error(`Failed to create doc: ${error?.message}`);
   }
-  return null;
+  return mapDbDoc(row as Record<string, unknown>);
 }
 
 export async function updateDoc(

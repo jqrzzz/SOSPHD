@@ -3,7 +3,12 @@
  *  Falls back to seed data when Supabase is unavailable.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
+import {
+  getSupabase,
+  getCurrentUserId,
+  requireAuthOrThrow,
+  warnDegradedMode,
+} from "@/lib/supabase/db";
 import type {
   JournalEntry,
   JournalEntryType,
@@ -325,7 +330,15 @@ export async function getJournalEntries(filters?: {
 
       const { data, error } = await query;
       if (!error && data) return data as JournalEntry[];
-    } catch { /* fall through to seed */ }
+      if (error) warnDegradedMode("getJournalEntries", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getJournalEntries",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getJournalEntries", "supabase env vars missing");
   }
 
   // Fallback: filter seed data in-memory
@@ -372,31 +385,30 @@ export async function createJournalEntry(data: {
   contact_ids?: string[];
   linked_case_id?: string | null;
   attachments?: JournalAttachment[];
-}): Promise<JournalEntry | null> {
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
+}): Promise<JournalEntry> {
+  const { supabase: sb, userId } = await requireAuthOrThrow();
 
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .from("phd_journal_entries")
-      .insert({
-        user_id: userId,
-        entry_type: data.entry_type,
-        title: data.title,
-        content: data.content,
-        location: data.location ?? null,
-        corridor: data.corridor ?? null,
-        tags: data.tags ?? [],
-        contact_ids: data.contact_ids ?? [],
-        linked_case_id: data.linked_case_id ?? null,
-        attachments: data.attachments ?? [],
-        is_pinned: false,
-      })
-      .select()
-      .single();
-    if (!error && row) return row as JournalEntry;
+  const { data: row, error } = await sb
+    .from("phd_journal_entries")
+    .insert({
+      user_id: userId,
+      entry_type: data.entry_type,
+      title: data.title,
+      content: data.content,
+      location: data.location ?? null,
+      corridor: data.corridor ?? null,
+      tags: data.tags ?? [],
+      contact_ids: data.contact_ids ?? [],
+      linked_case_id: data.linked_case_id ?? null,
+      attachments: data.attachments ?? [],
+      is_pinned: false,
+    })
+    .select()
+    .single();
+  if (error || !row) {
+    throw new Error(`Failed to create journal entry: ${error?.message}`);
   }
-  return null;
+  return row as JournalEntry;
 }
 
 export async function updateJournalEntry(
@@ -450,7 +462,15 @@ export async function getContacts(filters?: {
 
       const { data, error } = await query;
       if (!error && data) return data as Contact[];
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getContacts", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getContacts",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getContacts", "supabase env vars missing");
   }
 
   let result = [...seedContacts];
@@ -499,34 +519,33 @@ export async function createContact(data: {
   tags?: string[];
   notes?: string;
   business_card_url?: string | null;
-}): Promise<Contact | null> {
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
+}): Promise<Contact> {
+  const { supabase: sb, userId } = await requireAuthOrThrow();
 
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .from("phd_contacts")
-      .insert({
-        user_id: userId,
-        name: data.name,
-        role: data.role,
-        organization: data.organization ?? null,
-        title: data.title ?? null,
-        email: data.email ?? null,
-        phone: data.phone ?? null,
-        whatsapp: data.whatsapp ?? null,
-        location: data.location ?? null,
-        corridor: data.corridor ?? null,
-        tags: data.tags ?? [],
-        notes: data.notes ?? "",
-        linked_journal_ids: [],
-        business_card_url: data.business_card_url ?? null,
-      })
-      .select()
-      .single();
-    if (!error && row) return row as Contact;
+  const { data: row, error } = await sb
+    .from("phd_contacts")
+    .insert({
+      user_id: userId,
+      name: data.name,
+      role: data.role,
+      organization: data.organization ?? null,
+      title: data.title ?? null,
+      email: data.email ?? null,
+      phone: data.phone ?? null,
+      whatsapp: data.whatsapp ?? null,
+      location: data.location ?? null,
+      corridor: data.corridor ?? null,
+      tags: data.tags ?? [],
+      notes: data.notes ?? "",
+      linked_journal_ids: [],
+      business_card_url: data.business_card_url ?? null,
+    })
+    .select()
+    .single();
+  if (error || !row) {
+    throw new Error(`Failed to create contact: ${error?.message}`);
   }
-  return null;
+  return row as Contact;
 }
 
 export async function updateContact(

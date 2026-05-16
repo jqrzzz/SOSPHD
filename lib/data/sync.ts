@@ -29,13 +29,119 @@ import type { EventType } from "./types";
 
 const SYNC_ACTOR_ID = "soscommand_sync";
 
-interface NewEvent {
+export interface NewEvent {
   case_id: string;
   event_type: EventType;
   occurred_at: string;
   actor_id: string;
   payload: string;
 }
+
+// ── Pure logic (exported for tests) ───────────────────────────────────
+
+export interface OperationalRows {
+  caseRow: {
+    intake_at?: string | null;
+    triage_at?: string | null;
+    active_at?: string | null;
+    resolved_at?: string | null;
+    closed_at?: string | null;
+    closed_date?: string | null;
+  } | null;
+  transports: { actual_departure?: string | null; actual_arrival?: string | null }[];
+  gops: { issued_date?: string | null }[];
+  episodes: { start_date?: string | null }[];
+}
+
+export function asTimestamp(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return null;
+  if (value.trim().length === 0) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+/**
+ * Pure: given raw operational rows for a case, produce the set of
+ * research.case_events rows that should exist. No I/O. Used both at
+ * runtime by gatherOperationalEvents() and by the unit test suite.
+ */
+export function mapOperationalRowsToEvents(
+  caseId: string,
+  rows: OperationalRows,
+): NewEvent[] {
+  const events: NewEvent[] = [];
+  const push = (type: EventType, raw: unknown, source: string) => {
+    const at = asTimestamp(raw);
+    if (!at) return;
+    events.push({
+      case_id: caseId,
+      event_type: type,
+      occurred_at: at,
+      actor_id: SYNC_ACTOR_ID,
+      payload: JSON.stringify({ source }),
+    });
+  };
+
+  if (rows.caseRow) {
+    push("FIRST_CONTACT", rows.caseRow.intake_at, "cases.intake_at");
+    push("TRIAGE_COMPLETE", rows.caseRow.triage_at, "cases.triage_at");
+    const dischargeAt =
+      rows.caseRow.resolved_at ??
+      rows.caseRow.closed_at ??
+      rows.caseRow.closed_date;
+    push("DISCHARGE", dischargeAt, "cases.resolved_at|closed_at|closed_date");
+  }
+
+  // Earliest non-null departure / arrival across transport rows.
+  for (const t of rows.transports) {
+    if (t.actual_departure) {
+      push("TRANSPORT_ACTIVATED", t.actual_departure, "case_transport.actual_departure");
+      break;
+    }
+  }
+  for (const t of rows.transports) {
+    if (t.actual_arrival) {
+      push("FACILITY_ARRIVAL", t.actual_arrival, "case_transport.actual_arrival");
+      break;
+    }
+  }
+
+  const firstGop = rows.gops[0];
+  if (firstGop) {
+    push("GUARANTEED_PAYMENT", firstGop.issued_date, "guarantees_of_payment.issued_date");
+  }
+
+  const firstEpisode = rows.episodes[0];
+  if (firstEpisode) {
+    push(
+      "DEFINITIVE_CARE_START",
+      firstEpisode.start_date,
+      "case_episodes.start_date",
+    );
+  }
+
+  return events;
+}
+
+/**
+ * Pure: given the events that should exist + the events already
+ * synced, return the subset to insert. Same dedup key as the
+ * runtime: (event_type, occurred_at).
+ */
+export function diffEventsToInsert(
+  expected: NewEvent[],
+  existing: { event_type: EventType; occurred_at: string }[],
+): NewEvent[] {
+  const existingKeys = new Set(
+    existing.map((e) => `${e.event_type}:${asTimestamp(e.occurred_at)}`),
+  );
+  return expected.filter(
+    (e) => !existingKeys.has(`${e.event_type}:${e.occurred_at}`),
+  );
+}
+
+// ── Runtime (impure) ──────────────────────────────────────────────────
 
 async function tryCreateClient() {
   if (
@@ -51,19 +157,9 @@ async function tryCreateClient() {
   }
 }
 
-function asTimestamp(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== "string") return null;
-  if (value.trim().length === 0) return null;
-  // Accept either timestamps or date-only values; both parse fine.
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
-}
-
 /**
- * Pull every relevant SOSCOMMAND timestamp for a single case and
- * return the set of research.case_events rows that should exist.
- * Pure — no writes.
+ * Pull every relevant SOSCOMMAND row for a case and translate to the
+ * expected research event set via mapOperationalRowsToEvents.
  */
 async function gatherOperationalEvents(
   caseId: string,
@@ -79,7 +175,7 @@ async function gatherOperationalEvents(
   ] = await Promise.all([
     supabase
       .from("cases")
-      .select("intake_at, triage_at, active_at, resolved_at, closed_at, closed_date, incident_date")
+      .select("intake_at, triage_at, active_at, resolved_at, closed_at, closed_date")
       .eq("id", caseId)
       .maybeSingle(),
     supabase
@@ -103,63 +199,12 @@ async function gatherOperationalEvents(
       .limit(1),
   ]);
 
-  const events: NewEvent[] = [];
-  const push = (
-    type: EventType,
-    raw: unknown,
-    source: string,
-  ) => {
-    const at = asTimestamp(raw);
-    if (!at) return;
-    events.push({
-      case_id: caseId,
-      event_type: type,
-      occurred_at: at,
-      actor_id: SYNC_ACTOR_ID,
-      payload: JSON.stringify({ source }),
-    });
-  };
-
-  if (caseRow.data) {
-    push("FIRST_CONTACT", caseRow.data.intake_at, "cases.intake_at");
-    push("TRIAGE_COMPLETE", caseRow.data.triage_at, "cases.triage_at");
-    // resolved_at preferred, then closed_at, then closed_date
-    const dischargeAt =
-      caseRow.data.resolved_at ??
-      caseRow.data.closed_at ??
-      caseRow.data.closed_date;
-    push("DISCHARGE", dischargeAt, "cases.resolved_at|closed_at|closed_date");
-  }
-
-  // Earliest non-null departure / arrival across transport rows.
-  for (const t of transports.data ?? []) {
-    if (t.actual_departure) {
-      push("TRANSPORT_ACTIVATED", t.actual_departure, "case_transport.actual_departure");
-      break;
-    }
-  }
-  for (const t of transports.data ?? []) {
-    if (t.actual_arrival) {
-      push("FACILITY_ARRIVAL", t.actual_arrival, "case_transport.actual_arrival");
-      break;
-    }
-  }
-
-  const firstGop = gops.data?.[0];
-  if (firstGop) {
-    push("GUARANTEED_PAYMENT", firstGop.issued_date, "guarantees_of_payment.issued_date");
-  }
-
-  const firstEpisode = episodes.data?.[0];
-  if (firstEpisode) {
-    push(
-      "DEFINITIVE_CARE_START",
-      firstEpisode.start_date,
-      "case_episodes.start_date",
-    );
-  }
-
-  return events;
+  return mapOperationalRowsToEvents(caseId, {
+    caseRow: caseRow.data ?? null,
+    transports: transports.data ?? [],
+    gops: gops.data ?? [],
+    episodes: episodes.data ?? [],
+  });
 }
 
 export interface SyncResult {
@@ -204,14 +249,12 @@ export async function syncCaseFromOperational(
     };
   }
 
-  const existingKeys = new Set(
-    (existing ?? []).map(
-      (e) => `${e.event_type}:${asTimestamp(e.occurred_at)}`,
-    ),
-  );
-
-  const toInsert = expected.filter(
-    (e) => !existingKeys.has(`${e.event_type}:${e.occurred_at}`),
+  const toInsert = diffEventsToInsert(
+    expected,
+    (existing ?? []).map((e) => ({
+      event_type: e.event_type as EventType,
+      occurred_at: e.occurred_at as string,
+    })),
   );
 
   if (toInsert.length === 0) {

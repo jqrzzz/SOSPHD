@@ -61,15 +61,23 @@ export async function createDocAction(
         .filter(Boolean)
     : [];
 
-  const doc = await createDoc({
-    title: parsed.data.title,
-    folder: parsed.data.folder,
-    tags,
-    content_md: parsed.data.content_md,
-    linked_case_id: parsed.data.linked_case_id || null,
-  });
+  let docId: string;
+  try {
+    const doc = await createDoc({
+      title: parsed.data.title,
+      folder: parsed.data.folder,
+      tags,
+      content_md: parsed.data.content_md,
+      linked_case_id: parsed.data.linked_case_id || null,
+    });
+    docId = doc.id;
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to create document",
+    };
+  }
 
-  redirect(`/docs/${doc?.id}`);
+  redirect(`/docs/${docId}`);
 }
 
 export async function updateDocAction(data: {
