@@ -4,6 +4,7 @@ import {
   getCaseById,
   getEventsByCaseId,
   getRecommendationsByCaseId,
+  getOperationalContext,
 } from "@/lib/data/store";
 import { computeAllMetrics } from "@/lib/data/metrics";
 import { MetricCard } from "@/components/metric-card";
@@ -14,6 +15,7 @@ import { CaseMetricTimeline } from "@/components/case-metric-timeline";
 import { EventForm } from "@/components/event-form";
 import { RecommendationCard } from "@/components/recommendation-card";
 import { GenerateRecommendationsButton } from "@/components/generate-recommendations-button";
+import { OperationalContextPanel } from "@/components/operational-context-panel";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
 
@@ -27,9 +29,12 @@ export default async function CaseDetailPage(props: {
     notFound();
   }
 
-  const events = await getEventsByCaseId(params.id);
+  const [events, recommendations, operationalContext] = await Promise.all([
+    getEventsByCaseId(params.id),
+    getRecommendationsByCaseId(params.id),
+    getOperationalContext(params.id),
+  ]);
   const metrics = computeAllMetrics(events);
-  const recommendations = await getRecommendationsByCaseId(params.id);
 
   const pendingRecs = recommendations.filter((r) => r.accepted === null);
   const acceptedRecs = recommendations.filter((r) => r.accepted === true);
@@ -100,6 +105,11 @@ export default async function CaseDetailPage(props: {
             <CaseMetricTimeline events={events} metrics={metrics} />
           </section>
         )}
+
+        {/* Operational context · SOSCOMMAND (read-only) */}
+        <section aria-label="Operational context">
+          <OperationalContextPanel ctx={operationalContext} />
+        </section>
 
         {/* AI Recommendations (the Paper 2 surface) */}
         <section aria-label="AI recommendations">

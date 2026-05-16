@@ -330,6 +330,198 @@ export async function decideRecommendation(
   return toRecommendation(row as Record<string, unknown>);
 }
 
+// ── SOSCOMMAND operational context (READ-ONLY) ──────────────────────
+//
+// SOSPHD does not write to public.* operational tables. These functions
+// surface the operational state of a case so the research view shows
+// what actually happened around the events SOSPHD records itself.
+//
+// Tables read (per CLAUDE.md ownership):
+//   - public.case_status_history     (SOSCOMMAND status audit)
+//   - public.case_activity_log       (SOSCOMMAND activity log)
+//   - public.case_transport          (transport actuals)
+//   - public.guarantees_of_payment   (canonical GOP)
+//   - public.insurer_interactions    (payer-side outreach)
+//   - public.claims                  (downstream claim lifecycle)
+
+export interface OperationalStatusChange {
+  from_status: string | null;
+  to_status: string;
+  changed_at: string;
+  changed_by_user_id: string | null;
+  reason: string | null;
+}
+
+export interface OperationalActivity {
+  action: string;
+  actor_name: string | null;
+  actor_id: string | null;
+  created_at: string;
+  details: Record<string, unknown> | null;
+}
+
+export interface OperationalTransport {
+  mode: string | null;
+  transport_status: string | null;
+  origin_facility: string | null;
+  destination_facility: string | null;
+  origin_location: string | null;
+  destination_location: string | null;
+  actual_departure: string | null;
+  actual_arrival: string | null;
+  transport_provider: string | null;
+  booking_reference: string | null;
+}
+
+export interface OperationalGOP {
+  gop_number: string | null;
+  status: string;
+  amount_requested: number | null;
+  amount_guaranteed: number | null;
+  currency: string | null;
+  requested_date: string | null;
+  issued_date: string | null;
+  expiry_date: string | null;
+  payer_reference_number: string | null;
+}
+
+export interface OperationalInsurerInteraction {
+  interaction_type: string;
+  reference_number: string | null;
+  status: string | null;
+  amount: number | null;
+  currency: string | null;
+  notes: string | null;
+  occurred_at: string;
+}
+
+export interface OperationalClaim {
+  claim_number: string | null;
+  status: string;
+  amount_requested: number | null;
+  amount_approved: number | null;
+  amount_paid: number | null;
+  currency: string | null;
+  submitted_date: string | null;
+  decision_date: string | null;
+  denial_reason: string | null;
+  paid_at: string | null;
+}
+
+export interface OperationalContext {
+  has_data: boolean;
+  status_history: OperationalStatusChange[];
+  activity: OperationalActivity[];
+  transport: OperationalTransport | null;
+  gops: OperationalGOP[];
+  insurer_interactions: OperationalInsurerInteraction[];
+  claims: OperationalClaim[];
+}
+
+const EMPTY_OPERATIONAL_CONTEXT: OperationalContext = {
+  has_data: false,
+  status_history: [],
+  activity: [],
+  transport: null,
+  gops: [],
+  insurer_interactions: [],
+  claims: [],
+};
+
+export async function getOperationalContext(
+  caseId: string,
+): Promise<OperationalContext> {
+  const supabase = await tryCreateClient();
+  if (!supabase) return EMPTY_OPERATIONAL_CONTEXT;
+
+  // Run all six reads in parallel — operational tables are independent.
+  const [
+    statusHistoryResult,
+    activityResult,
+    transportResult,
+    gopsResult,
+    insurerInteractionsResult,
+    claimsResult,
+  ] = await Promise.all([
+    supabase
+      .from("case_status_history")
+      .select(
+        "from_status, to_status, changed_at, changed_by_user_id, reason",
+      )
+      .eq("case_id", caseId)
+      .order("changed_at", { ascending: true }),
+    supabase
+      .from("case_activity_log")
+      .select("action, actor_id, actor_name, created_at, details")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("case_transport")
+      .select(
+        "mode, transport_status, origin_facility, destination_facility, origin_location, destination_location, actual_departure, actual_arrival, transport_provider, booking_reference",
+      )
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("guarantees_of_payment")
+      .select(
+        "gop_number, status, amount_requested, amount_guaranteed, currency, requested_date, issued_date, expiry_date, payer_reference_number",
+      )
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("insurer_interactions")
+      .select(
+        "interaction_type, reference_number, status, amount, currency, notes, occurred_at",
+      )
+      .eq("case_id", caseId)
+      .order("occurred_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("claims")
+      .select(
+        "claim_number, status, amount_requested, amount_approved, amount_paid, currency, submitted_date, decision_date, denial_reason, paid_at",
+      )
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+
+  const status_history = (statusHistoryResult.data ?? []) as OperationalStatusChange[];
+  const activity = (activityResult.data ?? []).map((row) => ({
+    action: (row.action as string) ?? "",
+    actor_id: (row.actor_id as string | null) ?? null,
+    actor_name: (row.actor_name as string | null) ?? null,
+    created_at: (row.created_at as string) ?? "",
+    details: (row.details as Record<string, unknown> | null) ?? null,
+  })) as OperationalActivity[];
+  const transport = (transportResult.data ?? null) as OperationalTransport | null;
+  const gops = (gopsResult.data ?? []) as OperationalGOP[];
+  const insurer_interactions = (insurerInteractionsResult.data ?? []) as OperationalInsurerInteraction[];
+  const claims = (claimsResult.data ?? []) as OperationalClaim[];
+
+  const has_data =
+    status_history.length > 0 ||
+    activity.length > 0 ||
+    transport !== null ||
+    gops.length > 0 ||
+    insurer_interactions.length > 0 ||
+    claims.length > 0;
+
+  return {
+    has_data,
+    status_history,
+    activity,
+    transport,
+    gops,
+    insurer_interactions,
+    claims,
+  };
+}
+
 export async function getEventCountByCaseId(caseId: string): Promise<number> {
   const supabase = await tryCreateClient();
   if (!supabase) return 0;
