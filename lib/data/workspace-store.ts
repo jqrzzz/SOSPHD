@@ -175,14 +175,6 @@ export async function deleteUpload(id: string): Promise<boolean> {
 // ── Mind Maps ───────────────────────────────────────────────────────
 
 export async function getMindMaps(): Promise<MindMap[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .schema("research")
-    .from("mind_maps")
-    .select("*")
-    .order("updated_at", { ascending: false });
-
-export async function getMindMaps(): Promise<MindMap[]> {
   const sb = getSupabase();
   if (sb) {
     try {

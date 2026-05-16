@@ -26,7 +26,6 @@ import { createTaskAction, updateTaskStatusAction, updateTaskAction, deleteTaskA
 import { toast } from "sonner";
 import type { ResearchTask, TaskStatus } from "@/lib/data/advisor-types";
 import { cn, formatDate } from "@/lib/utils";
-import { toast } from "sonner";
 
 const STATUS_COLUMNS: { status: TaskStatus; label: string }[] = [
   { status: "todo", label: "To Do" },

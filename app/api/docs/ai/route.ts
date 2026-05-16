@@ -124,7 +124,17 @@ export async function POST(req: Request) {
       try {
         const taskData = JSON.parse(jsonMatch[1]);
         if (taskData.tasks && Array.isArray(taskData.tasks)) {
-
+          const createdTasks = await Promise.all(
+            taskData.tasks.map(
+              (t: { title: string; description?: string; priority?: number }) =>
+                createTask({
+                  title: t.title,
+                  description: t.description ?? null,
+                  priority: t.priority ?? 2,
+                  linked_case_id: doc.linked_case_id ?? null,
+                }),
+            ),
+          );
           return Response.json({
             mode,
             tasks_created: createdTasks.length,

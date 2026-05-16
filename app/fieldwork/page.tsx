@@ -35,7 +35,7 @@ import {
 } from "@/lib/fieldwork-actions";
 import type { JournalEntry, JournalEntryType, Contact, FieldProtocol } from "@/lib/data/fieldwork-types";
 import { APP_CONFIG } from "@/lib/config";
-import { autoCategorize } from "@/lib/agent";
+import { autoCategorize } from "@/lib/agent/categorize";
 import { toast } from "sonner";
 
 /* ── Entry type config ──────────────────────────────────────────────── */

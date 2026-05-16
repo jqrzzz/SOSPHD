@@ -43,7 +43,7 @@ Only include linked_case_id if the task directly relates to a specific case.
 
 ## Key Metrics
 - TTTA = Time to Transport Activation (FIRST_CONTACT → TRANSPORT_ACTIVATED)
-- TTGP = Time to Guaranteed Payment (FIRST_CONTACT → GUARANTEED_PAYMENT) 
+- TTGP = Time to Guaranteed Payment (FIRST_CONTACT → GUARANTEED_PAYMENT)
 - TTDC = Time to Definitive Care (FIRST_CONTACT → DEFINITIVE_CARE_START)
 
 ## Agent Capabilities
@@ -105,9 +105,7 @@ function formatContextForPrompt(
   if (ctx.top_tasks.length > 0) {
     lines.push("", `### Top Tasks (${ctx.top_tasks.length})`);
     for (const t of ctx.top_tasks) {
-      lines.push(
-        `- [${t.status}] P${t.priority}: ${t.title}`,
-      );
+      lines.push(`- [${t.status}] P${t.priority}: ${t.title}`);
     }
   }
 
@@ -123,6 +121,45 @@ function formatContextForPrompt(
   return lines.join("\n");
 }
 
+function formatAgentInsights(
+  pulse: Awaited<ReturnType<typeof getResearchPulse>>,
+  actions: Awaited<ReturnType<typeof suggestNextActions>>,
+  gaps: Awaited<ReturnType<typeof detectGaps>>,
+): string {
+  const lines: string[] = [
+    "",
+    "## Agent Intelligence (Real-Time)",
+    "",
+    `### Research Health: ${pulse.score}/100 (${pulse.health})`,
+    `- Corridor coverage: ${pulse.corridorCoverage}`,
+    `- High-priority gaps: ${pulse.highPriorityGaps}`,
+    `- Total gaps: ${pulse.totalGaps}`,
+    `- Open tasks: ${pulse.openTasks}`,
+  ];
+
+  if (actions.length > 0) {
+    lines.push("", "### Suggested Next Actions");
+    for (const a of actions) {
+      lines.push(`- [${a.severity.toUpperCase()}] ${a.action} (${a.area})`);
+    }
+  }
+
+  if (gaps.totalGaps > 0) {
+    lines.push("", `### Research Gaps (${gaps.totalGaps} total)`);
+    const highGaps = gaps.gaps.filter((g) => g.severity === "high");
+    for (const g of highGaps.slice(0, 5)) {
+      lines.push(`- [HIGH] ${g.gap} — ${g.suggestion}`);
+    }
+    const medGaps = gaps.gaps.filter((g) => g.severity === "medium");
+    for (const g of medGaps.slice(0, 3)) {
+      lines.push(`- [MED] ${g.gap}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+async function extractAndCreateTasks(text: string): Promise<void> {
   const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
   if (!jsonMatch) return;
 
@@ -139,6 +176,10 @@ function formatContextForPrompt(
 export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return Response.json(
+      {
+        error:
+          "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file.",
+      },
       { status: 503 },
     );
   }
@@ -148,6 +189,12 @@ export async function POST(req: Request) {
     sessionId,
   }: { messages: UIMessage[]; sessionId?: string } = await req.json();
 
+  const [contextSnapshot, pulse, actions, gaps] = await Promise.all([
+    buildContextSnapshot(),
+    getResearchPulse(),
+    suggestNextActions(5),
+    detectGaps(),
+  ]);
   const contextText = formatContextForPrompt(contextSnapshot);
   const agentText = formatAgentInsights(pulse, actions, gaps);
 
@@ -163,7 +210,6 @@ export async function POST(req: Request) {
     onFinish: async ({ messages: allMessages, isAborted }) => {
       if (isAborted) return;
 
-      // Extract tasks from the last assistant message
       const lastMsg = allMessages[allMessages.length - 1];
       if (lastMsg?.role === "assistant" && lastMsg.parts) {
         const textContent = lastMsg.parts
@@ -173,13 +219,15 @@ export async function POST(req: Request) {
 
         await extractAndCreateTasks(textContent);
 
-        // Persist assistant message with context snapshot
         if (sessionId) {
           await addMessage({
             session_id: sessionId,
             role: "assistant",
             content: textContent,
-            context_snapshot: contextSnapshot as unknown as Record<string, unknown>,
+            context_snapshot: contextSnapshot as unknown as Record<
+              string,
+              unknown
+            >,
           });
         }
       }

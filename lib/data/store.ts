@@ -2,10 +2,28 @@
  *  Reads cases from public schema (operational).
  *  Reads/writes events & recommendations from research schema.
  *  All functions are async — consumers must await.
+ *
+ *  When Supabase env vars are not configured (e.g. local dev without
+ *  .env.local), reads return empty results and writes throw — same
+ *  graceful-degradation pattern the other stores use.
  * ────────────────────────────────────────────────────────────────────── */
 
 import { createClient } from "@/lib/supabase/server";
 import type { Case, CaseEvent, CaseStatus, Severity, Recommendation } from "./types";
+
+async function tryCreateClient() {
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return null;
+  }
+  try {
+    return await createClient();
+  } catch {
+    return null;
+  }
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -63,9 +81,10 @@ export async function getCases(filters?: {
   status?: CaseStatus;
   search?: string;
 }): Promise<Case[]> {
-  const supabase = await createClient();
+  const supabase = await tryCreateClient();
+  if (!supabase) return [];
 
-  let query = supabase
+  const query = supabase
     .from("cases")
     .select("*, patients(full_name, medical_id)")
     .order("created_at", { ascending: false });
@@ -92,7 +111,8 @@ export async function getCases(filters?: {
 }
 
 export async function getCaseById(id: string): Promise<Case | undefined> {
-  const supabase = await createClient();
+  const supabase = await tryCreateClient();
+  if (!supabase) return undefined;
   const { data, error } = await supabase
     .from("cases")
     .select("*, patients(full_name, medical_id)")
@@ -112,7 +132,10 @@ export async function createCase(data: {
   // Creating a case in the operational system is complex (requires patient_id, etc.)
   // For the research layer, we create a minimal case entry.
   // In production, cases originate from SOSCOMMAND — SOSPHD is read-mostly.
-  const supabase = await createClient();
+  const supabase = await tryCreateClient();
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Cannot create case.");
+  }
   const caseNumber = `SOS-${Date.now().toString(36).toUpperCase()}`;
 
   const { data: newCase, error } = await supabase
@@ -138,7 +161,8 @@ export async function createCase(data: {
 // ── Events (research schema) ────────────────────────────────────────
 
 export async function getEventsByCaseId(caseId: string): Promise<CaseEvent[]> {
-  const supabase = await createClient();
+  const supabase = await tryCreateClient();
+  if (!supabase) return [];
   const { data, error } = await supabase
     .schema("research")
     .from("case_events")
@@ -164,7 +188,10 @@ export async function addEvent(data: {
   occurred_at: string;
   payload: string;
 }): Promise<CaseEvent> {
-  const supabase = await createClient();
+  const supabase = await tryCreateClient();
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Cannot add event.");
+  }
   const { data: newEvent, error } = await supabase
     .schema("research")
     .from("case_events")
@@ -195,7 +222,8 @@ export async function addEvent(data: {
 // ── Recommendations (research schema) ───────────────────────────────
 
 export async function getRecommendationsByCaseId(caseId: string): Promise<Recommendation[]> {
-  const supabase = await createClient();
+  const supabase = await tryCreateClient();
+  if (!supabase) return [];
   const { data, error } = await supabase
     .schema("research")
     .from("recommendations")
@@ -221,7 +249,8 @@ export async function getRecommendationsByCaseId(caseId: string): Promise<Recomm
 }
 
 export async function getEventCountByCaseId(caseId: string): Promise<number> {
-  const supabase = await createClient();
+  const supabase = await tryCreateClient();
+  if (!supabase) return 0;
   const { count, error } = await supabase
     .schema("research")
     .from("case_events")

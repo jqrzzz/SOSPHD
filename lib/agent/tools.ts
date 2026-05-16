@@ -7,6 +7,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { RESEARCH_DOMAIN } from "./domain";
+import { categorizeText as pureCategorize } from "./categorize";
 import { getJournalEntries, getContacts, getProtocols, getProtocolProgress } from "@/lib/data/fieldwork-store";
 import { getNotes, getTasks, createTask, createNote } from "@/lib/data/advisor-store";
 import { getDocs } from "@/lib/data/docs-store";
@@ -33,7 +34,7 @@ async function getResearchStatus() {
     getNotes(100),
     getTasks(),
     getDocs(),
-    Promise.resolve(getCases()),
+    getCases(),
   ]);
 
   const activeProtocols = protocols.filter((p) => p.status === "in_progress");
@@ -202,34 +203,38 @@ async function identifyResearchGaps() {
 // ── Tool: Compute Case Metrics ──────────────────────────────────────
 
 async function computeCaseMetrics(params: { case_id?: string }) {
-  const cases = getCases();
+  const cases = await getCases();
   const targetCases = params.case_id
     ? cases.filter((c) => c.id === params.case_id)
     : cases;
 
-  const results = targetCases.map((c) => {
-    const events = getEventsByCaseId(c.id);
-    const metrics = computeAllMetrics(events);
+  const results = await Promise.all(
+    targetCases.map(async (c) => {
+      const events = await getEventsByCaseId(c.id);
+      const metrics = computeAllMetrics(events);
 
-    const present = new Set(events.map((e) => e.event_type));
-    const missing = RESEARCH_DOMAIN.requiredMilestones.filter((m) => !present.has(m));
+      const present = new Set(events.map((e) => e.event_type));
+      const missing = RESEARCH_DOMAIN.requiredMilestones.filter(
+        (m) => !present.has(m),
+      );
 
-    return {
-      case_id: c.id,
-      patient_ref: c.patient_ref,
-      status: c.status,
-      severity: c.severity,
-      eventCount: events.length,
-      missingMilestones: missing,
-      provenanceComplete: missing.length === 0,
-      metrics: metrics.map((m) => ({
-        abbreviation: m.abbreviation,
-        value_ms: m.value_ms,
-        is_running: m.is_running,
-        minutes: m.value_ms ? Math.round(m.value_ms / 60000) : null,
-      })),
-    };
-  });
+      return {
+        case_id: c.id,
+        patient_ref: c.patient_ref,
+        status: c.status,
+        severity: c.severity,
+        eventCount: events.length,
+        missingMilestones: missing,
+        provenanceComplete: missing.length === 0,
+        metrics: metrics.map((m) => ({
+          abbreviation: m.abbreviation,
+          value_ms: m.value_ms,
+          is_running: m.is_running,
+          minutes: m.value_ms ? Math.round(m.value_ms / 60000) : null,
+        })),
+      };
+    }),
+  );
 
   // Aggregate stats
   const completeCases = results.filter((r) => r.provenanceComplete);
@@ -263,68 +268,10 @@ async function computeCaseMetrics(params: { case_id?: string }) {
 }
 
 // ── Tool: Auto-Categorize Text ──────────────────────────────────────
+// Delegates to the pure helper in ./categorize (also safe for client use).
 
 function categorizeText(params: { text: string }) {
-  const text = params.text.toLowerCase();
-  const results: {
-    suggestedType: string;
-    suggestedTags: string[];
-    suggestedCorridor: string | null;
-    detectedMetrics: string[];
-    detectedContacts: string[];
-  } = {
-    suggestedType: "observation",
-    suggestedTags: [],
-    suggestedCorridor: null,
-    detectedMetrics: [],
-    detectedContacts: [],
-  };
-
-  // Detect entry type
-  if (text.includes("interview") || text.includes("spoke with") || text.includes("meeting")) {
-    results.suggestedType = "conversation";
-  } else if (text.includes("visited") || text.includes("walked into") || text.includes("clinic") || text.includes("hospital")) {
-    results.suggestedType = "site_visit";
-  } else if (text.includes("idea") || text.includes("what if") || text.includes("could we")) {
-    results.suggestedType = "idea";
-  } else if (text.includes("conference") || text.includes("workshop") || text.includes("presentation")) {
-    results.suggestedType = "event";
-  }
-
-  // Detect corridors
-  for (const corridor of RESEARCH_DOMAIN.corridors) {
-    const nameWords = corridor.name.toLowerCase().split(/[\s→]+/);
-    if (nameWords.some((w) => text.includes(w) && w.length > 3)) {
-      results.suggestedCorridor = corridor.name;
-      break;
-    }
-  }
-
-  // Detect metrics mentions
-  for (const [key, metric] of Object.entries(RESEARCH_DOMAIN.metrics)) {
-    if (text.includes(key.toLowerCase()) || text.includes(metric.name.toLowerCase())) {
-      results.detectedMetrics.push(key);
-    }
-  }
-
-  // Detect topic tags
-  const tagPatterns: Record<string, string[]> = {
-    insurance: ["insurance", "pre-auth", "coverage", "claim", "payer", "allianz", "axa"],
-    transport: ["ambulance", "helicopter", "medevac", "transfer", "dispatch"],
-    "language-barrier": ["translate", "language", "english-speaking", "interpreter"],
-    "payment-delay": ["payment delay", "ttgp", "guaranteed payment", "financial clearance"],
-    methodology: ["stepped-wedge", "rct", "study design", "sample size", "power calculation"],
-    ethics: ["irb", "ethics", "consent", "de-identify", "anonymize"],
-    "data-source": ["data sharing", "anonymized data", "case data", "historical cases"],
-  };
-
-  for (const [tag, patterns] of Object.entries(tagPatterns)) {
-    if (patterns.some((p) => text.includes(p))) {
-      results.suggestedTags.push(tag);
-    }
-  }
-
-  return results;
+  return pureCategorize(params.text);
 }
 
 // ── Tool: Create Task from Insight ──────────────────────────────────

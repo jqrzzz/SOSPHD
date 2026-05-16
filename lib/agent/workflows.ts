@@ -10,27 +10,9 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { executeAgent } from "./core";
-import { getToolByName } from "./tools";
 
-// ── Auto-Categorize ─────────────────────────────────────────────────
-
-/**
- * Auto-categorize content and return suggestions.
- * Called when a user creates a new journal entry or note.
- */
-export async function autoCategorize(text: string) {
-  const tool = getToolByName("categorize_text");
-  if (!tool) return null;
-
-  const result = await tool.execute({ text });
-  return result as {
-    suggestedType: string;
-    suggestedTags: string[];
-    suggestedCorridor: string | null;
-    detectedMetrics: string[];
-    detectedContacts: string[];
-  };
-}
+// Re-export the pure categorization helper so existing callers still work.
+export { autoCategorize } from "./categorize";
 
 // ── Gap Detection ───────────────────────────────────────────────────
 

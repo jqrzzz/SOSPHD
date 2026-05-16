@@ -401,19 +401,10 @@ export async function getVersionById(id: string): Promise<DocVersion | null> {
 // ── Unique tags ─────────────────────────────────────────────────────
 
 export async function getAllTags(): Promise<string[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .schema("research")
-    .from("docs")
-    .select("tags");
-
-  if (error || !data) return [];
-
-export async function getAllTags(): Promise<string[]> {
   const docs = await getDocs();
   const tagSet = new Set<string>();
-  for (const doc of data) {
-    for (const tag of (doc.tags as string[]) ?? []) {
+  for (const doc of docs) {
+    for (const tag of doc.tags ?? []) {
       tagSet.add(tag);
     }
   }
