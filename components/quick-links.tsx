@@ -123,12 +123,15 @@ export function QuickLinks() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-foreground">Quick Links</h2>
+      <div className="flex items-center justify-between px-1">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          Quick links
+          <span className="ml-2 text-foreground/70">{links.length}</span>
+        </h2>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
-              Add Link
+              <span className="mr-1 text-base leading-none">+</span> Add link
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -165,9 +168,9 @@ export function QuickLinks() {
               rel="noopener noreferrer"
               className="block"
             >
-              <Card className="transition-colors hover:border-primary/50">
-                <CardContent className="flex items-center gap-2 p-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
+              <Card className="lift">
+                <CardContent className="flex items-center gap-2.5 p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-primary/5 font-mono text-[11px] font-bold text-primary ring-1 ring-primary/15">
                     {link.icon}
                   </div>
                   <span className="truncate text-sm font-medium text-foreground">

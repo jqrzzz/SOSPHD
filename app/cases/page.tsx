@@ -4,16 +4,12 @@ import { getCases, getEventCountByCaseId } from "@/lib/data/store";
 import { SeverityBadge } from "@/components/severity-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { CaseListFilters } from "@/components/case-list-filters";
+import { PageHeader } from "@/components/page-header";
+import { CountUp } from "@/components/motion/count-up";
+import { FadeIn } from "@/components/motion/fade-in";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default async function CasesPage(props: {
   searchParams: Promise<{ status?: string; q?: string }>;
@@ -36,101 +32,207 @@ export default async function CasesPage(props: {
   );
   const eventCountMap = new Map(cases.map((c, i) => [c.id, eventCounts[i]]));
 
+  const openCount = cases.filter((c) => c.status === "open").length;
+  const activeCount = cases.filter((c) => c.status === "active").length;
+  const closedCount = cases.filter((c) => c.status === "closed").length;
+
   return (
-    <div className="flex flex-1 flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Cases</h1>
-          <p className="text-sm text-muted-foreground">
-            {cases.length} case{cases.length !== 1 ? "s" : ""} found
-          </p>
-        </div>
-        <Button asChild size="sm">
-          <Link href="/cases/new">New Case</Link>
-        </Button>
-      </header>
+    <div className="flex flex-1 flex-col overflow-y-auto">
+      <PageHeader
+        eyebrow="Operational data"
+        title="Cases"
+        description="Every case the operational system has surfaced. Open one to see its event timeline, computed metrics, and AI recommendations."
+        actions={
+          <Button asChild size="sm">
+            <Link href="/cases/new">
+              <span className="mr-1 text-base leading-none">+</span> New case
+            </Link>
+          </Button>
+        }
+      />
 
-      {/* Filters */}
-      <Suspense fallback={<div className="h-12 border-b border-border" />}>
-        <CaseListFilters
-          currentStatus={statusFilter}
-          currentSearch={searchQuery}
-        />
-      </Suspense>
+      <div className="flex flex-col gap-5 p-4 sm:p-6">
+        {/* Stat row */}
+        <FadeIn>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <StatTile
+              label="Total"
+              value={<CountUp value={cases.length} duration={1} />}
+              dot="bg-muted-foreground/40"
+            />
+            <StatTile
+              label="Open"
+              value={
+                <span className="text-[hsl(213_94%_56%)]">
+                  <CountUp value={openCount} duration={1} />
+                </span>
+              }
+              dot="bg-[hsl(213_94%_56%)]"
+            />
+            <StatTile
+              label="Active"
+              value={
+                <span className="text-[hsl(38_92%_50%)]">
+                  <CountUp value={activeCount} duration={1} />
+                </span>
+              }
+              dot="bg-[hsl(38_92%_50%)]"
+            />
+            <StatTile
+              label="Closed"
+              value={
+                <span className="text-[hsl(142_71%_45%)]">
+                  <CountUp value={closedCount} duration={1} />
+                </span>
+              }
+              dot="bg-[hsl(142_71%_45%)]"
+            />
+          </div>
+        </FadeIn>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto px-3 pb-6 sm:px-6">
+        {/* Filters */}
+        <Suspense fallback={<div className="h-10" />}>
+          <CaseListFilters
+            currentStatus={statusFilter}
+            currentSearch={searchQuery}
+          />
+        </Suspense>
+
+        {/* List / empty state */}
         {cases.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-16">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary">
-              <span className="text-2xl text-muted-foreground">+</span>
-            </div>
-            <div className="flex flex-col items-center gap-1 text-center">
-              <p className="text-sm font-medium text-foreground">
-                {statusFilter || searchQuery ? "No cases match your filters" : "No cases yet"}
-              </p>
-              <p className="max-w-xs text-xs text-muted-foreground">
-                {statusFilter || searchQuery
-                  ? "Try adjusting your search or status filter."
-                  : "Create your first case to start tracking provenance events and computing TTDC/TTGP metrics."}
-              </p>
-            </div>
-            {!statusFilter && !searchQuery && (
-              <Button asChild size="sm">
-                <Link href="/cases/new">Create First Case</Link>
-              </Button>
-            )}
-          </div>
+          <FadeIn>
+            <Card className="surface-lifted">
+              <CardContent className="flex flex-col items-center gap-5 py-16">
+                <div className="relative">
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-0 -z-10 rounded-2xl bg-primary/15 blur-2xl"
+                  />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 to-primary/5 font-mono text-2xl text-primary/80">
+                    +
+                  </div>
+                </div>
+                <div className="flex flex-col items-center gap-1.5 text-center">
+                  <p className="text-sm font-semibold text-foreground">
+                    {statusFilter || searchQuery
+                      ? "No cases match those filters."
+                      : "No cases yet."}
+                  </p>
+                  <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+                    {statusFilter || searchQuery
+                      ? "Try clearing the filter or a different search term."
+                      : "Each case anchors a chain of provenance events. TTTA / TTGP / TTDC are computed from those events as they arrive."}
+                  </p>
+                </div>
+                {!statusFilter && !searchQuery && (
+                  <Button asChild size="sm">
+                    <Link href="/cases/new">Create first case</Link>
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </FadeIn>
         ) : (
-          <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-36">Patient Ref</TableHead>
-                <TableHead className="w-28 hidden sm:table-cell">Severity</TableHead>
-                <TableHead>Chief Complaint</TableHead>
-                <TableHead className="w-24">Status</TableHead>
-                <TableHead className="w-36 hidden md:table-cell">Created</TableHead>
-                <TableHead className="w-20 text-right hidden sm:table-cell">Events</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {cases.map((c) => {
-                const eventCount = eventCountMap.get(c.id) ?? 0;
-                return (
-                  <TableRow key={c.id} className="group">
-                    <TableCell>
-                      <Link
-                        href={`/cases/${c.id}`}
-                        className="font-mono text-sm font-medium text-primary underline-offset-4 hover:underline"
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border/60 bg-muted/20">
+                    <th className="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Patient ref
+                    </th>
+                    <th className="hidden px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground sm:table-cell">
+                      Severity
+                    </th>
+                    <th className="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Chief complaint
+                    </th>
+                    <th className="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Status
+                    </th>
+                    <th className="hidden px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground md:table-cell">
+                      Created
+                    </th>
+                    <th className="hidden px-4 py-3 text-right font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground sm:table-cell">
+                      Events
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cases.map((c) => {
+                    const eventCount = eventCountMap.get(c.id) ?? 0;
+                    return (
+                      <tr
+                        key={c.id}
+                        className="group border-b border-border/30 transition-colors last:border-0 hover:bg-accent/40"
                       >
-                        {c.patient_ref}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <SeverityBadge severity={c.severity} />
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                      {c.chief_complaint}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={c.status} />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground font-tabular hidden md:table-cell">
-                      {formatDate(c.created_at, "datetime")}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm font-tabular hidden sm:table-cell">
-                      {eventCount}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          </div>
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/cases/${c.id}`}
+                            className="font-mono text-sm font-medium text-primary underline-offset-4 transition-colors group-hover:underline"
+                          >
+                            {c.patient_ref}
+                          </Link>
+                        </td>
+                        <td className="hidden px-4 py-3 sm:table-cell">
+                          <SeverityBadge severity={c.severity} />
+                        </td>
+                        <td className="max-w-[260px] truncate px-4 py-3 text-sm text-muted-foreground">
+                          {c.chief_complaint}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={c.status} />
+                        </td>
+                        <td className="hidden px-4 py-3 font-mono text-xs tabular-nums text-muted-foreground md:table-cell">
+                          {formatDate(c.created_at, "datetime")}
+                        </td>
+                        <td className="hidden px-4 py-3 text-right font-mono text-sm tabular-nums sm:table-cell">
+                          <span
+                            className={
+                              eventCount > 0
+                                ? "text-foreground"
+                                : "text-muted-foreground/50"
+                            }
+                          >
+                            {eventCount}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  dot,
+}: {
+  label: string;
+  value: React.ReactNode;
+  dot: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-border/50 bg-card/40 p-3">
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={`inline-block h-1.5 w-1.5 rounded-full ${dot}`}
+        />
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          {label}
+        </span>
+      </div>
+      <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+        {value}
+      </span>
     </div>
   );
 }

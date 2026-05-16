@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { getDocs, getAllTags } from "@/lib/data/docs-store";
 import { DocListFilters } from "@/components/doc-list-filters";
+import { PageHeader } from "@/components/page-header";
+import { CountUp } from "@/components/motion/count-up";
+import { FadeIn } from "@/components/motion/fade-in";
+import { StaggerContainer, StaggerItem } from "@/components/motion/stagger";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
+
+const STATUS_STYLES: Record<string, string> = {
+  active: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  draft: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  archived: "border-border bg-muted/30 text-muted-foreground",
+};
 
 export default async function DocsPage(props: {
   searchParams: Promise<{ folder?: string; q?: string; tag?: string }>;
@@ -29,136 +32,195 @@ export default async function DocsPage(props: {
 
   const allTags = await getAllTags();
 
+  const folders = new Set(docs.map((d) => d.folder));
+  const activeCount = docs.filter((d) => d.status === "active").length;
+  const draftCount = docs.filter((d) => d.status === "draft").length;
+
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col overflow-y-auto">
       {/* No-PHI banner */}
       <div
-        className="flex items-center gap-2 border-b border-[hsl(142_71%_45%)]/20 bg-[hsl(142_71%_45%)]/5 px-4 py-1.5"
+        className="flex items-center gap-2 border-b border-emerald-500/20 bg-emerald-500/5 px-4 py-1.5"
         role="status"
       >
-        <span className="text-[11px] leading-tight text-[hsl(142_71%_45%)]">
-          Documents workspace -- no PHI is stored or processed here. Safe for research writing.
+        <span className="text-[11px] leading-tight text-emerald-200/90">
+          Documents workspace — no PHI stored or processed. Safe for research
+          writing.
         </span>
         <Badge
           variant="outline"
-          className="ml-auto shrink-0 border-[hsl(142_71%_45%)]/30 font-mono text-[9px] text-[hsl(142_71%_45%)]"
+          className="ml-auto shrink-0 border-emerald-500/30 bg-emerald-500/10 font-mono text-[9px] tracking-[0.12em] text-emerald-300"
         >
           NO-PHI
         </Badge>
       </div>
 
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Documents</h1>
-          <p className="text-sm text-muted-foreground">
-            {docs.length} document{docs.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <Button asChild size="sm">
-          <Link href="/docs/new">New Document</Link>
-        </Button>
-      </header>
-
-      {/* Filters */}
-      <DocListFilters
-        currentFolder={folderFilter}
-        currentSearch={searchQuery}
-        currentTag={tagFilter}
-        availableTags={allTags}
+      <PageHeader
+        eyebrow="Research artefacts"
+        title="Documents"
+        description="Papers, field logs, methods notes, and protocols. Each doc lives in a folder, carries tags, and keeps a version history."
+        actions={
+          <Button asChild size="sm">
+            <Link href="/docs/new">
+              <span className="mr-1 text-base leading-none">+</span> New
+              document
+            </Link>
+          </Button>
+        }
       />
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto px-3 pb-6 sm:px-6">
+      <div className="flex flex-col gap-5 p-4 sm:p-6">
+        <FadeIn>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <StatTile
+              label="Total"
+              value={<CountUp value={docs.length} duration={1} />}
+            />
+            <StatTile
+              label="Active"
+              value={
+                <span className="text-emerald-400">
+                  <CountUp value={activeCount} duration={1} />
+                </span>
+              }
+            />
+            <StatTile
+              label="Draft"
+              value={
+                <span className="text-amber-400">
+                  <CountUp value={draftCount} duration={1} />
+                </span>
+              }
+            />
+            <StatTile
+              label="Folders"
+              value={<CountUp value={folders.size} duration={1} />}
+            />
+          </div>
+        </FadeIn>
+
+        {/* Filters */}
+        <DocListFilters
+          currentFolder={folderFilter}
+          currentSearch={searchQuery}
+          currentTag={tagFilter}
+          availableTags={allTags}
+        />
+
+        {/* Doc grid */}
         {docs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-16">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary">
-              <span className="text-2xl text-muted-foreground">+</span>
-            </div>
-            <div className="flex flex-col items-center gap-1 text-center">
-              <p className="text-sm font-medium text-foreground">
-                {folderFilter || searchQuery || tagFilter ? "No documents match your filters" : "No documents yet"}
-              </p>
-              <p className="max-w-xs text-xs text-muted-foreground">
-                {folderFilter || searchQuery || tagFilter
-                  ? "Try adjusting your filters."
-                  : "Create a document to start writing papers, field logs, or research notes."}
-              </p>
-            </div>
-            {!folderFilter && !searchQuery && !tagFilter && (
-              <Button asChild size="sm">
-                <Link href="/docs/new">Create First Document</Link>
-              </Button>
-            )}
-          </div>
+          <FadeIn>
+            <Card className="surface-lifted">
+              <CardContent className="flex flex-col items-center gap-5 py-16">
+                <div className="relative">
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-0 -z-10 rounded-2xl bg-primary/15 blur-2xl"
+                  />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 to-primary/5 font-mono text-2xl text-primary/80">
+                    ✎
+                  </div>
+                </div>
+                <div className="flex flex-col items-center gap-1.5 text-center">
+                  <p className="text-sm font-semibold text-foreground">
+                    {folderFilter || searchQuery || tagFilter
+                      ? "No documents match those filters."
+                      : "No documents yet."}
+                  </p>
+                  <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+                    {folderFilter || searchQuery || tagFilter
+                      ? "Try clearing the filters or a different keyword."
+                      : "Start a paper, log, or methods note. Versions are tracked automatically."}
+                  </p>
+                </div>
+                {!folderFilter && !searchQuery && !tagFilter && (
+                  <Button asChild size="sm">
+                    <Link href="/docs/new">Create first document</Link>
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </FadeIn>
         ) : (
-          <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead className="w-28 hidden sm:table-cell">Folder</TableHead>
-                <TableHead className="w-28">Status</TableHead>
-                <TableHead className="w-44 hidden md:table-cell">Tags</TableHead>
-                <TableHead className="w-36 hidden sm:table-cell">Updated</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {docs.map((d) => (
-                <TableRow key={d.id} className="group">
-                  <TableCell>
-                    <Link
-                      href={`/docs/${d.id}`}
-                      className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-                    >
-                      {d.title}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">
-                    {d.folder}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        d.status === "active"
-                          ? "border-[hsl(var(--status-closed))]/30 text-[hsl(var(--status-closed))]"
-                          : d.status === "archived"
-                            ? "border-muted-foreground/30 text-muted-foreground"
-                            : "border-[hsl(var(--status-active))]/30 text-[hsl(var(--status-active))]"
-                      }
-                    >
-                      {d.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {d.tags.slice(0, 3).map((tag) => (
+          <StaggerContainer
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+            stagger={0.04}
+          >
+            {docs.map((d) => (
+              <StaggerItem key={d.id}>
+                <Link href={`/docs/${d.id}`} className="block h-full">
+                  <Card className="lift group flex h-full flex-col">
+                    <CardContent className="flex flex-1 flex-col gap-3 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                            {d.folder}
+                          </span>
+                          <h3 className="line-clamp-2 text-balance text-sm font-semibold leading-snug text-foreground group-hover:text-primary">
+                            {d.title}
+                          </h3>
+                        </div>
                         <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="text-[10px]"
+                          variant="outline"
+                          className={`shrink-0 font-mono text-[9.5px] uppercase tracking-[0.08em] ${
+                            STATUS_STYLES[d.status] ?? STATUS_STYLES.draft
+                          }`}
                         >
-                          {tag}
+                          {d.status}
                         </Badge>
-                      ))}
-                      {d.tags.length > 3 && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          +{d.tags.length - 3}
-                        </Badge>
+                      </div>
+
+                      {d.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {d.tags.slice(0, 4).map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/80"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {d.tags.length > 4 && (
+                            <span className="font-mono text-[10px] text-muted-foreground/60">
+                              +{d.tags.length - 4}
+                            </span>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground font-tabular hidden sm:table-cell">
-                    {formatDate(d.updated_at, "datetime")}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          </div>
+
+                      <div className="mt-auto flex items-center justify-between border-t border-border/40 pt-2 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                        <span>Updated {formatDate(d.updated_at, "short")}</span>
+                        <span className="text-primary/80 transition-transform group-hover:translate-x-0.5">
+                          Open →
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </StaggerItem>
+            ))}
+          </StaggerContainer>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-border/50 bg-card/40 p-3">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+        {value}
+      </span>
     </div>
   );
 }

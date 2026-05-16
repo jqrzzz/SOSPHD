@@ -5,10 +5,6 @@ import { AdvisorSessionsList } from "@/components/advisor-sessions";
 import { AdvisorChat } from "@/components/advisor-chat";
 import { AdvisorContextPanel } from "@/components/advisor-context-panel";
 import { PhiWarning } from "@/components/phi-warning";
-import {
-  QuickCaptureNote,
-  QuickCaptureTask,
-} from "@/components/advisor-quick-capture";
 import type { AdvisorSession, ContextSnapshot } from "@/lib/data/advisor-types";
 import type { AgentInsights } from "@/components/advisor-context-panel";
 
@@ -31,42 +27,36 @@ export function AdvisorPageClient({
     <div className="flex flex-1 flex-col overflow-hidden">
       <PhiWarning />
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-        <h1 className="text-sm font-semibold text-foreground">
-          Research Advisor
-        </h1>
-        <div className="ml-auto flex items-center gap-2">
-          <QuickCaptureNote />
-          <QuickCaptureTask />
-        </div>
-      </div>
-
       {/* Three-panel layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Sessions */}
         <AdvisorSessionsList
           sessions={sessions}
           activeSessionId={activeSessionId}
           onSelectSession={setActiveSessionId}
         />
 
-        {/* Center: Chat */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {activeSessionId ? (
             <AdvisorChat sessionId={activeSessionId} />
           ) : (
-            <div className="flex flex-1 items-center justify-center">
-              <p className="text-sm text-muted-foreground">
-                Create a session to start chatting with the advisor.
-              </p>
+            <div className="flex flex-1 items-center justify-center p-8">
+              <div className="flex max-w-sm flex-col items-center gap-3 text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/50 bg-card/60 font-mono text-base text-muted-foreground">
+                  +
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Start a new session to chat with the advisor.
+                </p>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Right: Context panel */}
-        <div className="hidden w-64 border-l border-border lg:block">
-          <AdvisorContextPanel context={context} agentInsights={agentInsights} />
+        <div className="hidden w-72 border-l border-border/60 bg-background/40 lg:block">
+          <AdvisorContextPanel
+            context={context}
+            agentInsights={agentInsights}
+          />
         </div>
       </div>
     </div>

@@ -44,13 +44,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+    <div className="relative flex min-h-svh w-full items-center justify-center overflow-hidden p-6 md:p-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10"
+      >
+        <div className="absolute left-1/2 top-0 h-[500px] w-[1000px] -translate-x-1/2 rounded-full bg-primary/[0.08] blur-3xl" />
+      </div>
       <div className="w-full max-w-sm">
-        <Card className="border-border bg-card">
+        <div className="mb-6 flex flex-col items-center gap-3">
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 rounded-xl bg-primary/30 blur-lg"
+            />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 font-mono text-sm font-bold text-primary-foreground shadow-[0_6px_18px_-4px_hsl(170_50%_38%/0.6)]">
+              S
+            </div>
+          </div>
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            SOS PHD · Research
+          </span>
+        </div>
+        <Card className="surface-lifted">
           <CardHeader>
-            <CardTitle className="text-2xl text-foreground">Sign In</CardTitle>
+            <CardTitle className="text-balance text-xl font-semibold tracking-tight text-foreground">
+              Sign in
+            </CardTitle>
             <CardDescription>
-              Enter your email and password to access SOS PHD
+              Email and password to access your research workspace.
             </CardDescription>
           </CardHeader>
           <CardContent>
