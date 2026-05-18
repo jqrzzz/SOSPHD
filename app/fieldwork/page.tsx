@@ -35,8 +35,12 @@ import {
 } from "@/lib/fieldwork-actions";
 import type { JournalEntry, JournalEntryType, Contact, FieldProtocol } from "@/lib/data/fieldwork-types";
 import { APP_CONFIG } from "@/lib/config";
-import { autoCategorize } from "@/lib/agent";
+import { autoCategorize } from "@/lib/agent/categorize";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
+import { CountUp } from "@/components/motion/count-up";
+import { StaggerContainer, StaggerItem } from "@/components/motion/stagger";
+import { FadeIn } from "@/components/motion/fade-in";
 
 /* ── Entry type config ──────────────────────────────────────────────── */
 
@@ -109,135 +113,233 @@ export default function FieldworkPage() {
   const pinned = filtered.filter((e) => e.is_pinned);
   const unpinned = filtered.filter((e) => !e.is_pinned);
 
+  const siteVisits = entries.filter((e) => e.entry_type === "site_visit").length;
+  const corridorsCovered = new Set(
+    entries.map((e) => e.corridor).filter(Boolean),
+  ).size;
+
   return (
     <div className="flex flex-1 flex-col overflow-auto">
-      {/* Header */}
-      <header className="flex flex-col gap-2 border-b border-border px-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Field Journal</h1>
-          <p className="text-sm text-muted-foreground">
-            Capture observations, conversations, and evidence from the field
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => {
-            if (templates.length > 0) {
-              startProtocolAction(templates[0].id, {}).then(() => {
-                window.location.reload();
-              });
-            }
-          }}>
-            Start Protocol
-          </Button>
-          <Button size="sm" onClick={() => setShowNew(true)}>
-            New Entry
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Field · capture"
+        title="Field Journal"
+        description="Observations, conversations, and evidence from the field. Every entry is auto-tagged and indexed against your corridor map."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (templates.length > 0) {
+                  startProtocolAction(templates[0].id, {}).then(() => {
+                    window.location.reload();
+                  });
+                }
+              }}
+            >
+              Start protocol
+            </Button>
+            <Button size="sm" onClick={() => setShowNew(true)}>
+              <span className="mr-1 text-base leading-none">+</span> New entry
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex flex-1 gap-0 overflow-hidden">
-        {/* Main content */}
-        <div className="flex flex-1 flex-col overflow-auto p-3 sm:p-6">
-          {/* Filters */}
+        <div className="flex flex-1 flex-col overflow-auto p-4 sm:p-6">
+          {/* Quick stats row */}
+          <FadeIn>
+            <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <MiniTile
+                label="Entries"
+                value={
+                  <CountUp value={entries.length} duration={1} />
+                }
+              />
+              <MiniTile
+                label="Contacts"
+                value={
+                  <CountUp value={contacts.length} duration={1} />
+                }
+              />
+              <MiniTile
+                label="Site visits"
+                value={
+                  <CountUp value={siteVisits} duration={1} />
+                }
+              />
+              <MiniTile
+                label="Corridors"
+                value={
+                  <CountUp value={corridorsCovered} duration={1} />
+                }
+                sub={`of ${CORRIDORS.length}`}
+              />
+            </div>
+          </FadeIn>
+
+          {/* Type filter pills */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Input
-              placeholder="Search entries..."
+              placeholder="Search entries…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-xs text-sm"
             />
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {Object.entries(ENTRY_TYPE_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="text-xs text-muted-foreground">
-              {filtered.length} {filtered.length === 1 ? "entry" : "entries"}
+            <div className="flex flex-wrap items-center gap-1">
+              <FilterPill
+                active={typeFilter === "all"}
+                onClick={() => setTypeFilter("all")}
+              >
+                All · {entries.length}
+              </FilterPill>
+              {Object.entries(ENTRY_TYPE_LABELS).map(([key, label]) => {
+                const count = entries.filter(
+                  (e) => e.entry_type === key,
+                ).length;
+                if (count === 0) return null;
+                return (
+                  <FilterPill
+                    key={key}
+                    active={typeFilter === key}
+                    onClick={() => setTypeFilter(key)}
+                    icon={ENTRY_TYPE_ICONS[key as JournalEntryType]}
+                  >
+                    {label} · {count}
+                  </FilterPill>
+                );
+              })}
+            </div>
+            <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              {filtered.length} shown
             </span>
           </div>
 
           {/* Pinned entries */}
           {pinned.length > 0 && (
-            <div className="mb-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Pinned
+            <div className="mb-5">
+              <p className="mb-2 flex items-center gap-1.5 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                <span className="text-amber-400">★</span> Pinned
               </p>
-              <div className="flex flex-col gap-2">
+              <StaggerContainer className="flex flex-col gap-2" stagger={0.04}>
                 {pinned.map((entry) => (
-                  <JournalCard
-                    key={entry.id}
-                    entry={entry}
-                    contacts={contacts}
-                    expanded={expandedId === entry.id}
-                    onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                  />
+                  <StaggerItem key={entry.id}>
+                    <JournalCard
+                      entry={entry}
+                      contacts={contacts}
+                      expanded={expandedId === entry.id}
+                      onToggle={() =>
+                        setExpandedId(
+                          expandedId === entry.id ? null : entry.id,
+                        )
+                      }
+                    />
+                  </StaggerItem>
                 ))}
-              </div>
+              </StaggerContainer>
             </div>
           )}
 
           {/* All entries */}
-          <div className="flex flex-col gap-2">
-            {unpinned.map((entry) => (
-              <JournalCard
-                key={entry.id}
-                entry={entry}
-                contacts={contacts}
-                expanded={expandedId === entry.id}
-                onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-              />
-            ))}
-          </div>
+          {unpinned.length > 0 && (
+            <StaggerContainer className="flex flex-col gap-2" stagger={0.04}>
+              {unpinned.map((entry) => (
+                <StaggerItem key={entry.id}>
+                  <JournalCard
+                    entry={entry}
+                    contacts={contacts}
+                    expanded={expandedId === entry.id}
+                    onToggle={() =>
+                      setExpandedId(expandedId === entry.id ? null : entry.id)
+                    }
+                  />
+                </StaggerItem>
+              ))}
+            </StaggerContainer>
+          )}
 
-          {filtered.length === 0 && (
-            <div className="flex flex-1 items-center justify-center py-20">
-              <p className="text-sm text-muted-foreground">
-                No journal entries yet. Click &quot;New Entry&quot; to capture your first field observation.
-              </p>
-            </div>
+          {loaded && filtered.length === 0 && (
+            <FadeIn>
+              <div className="flex flex-1 items-center justify-center py-20">
+                <div className="flex max-w-md flex-col items-center gap-4 text-center">
+                  <div className="relative">
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 -z-10 rounded-2xl bg-primary/15 blur-2xl"
+                    />
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 to-primary/5 text-2xl">
+                      ✎
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-sm font-semibold text-foreground">
+                      {search || typeFilter !== "all"
+                        ? "Nothing matches that filter."
+                        : "No journal entries yet."}
+                    </p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {search || typeFilter !== "all"
+                        ? "Try a different keyword or clear the filter."
+                        : "Capture your first field observation. The AI will auto-suggest a type, corridor, and tags as you type."}
+                    </p>
+                  </div>
+                  {!search && typeFilter === "all" && (
+                    <Button size="sm" onClick={() => setShowNew(true)}>
+                      <span className="mr-1 text-base leading-none">+</span> New entry
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </FadeIn>
           )}
         </div>
 
         {/* Right sidebar — Active Protocols */}
-        <div className="hidden w-72 flex-shrink-0 border-l border-border p-4 lg:block overflow-auto">
-          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Active Protocols
+        <aside className="hidden w-72 shrink-0 overflow-auto border-l border-border/60 bg-background/40 p-4 lg:block">
+          <p className="mb-3 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            Active protocols
           </p>
           {activeProtocols.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No active protocols</p>
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
+                <div className="font-mono text-base text-muted-foreground/50">
+                  ☐
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+                  None running. Start one from a template below.
+                </p>
+              </CardContent>
+            </Card>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               {activeProtocols.map((protocol) => {
                 const progress = getProtocolProgress(protocol);
                 return (
                   <Card
                     key={protocol.id}
-                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    className="lift cursor-pointer"
                     onClick={() => setActiveProtocol(protocol)}
                   >
-                    <CardContent className="p-3">
-                      <p className="text-sm font-medium">{protocol.title}</p>
-                      {protocol.location && (
-                        <p className="text-xs text-muted-foreground">{protocol.location}</p>
-                      )}
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="h-1.5 flex-1 rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all"
-                            style={{ width: `${progress.percent}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">
+                    <CardContent className="flex flex-col gap-2 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[13px] font-medium leading-tight">
+                          {protocol.title}
+                        </p>
+                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
                           {progress.checked}/{progress.total}
                         </span>
+                      </div>
+                      {protocol.location && (
+                        <p className="text-[10.5px] text-muted-foreground">
+                          {protocol.location}
+                        </p>
+                      )}
+                      <div className="relative h-1 overflow-hidden rounded-full bg-muted/60">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70 transition-all"
+                          style={{ width: `${progress.percent}%` }}
+                        />
                       </div>
                     </CardContent>
                   </Card>
@@ -246,40 +348,34 @@ export default function FieldworkPage() {
             </div>
           )}
 
-          <p className="mb-3 mt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Protocol Templates
+          <p className="mb-3 mt-6 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            Protocol templates
           </p>
-          {templates.map((t) => (
-            <Card key={t.id} className="mb-2">
-              <CardContent className="p-3">
-                <p className="text-sm font-medium">{t.title}</p>
-                <p className="text-xs text-muted-foreground line-clamp-2">{t.description}</p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-1 h-6 px-2 text-xs"
-                  onClick={() => {
-                    startProtocolAction(t.id, {}).then(() => {
-                      window.location.reload();
-                    });
-                  }}
-                >
-                  Use Template
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-
-          <p className="mb-3 mt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Quick Stats
-          </p>
-          <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-            <p>{entries.length} journal entries</p>
-            <p>{contacts.length} contacts</p>
-            <p>{entries.filter((e) => e.entry_type === "site_visit").length} site visits</p>
-            <p>{new Set(entries.map((e) => e.corridor).filter(Boolean)).size} corridors covered</p>
+          <div className="flex flex-col gap-2">
+            {templates.map((t) => (
+              <Card key={t.id} className="lift">
+                <CardContent className="flex flex-col gap-1.5 p-3">
+                  <p className="text-[13px] font-medium leading-tight">
+                    {t.title}
+                  </p>
+                  <p className="line-clamp-2 text-[10.5px] leading-relaxed text-muted-foreground">
+                    {t.description}
+                  </p>
+                  <button
+                    onClick={() => {
+                      startProtocolAction(t.id, {}).then(() => {
+                        window.location.reload();
+                      });
+                    }}
+                    className="mt-1 inline-flex w-fit items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-primary transition-colors hover:border-primary/40 hover:bg-primary/15"
+                  >
+                    Use template →
+                  </button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </div>
+        </aside>
       </div>
 
       {/* New Entry Dialog */}
@@ -298,6 +394,62 @@ export default function FieldworkPage() {
 
 /* ── Journal Card ───────────────────────────────────────────────────── */
 
+function MiniTile({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-border/50 bg-card/40 p-3">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-foreground">
+        {value}
+        {sub && (
+          <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+            {sub}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function FilterPill({
+  active,
+  onClick,
+  children,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  icon?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        active
+          ? "inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors"
+          : "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card/40 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-accent/40 hover:text-foreground"
+      }
+    >
+      {icon && (
+        <span aria-hidden="true" className="text-sm leading-none">
+          {icon}
+        </span>
+      )}
+      {children}
+    </button>
+  );
+}
+
 function JournalCard({
   entry,
   contacts,
@@ -309,86 +461,113 @@ function JournalCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const linkedContacts = contacts.filter((c) => entry.contact_ids.includes(c.id));
+  const linkedContacts = contacts.filter((c) =>
+    entry.contact_ids.includes(c.id),
+  );
   const date = new Date(entry.created_at);
   const typeIcon = ENTRY_TYPE_ICONS[entry.entry_type];
   const typeLabel = ENTRY_TYPE_LABELS[entry.entry_type];
 
   return (
     <Card
-      className="transition-colors hover:bg-accent/30 cursor-pointer"
+      className="lift cursor-pointer"
       onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 text-lg" role="img" aria-label={typeLabel}>
+          <span
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-background/40 text-base"
+            role="img"
+            aria-label={typeLabel}
+          >
             {typeIcon}
           </span>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-medium text-foreground truncate">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h3 className="truncate text-sm font-semibold text-foreground">
                 {entry.title}
               </h3>
               {entry.is_pinned && (
-                <span className="text-xs text-primary">pinned</span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0 font-mono text-[9px] uppercase tracking-[0.12em] text-amber-300">
+                  ★ pinned
+                </span>
               )}
             </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
               <span>{typeLabel}</span>
-              <span>·</span>
-              <span>{date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {date.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
               {entry.location && (
                 <>
-                  <span>·</span>
-                  <span>{entry.location}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="normal-case">{entry.location}</span>
                 </>
               )}
               {entry.corridor && (
                 <>
-                  <span>·</span>
-                  <span className="text-primary/80">{entry.corridor}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-primary/90">{entry.corridor}</span>
                 </>
               )}
             </div>
 
-            {/* Preview (collapsed) */}
             {!expanded && (
-              <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                 {entry.content}
               </p>
             )}
 
-            {/* Expanded content */}
             {expanded && (
-              <div className="mt-3">
-                <div className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
                   {entry.content}
                 </div>
 
                 {linkedContacts.length > 0 && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Contacts:</span>
-                    {linkedContacts.map((c) => (
-                      <Badge key={c.id} variant="outline" className="text-xs">
-                        {c.name}
-                      </Badge>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Contacts
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {linkedContacts.map((c) => (
+                        <Badge
+                          key={c.id}
+                          variant="outline"
+                          className="border-primary/25 bg-primary/5 text-[10.5px] text-primary/90"
+                        >
+                          {c.name}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {entry.attachments.length > 0 && (
-                  <div className="mt-2">
-                    <span className="text-xs text-muted-foreground">
-                      {entry.attachments.length} attachment(s)
-                    </span>
-                  </div>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    {entry.attachments.length} attachment
+                    {entry.attachments.length === 1 ? "" : "s"}
+                  </span>
                 )}
 
-                <div className="mt-3 flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-6 px-2 text-xs"
+                    className="h-7 px-2.5 text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       togglePinAction(entry.id, !entry.is_pinned).then(() => {
@@ -402,13 +581,15 @@ function JournalCard({
               </div>
             )}
 
-            {/* Tags */}
             {entry.tags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {entry.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
+                  <span
+                    key={tag}
+                    className="inline-flex items-center rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/80"
+                  >
                     {tag}
-                  </Badge>
+                  </span>
                 ))}
               </div>
             )}

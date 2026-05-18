@@ -10,7 +10,9 @@ import { CommandPalette } from "@/components/command-palette";
 import { QuickCaptureNote, QuickCaptureTask } from "@/components/advisor-quick-capture";
 
 const NAV_ITEMS = [
-
+  { href: "/spine", label: "PhD Spine", icon: SpineIcon },
+  { href: "/fieldwork", label: "Field Journal", icon: JournalIcon },
+  { href: "/contacts", label: "Contacts", icon: UsersIcon },
   { href: "/cases", label: "Cases", icon: ClipboardIcon },
   { href: "/docs", label: "Docs", icon: FileTextIcon },
   { href: "/workspace", label: "Workspace", icon: FolderIcon },
@@ -36,7 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-
+  // Close sidebar on navigation
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
@@ -51,32 +53,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
-
         />
       )}
 
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-56 flex-col border-r border-border bg-sidebar transition-transform duration-200 md:static md:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-sidebar-border/80 bg-sidebar transition-transform duration-200 md:static md:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-            <span className="text-xs font-bold text-primary-foreground">S</span>
+        <div className="relative flex h-14 items-center gap-2.5 border-b border-sidebar-border/80 px-4">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+          />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-[0_4px_12px_-4px_hsl(170_50%_38%/0.5)]">
+            <span className="font-mono text-[11px] font-bold tracking-tight">
+              S
+            </span>
           </div>
-          <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
-            SOS PHD
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-[13px] font-semibold tracking-tight text-sidebar-foreground">
+              SOS PHD
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-sidebar-foreground/40">
+              Research
+            </span>
+          </div>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 p-3" aria-label="Main navigation">
+        <nav
+          className="flex flex-1 flex-col gap-0.5 p-3"
+          aria-label="Main navigation"
+        >
           {NAV_ITEMS.map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -85,56 +100,132 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150",
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                    ? "bg-gradient-to-r from-sidebar-accent to-sidebar-accent/40 text-sidebar-accent-foreground shadow-[inset_0_1px_0_0_hsl(0_0%_100%/0.04)]"
+                    : "text-sidebar-foreground/65 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground",
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
-                <item.icon className="h-4 w-4" />
+                {/* Active rail */}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-primary transition-opacity",
+                    isActive
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-30",
+                  )}
+                />
+                <item.icon
+                  className={cn(
+                    "h-4 w-4 shrink-0 transition-colors",
+                    isActive
+                      ? "text-primary"
+                      : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground/80",
+                  )}
+                />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="flex flex-col gap-2 border-t border-border p-3">
+        <div className="flex flex-col gap-1.5 border-t border-sidebar-border/80 p-3">
           {userEmail && (
-            <div className="flex flex-col gap-0.5">
-              {userName && (
-                <p className="truncate text-xs font-medium text-sidebar-foreground/80" title={userName}>
-                  {userName}
+            <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 font-mono text-[11px] font-semibold text-primary ring-1 ring-primary/20">
+                {(userName ?? userEmail).charAt(0).toUpperCase()}
+              </div>
+              <div className="flex min-w-0 flex-col leading-tight">
+                {userName && (
+                  <p
+                    className="truncate text-[12px] font-medium text-sidebar-foreground/90"
+                    title={userName}
+                  >
+                    {userName}
+                  </p>
+                )}
+                <p
+                  className="truncate text-[11px] text-sidebar-foreground/45"
+                  title={userEmail}
+                >
+                  {userEmail}
                 </p>
-              )}
-              <p className="truncate text-xs text-muted-foreground" title={userEmail}>
-                {userEmail}
-              </p>
+              </div>
             </div>
           )}
           <button
             onClick={handleSignOut}
             disabled={isSigningOut}
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/40 hover:text-sidebar-foreground disabled:opacity-50"
           >
             <LogOutIcon className="h-4 w-4" />
             {isSigningOut ? "Signing out..." : "Sign Out"}
           </button>
-          <p className="text-xs text-muted-foreground/60">
-            {APP_CONFIG.app.name} v{APP_CONFIG.app.version}
+          <p className="px-3 pt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-sidebar-foreground/30">
+            {APP_CONFIG.app.name} · v{APP_CONFIG.app.version}
           </p>
         </div>
       </aside>
 
       {/* Main content */}
+      <main className="flex flex-1 flex-col overflow-hidden">
+        {/* Top bar — mobile nav toggle + quick actions */}
+        <div className="flex items-center gap-2 border-b border-border/60 bg-background/60 px-3 py-2 backdrop-blur-md">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+            aria-label="Open navigation"
+          >
+            <MenuIcon className="h-5 w-5" />
+          </button>
+          <span className="text-sm font-semibold text-foreground md:hidden">
+            SOS PHD
+          </span>
 
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() =>
+                document.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", metaKey: true }),
+                )
+              }
+              className="group hidden items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-accent/80 hover:text-foreground sm:flex"
+            >
+              <SearchIcon className="h-3.5 w-3.5" />
+              <span>Search anything…</span>
+              <kbd className="ml-2 rounded border border-border/70 bg-background/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/70">
+                {typeof navigator !== "undefined" &&
+                /Mac/.test(navigator.userAgent)
+                  ? "⌘"
+                  : "Ctrl+"}
+                K
+              </kbd>
+            </button>
+            <QuickCaptureNote />
+            <QuickCaptureTask />
+          </div>
+        </div>
+        {children}
+      </main>
+
+      {/* Command Palette (Cmd+K) */}
+      <CommandPalette />
     </div>
   );
 }
 
 /* ── Inline icons ──── */
 
-
+function SpineIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 2v20" />
+      <path d="M8 6h8" />
+      <path d="M7 10h10" />
+      <path d="M8 14h8" />
+      <path d="M9 18h6" />
     </svg>
   );
 }
@@ -195,7 +286,42 @@ function FolderIcon({ className }: { className?: string }) {
   );
 }
 
+function JournalIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+      <path d="M8 7h6" />
+      <path d="M8 11h8" />
+    </svg>
+  );
+}
 
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function MenuIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <line x1="4" x2="20" y1="12" y2="12" />
+      <line x1="4" x2="20" y1="6" y2="6" />
+      <line x1="4" x2="20" y1="18" y2="18" />
     </svg>
   );
 }

@@ -11,6 +11,10 @@
 
 import { z } from "zod";
 import { executeAgent, getAgentCapabilities, type AgentAction } from "@/lib/agent/core";
+import {
+  requireAuthenticatedUser,
+  UnauthenticatedError,
+} from "@/lib/ai/config";
 
 const VALID_ACTIONS: AgentAction[] = [
   "research_status",
@@ -41,6 +45,15 @@ export async function GET() {
 
 /** POST /api/agent — Execute an agent action */
 export async function POST(req: Request) {
+  try {
+    await requireAuthenticatedUser();
+  } catch (err) {
+    if (err instanceof UnauthenticatedError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const body = await req.json();
   const parsed = requestSchema.safeParse(body);
 

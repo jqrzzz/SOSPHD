@@ -1,7 +1,13 @@
 import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buildPaperContext } from "@/lib/data/analytics";
+import {
+  modelFor,
+  requireAIKey,
+  MissingAIKeyError,
+  requireAuthenticatedUser,
+  UnauthenticatedError,
+} from "@/lib/ai/config";
 
 export const maxDuration = 60;
 
@@ -110,11 +116,14 @@ Output in Markdown. No preamble.`,
 };
 
 export async function POST(req: Request) {
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json(
-      { error: "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file." },
-      { status: 503 },
-    );
+  try {
+    await requireAuthenticatedUser();
+    requireAIKey("paper_builder");
+  } catch (err) {
+    if (err instanceof UnauthenticatedError || err instanceof MissingAIKeyError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
   }
 
   const body = await req.json();
@@ -157,15 +166,8 @@ ${paperCtx.rows
     ? `${dataContext}\n\n## Additional Instructions\n${custom_instructions}`
     : dataContext;
 
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json(
-      { error: "OPENAI_API_KEY not configured. Add it to .env.local to enable paper generation." },
-      { status: 503 },
-    );
-  }
-
   const result = await generateText({
-    model: openai("gpt-4o-mini"),
+    model: modelFor("paper_builder"),
     system: systemPrompt,
     prompt: userPrompt,
     abortSignal: req.signal,

@@ -53,7 +53,7 @@ export function MetricCard({ metric }: { metric: MetricResult }) {
             !hasValue && "text-muted-foreground",
           )}
         >
-          {hasValue ? formatDuration(metric.value_ms) : "--"}
+          {hasValue && metric.value_ms !== null ? formatDuration(metric.value_ms) : "--"}
         </p>
 
         <p className="text-xs text-muted-foreground">{metric.description}</p>

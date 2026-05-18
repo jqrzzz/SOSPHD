@@ -2,10 +2,27 @@
  *  Pure functions that compute dashboard-level stats from the store.
  *  All computations use the same metric functions as the case detail
  *  page for consistency.
+ *
+ *  Performance contract: every aggregator function in this file uses
+ *  exactly THREE database round-trips (cases, all_events, all_recs)
+ *  regardless of dataset size. Per-case fetches are forbidden here.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getCases, getEventsByCaseId, getRecommendationsByCaseId } from "./store";
+import { getCases, getAllCaseEvents, getAllRecommendations } from "./store";
 import { computeTTTA, computeTTGP, computeTTDC, formatDuration } from "./metrics";
+import type { Recommendation } from "./types";
+
+function groupByCaseId<T extends { case_id: string }>(
+  items: T[],
+): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const arr = map.get(item.case_id) ?? [];
+    arr.push(item);
+    map.set(item.case_id, arr);
+  }
+  return map;
+}
 
 // ── Summary stats ────────────────────────────────────────────────────
 
@@ -40,7 +57,15 @@ function average(values: number[]): number | null {
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const allCases = await getCases();
+  // 3 parallel queries, regardless of case count.
+  const [allCases, allEvents, allRecs] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+    getAllRecommendations(),
+  ]);
+
+  const eventsByCaseId = groupByCaseId(allEvents);
+  const recsByCaseId = groupByCaseId(allRecs);
 
   const tttas: number[] = [];
   const ttgps: number[] = [];
@@ -50,7 +75,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   let overriddenRecs = 0;
 
   for (const c of allCases) {
-    const events = await getEventsByCaseId(c.id);
+    const events = eventsByCaseId.get(c.id) ?? [];
     const ttta = computeTTTA(events);
     const ttgp = computeTTGP(events);
     const ttdc = computeTTDC(events);
@@ -59,7 +84,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     if (ttgp.value_ms !== null && !ttgp.is_running) ttgps.push(ttgp.value_ms);
     if (ttdc.value_ms !== null && !ttdc.is_running) ttdcs.push(ttdc.value_ms);
 
-    const recs = await getRecommendationsByCaseId(c.id);
+    const recs = recsByCaseId.get(c.id) ?? [];
     totalRecs += recs.length;
     acceptedRecs += recs.filter((r) => r.accepted === true).length;
     overriddenRecs += recs.filter((r) => r.accepted === false).length;
@@ -103,15 +128,22 @@ export interface CaseMetricRow {
 }
 
 export async function getCaseMetricRows(): Promise<CaseMetricRow[]> {
-  const allCases = await getCases();
+  const [allCases, allEvents, allRecs] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+    getAllRecommendations(),
+  ]);
+
+  const eventsByCaseId = groupByCaseId(allEvents);
+  const recsByCaseId = groupByCaseId(allRecs);
 
   const rows: CaseMetricRow[] = [];
   for (const c of allCases) {
-    const events = await getEventsByCaseId(c.id);
+    const events = eventsByCaseId.get(c.id) ?? [];
     const ttta = computeTTTA(events);
     const ttgp = computeTTGP(events);
     const ttdc = computeTTDC(events);
-    const recs = await getRecommendationsByCaseId(c.id);
+    const recs = recsByCaseId.get(c.id) ?? [];
 
     const ttgpComplete = ttgp.value_ms !== null && !ttgp.is_running;
     const ttdcComplete = ttdc.value_ms !== null && !ttdc.is_running;
@@ -138,6 +170,257 @@ export async function getCaseMetricRows(): Promise<CaseMetricRow[]> {
   }
 
   return rows;
+}
+
+// ── Paper 2: human-AI coordination analytics ─────────────────────────
+
+export interface EngineStat {
+  engine_version: string;
+  total: number;
+  accepted: number;
+  overridden: number;
+  pending: number;
+  accept_rate: number | null; // null when no decided recs
+  avg_confidence: number;
+  avg_time_to_decision_ms: number | null;
+}
+
+export interface ConfidenceBucket {
+  label: string;
+  lo: number;
+  hi: number;
+  total: number;
+  accepted: number;
+  overridden: number;
+  accept_rate: number | null;
+}
+
+export interface SeverityStat {
+  severity: number;
+  total: number;
+  accepted: number;
+  overridden: number;
+  accept_rate: number | null;
+}
+
+export interface OverrideReason {
+  case_id: string;
+  patient_ref: string;
+  recommendation_text: string;
+  reason: string;
+  engine_version: string;
+  confidence: number;
+  decided_at: string;
+}
+
+export interface Paper2Coordination {
+  total: number;
+  accepted: number;
+  overridden: number;
+  pending: number;
+  overall_accept_rate: number | null;
+  avg_confidence: number | null;
+  avg_time_to_decision_ms: number | null;
+  median_time_to_decision_ms: number | null;
+  by_engine: EngineStat[];
+  by_confidence: ConfidenceBucket[];
+  by_severity: SeverityStat[];
+  override_reasons: OverrideReason[];
+  unique_engines: number;
+  cases_with_recommendations: number;
+}
+
+function bucketLabel(lo: number, hi: number): string {
+  return `${Math.round(lo * 100)}–${Math.round(hi * 100)}%`;
+}
+
+/**
+ * Aggregates every recommendation across every case using the
+ * decided_at column directly (added in migration 20260516_005).
+ * Two parallel queries regardless of dataset size.
+ */
+export async function getPaper2Coordination(): Promise<Paper2Coordination> {
+  const [allCases, allRecs] = await Promise.all([
+    getCases(),
+    getAllRecommendations(),
+  ]);
+  return computePaper2Coordination(allCases, allRecs);
+}
+
+/**
+ * Pure aggregator: given the full set of cases + recommendations,
+ * produce the Paper 2 figure-set. Extracted from getPaper2Coordination
+ * so it can be unit-tested without a database.
+ */
+export function computePaper2Coordination(
+  allCases: { id: string; patient_ref: string; severity: number }[],
+  allRecs: Recommendation[],
+): Paper2Coordination {
+  // Index cases by id for O(1) severity / patient_ref lookups.
+  const caseById = new Map(allCases.map((c) => [c.id, c]));
+
+  // Decorated rec with the joining fields we need.
+  type DecoratedRec = {
+    rec: Recommendation;
+    case_id: string;
+    patient_ref: string;
+    severity: number;
+  };
+  const decoratedRecs: DecoratedRec[] = [];
+  const seenCaseIds = new Set<string>();
+  for (const rec of allRecs) {
+    const c = caseById.get(rec.case_id);
+    if (!c) continue; // rec orphaned from operational case — skip
+    decoratedRecs.push({
+      rec,
+      case_id: rec.case_id,
+      patient_ref: c.patient_ref,
+      severity: c.severity,
+    });
+    seenCaseIds.add(rec.case_id);
+  }
+
+  const total = decoratedRecs.length;
+  const accepted = decoratedRecs.filter((d) => d.rec.accepted === true).length;
+  const overridden = decoratedRecs.filter((d) => d.rec.accepted === false).length;
+  const pending = decoratedRecs.filter((d) => d.rec.accepted === null).length;
+  const decided = accepted + overridden;
+
+  const overall_accept_rate = decided > 0 ? accepted / decided : null;
+  const avg_confidence =
+    total > 0
+      ? decoratedRecs.reduce((sum, d) => sum + d.rec.confidence_value, 0) / total
+      : null;
+
+  // Time-to-decision comes straight from decided_at - created_at.
+  const decisionTimes: number[] = [];
+  for (const d of decoratedRecs) {
+    if (!d.rec.decided_at) continue;
+    const created = Date.parse(d.rec.created_at);
+    const decidedAt = Date.parse(d.rec.decided_at);
+    if (!Number.isFinite(created) || !Number.isFinite(decidedAt)) continue;
+    const diff = decidedAt - created;
+    if (diff >= 0) decisionTimes.push(diff);
+  }
+  const avg_time_to_decision_ms = average(decisionTimes);
+  const median_time_to_decision_ms = median(decisionTimes);
+
+  // By engine_version
+  const engineMap = new Map<string, DecoratedRec[]>();
+  for (const d of decoratedRecs) {
+    const key = d.rec.engine_version;
+    const arr = engineMap.get(key) ?? [];
+    arr.push(d);
+    engineMap.set(key, arr);
+  }
+  const by_engine: EngineStat[] = [];
+  for (const [engine_version, recs] of engineMap.entries()) {
+    const acc = recs.filter((d) => d.rec.accepted === true).length;
+    const ovr = recs.filter((d) => d.rec.accepted === false).length;
+    const pen = recs.filter((d) => d.rec.accepted === null).length;
+    const dec = acc + ovr;
+    const times: number[] = [];
+    for (const d of recs) {
+      if (!d.rec.decided_at) continue;
+      const t = Date.parse(d.rec.decided_at) - Date.parse(d.rec.created_at);
+      if (Number.isFinite(t) && t >= 0) times.push(t);
+    }
+    by_engine.push({
+      engine_version,
+      total: recs.length,
+      accepted: acc,
+      overridden: ovr,
+      pending: pen,
+      accept_rate: dec > 0 ? acc / dec : null,
+      avg_confidence:
+        recs.reduce((sum, d) => sum + d.rec.confidence_value, 0) / recs.length,
+      avg_time_to_decision_ms: average(times),
+    });
+  }
+  by_engine.sort((a, b) => b.total - a.total);
+
+  // Confidence calibration buckets (only decided recs)
+  const decidedOnly = decoratedRecs.filter((d) => d.rec.accepted !== null);
+  const buckets: { lo: number; hi: number }[] = [
+    { lo: 0.0, hi: 0.25 },
+    { lo: 0.25, hi: 0.5 },
+    { lo: 0.5, hi: 0.75 },
+    { lo: 0.75, hi: 1.0001 },
+  ];
+  const by_confidence: ConfidenceBucket[] = buckets.map((b) => {
+    const inBucket = decidedOnly.filter(
+      (d) =>
+        d.rec.confidence_value >= b.lo && d.rec.confidence_value < b.hi,
+    );
+    const acc = inBucket.filter((d) => d.rec.accepted === true).length;
+    const ovr = inBucket.filter((d) => d.rec.accepted === false).length;
+    return {
+      label: bucketLabel(b.lo, Math.min(b.hi, 1)),
+      lo: b.lo,
+      hi: Math.min(b.hi, 1),
+      total: inBucket.length,
+      accepted: acc,
+      overridden: ovr,
+      accept_rate: inBucket.length > 0 ? acc / inBucket.length : null,
+    };
+  });
+
+  // By severity
+  const sevMap = new Map<number, DecoratedRec[]>();
+  for (const d of decidedOnly) {
+    const arr = sevMap.get(d.severity) ?? [];
+    arr.push(d);
+    sevMap.set(d.severity, arr);
+  }
+  const by_severity: SeverityStat[] = [];
+  for (let sev = 1; sev <= 5; sev++) {
+    const recs = sevMap.get(sev) ?? [];
+    const acc = recs.filter((d) => d.rec.accepted === true).length;
+    const ovr = recs.filter((d) => d.rec.accepted === false).length;
+    by_severity.push({
+      severity: sev,
+      total: recs.length,
+      accepted: acc,
+      overridden: ovr,
+      accept_rate: recs.length > 0 ? acc / recs.length : null,
+    });
+  }
+
+  // Override reasons (recent first, max 20)
+  const override_reasons: OverrideReason[] = [];
+  for (const d of decoratedRecs) {
+    if (d.rec.accepted === false && d.rec.override_reason && d.rec.decided_at) {
+      override_reasons.push({
+        case_id: d.case_id,
+        patient_ref: d.patient_ref,
+        recommendation_text: d.rec.recommendation,
+        reason: d.rec.override_reason,
+        engine_version: d.rec.engine_version,
+        confidence: d.rec.confidence_value,
+        decided_at: d.rec.decided_at,
+      });
+    }
+  }
+  override_reasons.sort(
+    (a, b) => Date.parse(b.decided_at) - Date.parse(a.decided_at),
+  );
+
+  return {
+    total,
+    accepted,
+    overridden,
+    pending,
+    overall_accept_rate,
+    avg_confidence,
+    avg_time_to_decision_ms,
+    median_time_to_decision_ms,
+    by_engine,
+    by_confidence,
+    by_severity,
+    override_reasons: override_reasons.slice(0, 20),
+    unique_engines: engineMap.size,
+    cases_with_recommendations: seenCaseIds.size,
+  };
 }
 
 // ── Paper builder context ───────────────────────────────────────────

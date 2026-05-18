@@ -1,8 +1,14 @@
 import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { getDocById, updateDoc } from "@/lib/data/docs-store";
 import { createTask } from "@/lib/data/advisor-store";
+import {
+  modelFor,
+  requireAIKey,
+  MissingAIKeyError,
+  requireAuthenticatedUser,
+  UnauthenticatedError,
+} from "@/lib/ai/config";
 
 export const maxDuration = 60;
 
@@ -66,11 +72,14 @@ Keep it under 500 words. Use clear, persuasive academic prose. Output in Markdow
 };
 
 export async function POST(req: Request) {
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json(
-      { error: "AI features require an OPENAI_API_KEY environment variable. Add it to your .env.local file." },
-      { status: 503 },
-    );
+  try {
+    await requireAuthenticatedUser();
+    requireAIKey("doc_assistant");
+  } catch (err) {
+    if (err instanceof UnauthenticatedError || err instanceof MissingAIKeyError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
   }
 
   const body = await req.json();
@@ -101,15 +110,8 @@ export async function POST(req: Request) {
 
   const systemPrompt = MODE_PROMPTS[mode];
 
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json(
-      { error: "OPENAI_API_KEY not configured. Add it to .env.local to enable AI features." },
-      { status: 503 },
-    );
-  }
-
   const result = await generateText({
-    model: openai("gpt-4o-mini"),
+    model: modelFor("doc_assistant"),
     system: systemPrompt,
     prompt: `Document title: "${doc.title}"\n\nContent:\n${contentToProcess}`,
     abortSignal: req.signal,
@@ -124,7 +126,17 @@ export async function POST(req: Request) {
       try {
         const taskData = JSON.parse(jsonMatch[1]);
         if (taskData.tasks && Array.isArray(taskData.tasks)) {
-
+          const createdTasks = await Promise.all(
+            taskData.tasks.map(
+              (t: { title: string; description?: string; priority?: number }) =>
+                createTask({
+                  title: t.title,
+                  description: t.description ?? null,
+                  priority: t.priority ?? 2,
+                  linked_case_id: doc.linked_case_id ?? null,
+                }),
+            ),
+          );
           return Response.json({
             mode,
             tasks_created: createdTasks.length,
