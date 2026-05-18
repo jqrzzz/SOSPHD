@@ -136,7 +136,11 @@ export async function createCase(data: {
   if (!supabase) {
     throw new Error("Supabase is not configured. Cannot create case.");
   }
-  const caseNumber = `SOS-${Date.now().toString(36).toUpperCase()}`;
+  // Time-ordered prefix + 4-char random suffix so two creates in the
+  // same millisecond don't collide. ~1 in 1.6M collision per ms-bucket.
+  const millis = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const caseNumber = `SOS-${millis}-${random}`;
 
   const { data: newCase, error } = await supabase
     .from("cases")

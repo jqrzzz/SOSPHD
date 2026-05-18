@@ -1,14 +1,15 @@
-/* ─── Fieldwork Store (Supabase) ───────────────────────────────────────
+/* ─── Fieldwork Store — READ paths ─────────────────────────────────────
  *  Queries phd_journal_entries, phd_contacts, phd_protocols.
- *  Falls back to seed data when Supabase is unavailable.
+ *  Falls back to seed data when Supabase is unavailable (with a
+ *  [SOSPHD:DEGRADED] warning so it's not silent).
+ *
+ *  IMPORTANT: this file is imported by client components
+ *  (/app/fieldwork/page.tsx, /app/contacts/page.tsx). All write paths
+ *  live in fieldwork-mutations.ts (server-only) so importing the
+ *  server Supabase client doesn't pollute the client bundle.
  * ────────────────────────────────────────────────────────────────────── */
 
-import {
-  getSupabase,
-  getCurrentUserId,
-  requireAuthOrThrow,
-  warnDegradedMode,
-} from "@/lib/supabase/db";
+import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
 import type {
   JournalEntry,
   JournalEntryType,
@@ -375,68 +376,6 @@ export async function getJournalEntryById(id: string): Promise<JournalEntry | nu
   return seedJournal.find((e) => e.id === id) ?? null;
 }
 
-export async function createJournalEntry(data: {
-  entry_type: JournalEntryType;
-  title: string;
-  content: string;
-  location?: string | null;
-  corridor?: string | null;
-  tags?: string[];
-  contact_ids?: string[];
-  linked_case_id?: string | null;
-  attachments?: JournalAttachment[];
-}): Promise<JournalEntry> {
-  const { supabase: sb, userId } = await requireAuthOrThrow();
-
-  const { data: row, error } = await sb
-    .from("phd_journal_entries")
-    .insert({
-      user_id: userId,
-      entry_type: data.entry_type,
-      title: data.title,
-      content: data.content,
-      location: data.location ?? null,
-      corridor: data.corridor ?? null,
-      tags: data.tags ?? [],
-      contact_ids: data.contact_ids ?? [],
-      linked_case_id: data.linked_case_id ?? null,
-      attachments: data.attachments ?? [],
-      is_pinned: false,
-    })
-    .select()
-    .single();
-  if (error || !row) {
-    throw new Error(`Failed to create journal entry: ${error?.message}`);
-  }
-  return row as JournalEntry;
-}
-
-export async function updateJournalEntry(
-  id: string,
-  data: Partial<Pick<JournalEntry, "title" | "content" | "entry_type" | "location" | "corridor" | "tags" | "contact_ids" | "linked_case_id" | "is_pinned" | "attachments">>,
-): Promise<JournalEntry | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .from("phd_journal_entries")
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
-    if (!error && row) return row as JournalEntry;
-  }
-  return null;
-}
-
-export async function deleteJournalEntry(id: string): Promise<boolean> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.from("phd_journal_entries").delete().eq("id", id);
-    return !error;
-  }
-  return false;
-}
-
 // ── Contacts ────────────────────────────────────────────────────────
 
 export async function getContacts(filters?: {
@@ -506,74 +445,6 @@ export async function getContactById(id: string): Promise<Contact | null> {
   return seedContacts.find((c) => c.id === id) ?? null;
 }
 
-export async function createContact(data: {
-  name: string;
-  role: ContactRole;
-  organization?: string | null;
-  title?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  whatsapp?: string | null;
-  location?: string | null;
-  corridor?: string | null;
-  tags?: string[];
-  notes?: string;
-  business_card_url?: string | null;
-}): Promise<Contact> {
-  const { supabase: sb, userId } = await requireAuthOrThrow();
-
-  const { data: row, error } = await sb
-    .from("phd_contacts")
-    .insert({
-      user_id: userId,
-      name: data.name,
-      role: data.role,
-      organization: data.organization ?? null,
-      title: data.title ?? null,
-      email: data.email ?? null,
-      phone: data.phone ?? null,
-      whatsapp: data.whatsapp ?? null,
-      location: data.location ?? null,
-      corridor: data.corridor ?? null,
-      tags: data.tags ?? [],
-      notes: data.notes ?? "",
-      linked_journal_ids: [],
-      business_card_url: data.business_card_url ?? null,
-    })
-    .select()
-    .single();
-  if (error || !row) {
-    throw new Error(`Failed to create contact: ${error?.message}`);
-  }
-  return row as Contact;
-}
-
-export async function updateContact(
-  id: string,
-  data: Partial<Pick<Contact, "name" | "role" | "organization" | "title" | "email" | "phone" | "whatsapp" | "location" | "corridor" | "tags" | "notes" | "business_card_url" | "linked_journal_ids">>,
-): Promise<Contact | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .from("phd_contacts")
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
-    if (!error && row) return row as Contact;
-  }
-  return null;
-}
-
-export async function deleteContact(id: string): Promise<boolean> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.from("phd_contacts").delete().eq("id", id);
-    return !error;
-  }
-  return false;
-}
-
 // ── Protocols ───────────────────────────────────────────────────────
 
 export async function getProtocols(filters?: {
@@ -619,55 +490,6 @@ export async function getProtocolById(id: string): Promise<FieldProtocol | null>
 
 export async function getProtocolTemplates(): Promise<FieldProtocol[]> {
   return getProtocols({ status: "template" });
-}
-
-export async function createProtocolFromTemplate(
-  templateId: string,
-  data: { location?: string; corridor?: string; linked_contact_ids?: string[] },
-): Promise<FieldProtocol | null> {
-  const template = await getProtocolById(templateId);
-  if (!template) return null;
-
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
-
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .from("phd_protocols")
-      .insert({
-        user_id: userId,
-        template_id: templateId,
-        status: "in_progress",
-        title: template.title,
-        description: template.description,
-        sections: template.sections,
-        location: data.location ?? null,
-        corridor: data.corridor ?? null,
-        linked_journal_id: null,
-        linked_contact_ids: data.linked_contact_ids ?? [],
-      })
-      .select()
-      .single();
-    if (!error && row) return row as FieldProtocol;
-  }
-  return null;
-}
-
-export async function updateProtocol(
-  id: string,
-  data: Partial<Pick<FieldProtocol, "status" | "sections" | "location" | "corridor" | "linked_journal_id" | "linked_contact_ids">>,
-): Promise<FieldProtocol | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .from("phd_protocols")
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
-    if (!error && row) return row as FieldProtocol;
-  }
-  return null;
 }
 
 export function getProtocolProgress(protocol: FieldProtocol): {

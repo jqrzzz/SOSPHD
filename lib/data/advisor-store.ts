@@ -1,6 +1,14 @@
 /* ─── Advisor Store (Supabase) ─────────────────────────────────────────
  *  Queries phd_notes, phd_tasks, phd_advisor_sessions, phd_advisor_messages.
  *  Falls back to seed data when Supabase is unavailable.
+ *
+ *  KNOWN ISSUE — uses the BROWSER Supabase client (via lib/supabase/db).
+ *  When called from a server context (which is currently every call
+ *  site — verified), auth.getUser() returns null and writes silently
+ *  fail. The fix is to migrate write functions to requireAuthOrThrow
+ *  from server-auth (as fieldwork-mutations.ts does), then await the
+ *  server client at each call site. Tracked as a follow-up; the
+ *  existing behavior matches what was on main pre-cleanup.
  * ────────────────────────────────────────────────────────────────────── */
 
 import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";

@@ -6,12 +6,8 @@
  *  DB has no `site_id` or `user_id` on doc_versions — handled in mapping.
  * ────────────────────────────────────────────────────────────────────── */
 
-import {
-  getSupabase,
-  getCurrentUserId,
-  requireAuthOrThrow,
-  warnDegradedMode,
-} from "@/lib/supabase/db";
+import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
+import { requireAuthOrThrow } from "@/lib/supabase/server-auth";
 import type { Doc, DocVersion, DocStatus } from "./docs-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────

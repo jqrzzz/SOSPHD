@@ -1,6 +1,12 @@
 /* ─── Workspace Store (Supabase) ───────────────────────────────────────
  *  Queries phd_uploads, phd_mind_maps.
  *  Falls back to seed data when Supabase is unavailable.
+ *
+ *  KNOWN ISSUE — same shape as advisor-store: writes use the BROWSER
+ *  Supabase client and silently fail server-side. Fieldwork was split
+ *  into store + mutations (see fieldwork-mutations.ts) to fix this.
+ *  workspace + advisor stores follow the same migration path; tracked
+ *  as a follow-up. Existing behavior unchanged by today's work.
  * ────────────────────────────────────────────────────────────────────── */
 
 import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";

@@ -11,7 +11,7 @@ import {
   deleteContact,
   createProtocolFromTemplate,
   updateProtocol,
-} from "@/lib/data/fieldwork-store";
+} from "@/lib/data/fieldwork-mutations";
 import type { JournalEntryType, ContactRole } from "@/lib/data/fieldwork-types";
 
 // ── Schemas ─────────────────────────────────────────────────────────

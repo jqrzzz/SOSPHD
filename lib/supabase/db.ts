@@ -1,11 +1,16 @@
-/* ─── Supabase Database Helper ─────────────────────────────────────────
- *  Wraps the browser client for use in store modules.
- *  All phd_* table queries go through this.
+/* ─── Supabase Database Helper (client-side) ───────────────────────────
+ *  Browser-context wrapper around the Supabase client.
+ *  Safe to import from client components.
+ *
+ *  Server-side auth + the server client live in
+ *  ./server-auth.ts — DO NOT import that file from anything reachable
+ *  by a client component, or Turbopack will try to bundle next/headers
+ *  into the client and the build will fail.
  * ────────────────────────────────────────────────────────────────────── */
 
 import { createClient } from "./client";
 
-/** Get the Supabase browser client. Returns null if env vars are missing. */
+/** Browser-only Supabase client. Returns null if env vars are missing. */
 export function getSupabase() {
   try {
     if (
@@ -20,7 +25,7 @@ export function getSupabase() {
   }
 }
 
-/** Get the authenticated user's ID. Returns null if not signed in. */
+/** Browser-only auth check. Returns null when not signed in. */
 export async function getCurrentUserId(): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return null;
@@ -33,46 +38,32 @@ export async function getCurrentUserId(): Promise<string | null> {
 }
 
 /**
- * Throws AuthRequiredError when Supabase or auth aren't available.
- * Use in write paths so the UI surfaces a real error instead of
- * silently treating a no-op as success.
+ * Emits a one-shot warning when a store function takes the seed /
+ * empty fallback path. Helps catch the case where production is
+ * silently serving demo data because of a misconfigured client.
+ *
+ * Lifetime: the dedup Map lives in module scope. In a Vercel
+ * serverless model that's per-worker — fresh on every cold start.
+ * In `next dev`, it lasts the lifetime of the dev server. Neither
+ * is cross-request-globally-perfect; that's by design — we want one
+ * warning per worker per (key, reason), not one ever.
+ *
+ * Pass a positive `ttlMs` for stricter throttling: the same
+ * (key, reason) won't warn again until that many ms have elapsed.
  */
-export class AuthRequiredError extends Error {
-  status = 401;
-  constructor(message: string = "Sign in required to perform this action.") {
-    super(message);
-    this.name = "AuthRequiredError";
-  }
-}
+const _warnedKeys = new Map<string, number>();
+const DEFAULT_TTL_MS = 0; // 0 = once-per-worker
 
-export async function requireAuthOrThrow(): Promise<{
-  supabase: NonNullable<ReturnType<typeof getSupabase>>;
-  userId: string;
-}> {
-  const supabase = getSupabase();
-  if (!supabase) {
-    throw new AuthRequiredError(
-      "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
-    );
-  }
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    throw new AuthRequiredError();
-  }
-  return { supabase, userId };
-}
-
-/**
- * Logs once per (key, reason) pair when a store function takes the
- * seed/empty fallback path. Helps catch the case where production
- * is silently serving demo data because of a misconfigured client.
- */
-const _warnedKeys = new Set<string>();
-export function warnDegradedMode(key: string, reason: string) {
+export function warnDegradedMode(
+  key: string,
+  reason: string,
+  ttlMs: number = DEFAULT_TTL_MS,
+) {
   const tag = `${key}:${reason}`;
-  if (_warnedKeys.has(tag)) return;
-  _warnedKeys.add(tag);
-  // eslint-disable-next-line no-console
+  const now = Date.now();
+  const last = _warnedKeys.get(tag);
+  if (last !== undefined && (ttlMs === 0 || now - last < ttlMs)) return;
+  _warnedKeys.set(tag, now);
   console.warn(
     `[SOSPHD:DEGRADED] ${key} — ${reason}. Returning fallback/empty data.`,
   );
