@@ -38,17 +38,19 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
 
 - **Project ref**: `jnbxkvlkqmwnqlmetknj`
 - **URL**: `https://jnbxkvlkqmwnqlmetknj.supabase.co`
-- **MCP connector**: "SOS SUPABASE" (configured in Claude account-level settings)
+- **MCP connector**: "SOS SUPABASE" (configured in Claude account-level settings). ⚠️ **More than one Supabase MCP connector may be configured. Before any `apply_migration` / `execute_sql`, confirm `get_project_url` returns `jnbxkvlkqmwnqlmetknj.supabase.co` — another connector points at a different SOS project and applying SOSPHD migrations there would corrupt the wrong database.**
 - **Credentials**: in `.env.local` (gitignored)
-- **SOSPHD tables**: all in the `research` schema — see `supabase/migrations/20260516_004_research_schema_snapshot.sql` (core) + `20260519_007_research_journal_contacts_protocols.sql` (fieldwork)
-- **RLS**: enabled on all tables, scoped to `auth.uid()`
+- **SOSPHD tables**: all in the `research` schema — see `supabase/migrations/20260516_004_research_schema_snapshot.sql` (core) + `20260519_007_research_journal_contacts_protocols.sql` (fieldwork) + `20260528_008_research_cases_allowlist.sql` (case dimension + allowlist)
+- **RLS**: enabled on all tables. User-scoped tables use `auth.uid() = user_id`; the shared research spine (`case_events`, `recommendations`, `cases`) is gated by the `research.allowed_users` allowlist via `research.is_allowed_user()` (SD-001).
 
 ### SOSPHD Tables (`research.*` schema)
 
 | Table | Purpose |
 |-------|---------|
+| `research.cases` | SOSPHD-owned case dimension — historical backfill + research-native cases (de-identified). Unified with `public.cases` in the read layer. |
 | `research.case_events` | The provenance spine — operational milestones |
 | `research.recommendations` | AI recommendations + operator decisions (Paper 2 core) |
+| `research.allowed_users` | SD-001 allowlist gating the shared research spine |
 | `research.journal_entries` | Field observations, conversations, site visits |
 | `research.contacts` | Research network (doctors, fixers, academics) |
 | `research.protocols` | Field visit checklists (templates + active) |

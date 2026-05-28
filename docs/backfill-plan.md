@@ -2,7 +2,22 @@
 
 > Scoping for Phase 1 / Step 5a (`phd-spine.ts`): ingest the historical operational spreadsheet so Paper 1 has descriptive stats to compute over. This doc is the architecture decision + task plan. It does NOT change schema yet — it surfaces the decision that must be made first.
 
-**Status**: SCOPING (2026-05-28). Awaiting architecture decision (§4) and SD-001 resolution.
+**Status**: FOUNDATIONS BUILT (2026-05-28). Architecture decision = **Option C** (§4). SD-001 = **resolved, Option B** (allowlist). Migration `20260528_008` applied live + verified. Read-layer union, normalization, pure transform, and idempotent writer are implemented and tested. **Remaining: the spreadsheet parser** (HistoricalCaseInput[] from the real 843-case sheet) + running the ingest — both blocked on access to the sheet headers/data.
+
+### What's built (Phase 9)
+- `research.cases` dimension + `research.allowed_users` allowlist + `is_allowed_user()` + ingestion-provenance columns on `case_events` (migration `20260528_008`, applied + verified).
+- Read-layer union: `getCases()` / `getCaseById()` merge `public.cases` ∪ `research.cases`; new `getResearchCases()`. `Case.source` discriminator added.
+- Backfill module `lib/data/backfill/`: typed `HistoricalCaseInput` (the parser's contract), `normalize.ts` (payer/diagnosis/status/severity v1 mappers), pure `historicalCaseToRows` transform (unit-tested), idempotent server-side `ingestHistoricalCases` writer.
+- SD-001 closed; `measurement-projection.md` dedup wording corrected; CLAUDE.md MCP-connector warning added.
+
+### What remains (needs the spreadsheet)
+- A parser: 843-case sheet → `HistoricalCaseInput[]`, written against the real headers.
+- Widening the `PAYER_ALIASES` map (448 distinct strings → ~30) and diagnosis keyword lists from the actual data.
+- Running `ingestHistoricalCases` and reconciling the missingness log against expectations.
+
+---
+
+### Original scoping (retained for the record)
 
 ---
 

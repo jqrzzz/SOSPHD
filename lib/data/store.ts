@@ -127,6 +127,29 @@ function toCase(row: Record<string, unknown>): Case {
     chief_complaint: (row.incident_description as string) ?? "",
     patient_ref: (patient?.medical_id as string) ?? (row.case_number as string) ?? "Unknown",
     notes: (row.notes as string) ?? "",
+    source: "operational",
+  };
+}
+
+/**
+ * Map a research.cases row → the shared Case type. Unlike toCase (which
+ * projects the operational public.cases schema), research.cases already
+ * stores the research model: status is open/active/closed, severity is
+ * 1–4, and there is no raw PHI — patient_ref is the pseudonym. See
+ * docs/backfill-plan.md.
+ */
+function toResearchCase(row: Record<string, unknown>): Case {
+  const sev = row.severity as number | null;
+  return {
+    id: row.id as string,
+    site_id: (row.country as string) ?? "unknown",
+    created_at: row.created_at as string,
+    status: (row.status as CaseStatus) ?? "closed",
+    severity: (sev && sev >= 1 && sev <= 4 ? sev : 2) as Severity,
+    chief_complaint: (row.incident_summary as string) ?? "",
+    patient_ref: (row.patient_ref as string) ?? "Unknown",
+    notes: "",
+    source: "historical",
   };
 }
 
@@ -164,10 +187,10 @@ const OP_STATUSES_BY_RESEARCH_BUCKET: Record<CaseStatus, string[]> = {
   closed: ["discharged", "resolved", "billing", "claims", "closed", "cancelled"],
 };
 
-export async function getCases(filters?: {
-  status?: CaseStatus;
-  search?: string;
-}): Promise<Case[]> {
+/** Operational cases projected from public.cases (live SOSCOMMAND data). */
+async function getOperationalCases(
+  statusFilter?: CaseStatus,
+): Promise<Case[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
 
@@ -178,17 +201,61 @@ export async function getCases(filters?: {
       .from("cases")
       .select(CASE_COLUMNS)
       .order("created_at", { ascending: false });
-    if (filters?.status) {
-      query = query.in(
-        "status",
-        OP_STATUSES_BY_RESEARCH_BUCKET[filters.status],
-      );
+    if (statusFilter) {
+      query = query.in("status", OP_STATUSES_BY_RESEARCH_BUCKET[statusFilter]);
     }
     return query;
-  }, "getCases");
+  }, "getOperationalCases");
   if (error || !data) return [];
+  return data.map(toCase);
+}
 
-  let result = data.map(toCase);
+/**
+ * Research-native cases from research.cases (historical backfill +
+ * future prospective research cases). Status is already the research
+ * model, so the filter pushes down directly. See docs/backfill-plan.md.
+ */
+export async function getResearchCases(
+  statusFilter?: CaseStatus,
+): Promise<Case[]> {
+  const supabase = await tryCreateClient();
+  if (!supabase) return [];
+  const { data, error } = await withSupabaseRetry(() => {
+    let query = supabase
+      .schema("research")
+      .from("cases")
+      .select(
+        "id, status, severity, country, incident_summary, patient_ref, created_at",
+      )
+      .order("created_at", { ascending: false });
+    if (statusFilter) {
+      query = query.eq("status", statusFilter);
+    }
+    return query;
+  }, "getResearchCases");
+  if (error || !data) return [];
+  return data.map((row) => toResearchCase(row as Record<string, unknown>));
+}
+
+/**
+ * Unified case list: operational (public.cases) ∪ research-native
+ * (research.cases), newest first. The analytics layer and dashboards
+ * call this, so backfilled historical cases become first-class
+ * everywhere without those call sites changing.
+ */
+export async function getCases(filters?: {
+  status?: CaseStatus;
+  search?: string;
+}): Promise<Case[]> {
+  const [operational, research] = await Promise.all([
+    getOperationalCases(filters?.status),
+    getResearchCases(filters?.status),
+  ]);
+
+  let result = [...operational, ...research].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
 
   if (filters?.search) {
     const q = filters.search.toLowerCase();
@@ -205,18 +272,30 @@ export async function getCases(filters?: {
 export async function getCaseById(id: string): Promise<Case | undefined> {
   const supabase = await tryCreateClient();
   if (!supabase) return undefined;
+
+  // Operational first (the common case), then research-native.
   const { data, error } = await withSupabaseRetry(
     () =>
-      supabase
-        .from("cases")
-        .select(CASE_COLUMNS)
-        .eq("id", id)
-        .single(),
+      supabase.from("cases").select(CASE_COLUMNS).eq("id", id).maybeSingle(),
     "getCaseById",
   );
+  if (!error && data) return toCase(data);
 
-  if (error || !data) return undefined;
-  return toCase(data);
+  const { data: rData, error: rErr } = await withSupabaseRetry(
+    () =>
+      supabase
+        .schema("research")
+        .from("cases")
+        .select(
+          "id, status, severity, country, incident_summary, patient_ref, created_at",
+        )
+        .eq("id", id)
+        .maybeSingle(),
+    "getCaseById.research",
+  );
+  if (!rErr && rData) return toResearchCase(rData as Record<string, unknown>);
+
+  return undefined;
 }
 
 // Per docs/audit-action-plan.md Decision C: SOSPHD does not create

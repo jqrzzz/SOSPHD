@@ -6,7 +6,11 @@ Decisions that affect production security posture but require explicit owner inp
 
 ## SD-001 — Cross-project access to `research.case_events` and `research.recommendations`
 
-**Status**: OPEN (Phase 7 audit, 2026-05-28)
+**Status**: ✅ RESOLVED via Option B (2026-05-28, migration `20260528_008`). An allowlist table `research.allowed_users` + `research.is_allowed_user()` (SECURITY DEFINER) now gates SELECT/INSERT/UPDATE on `case_events`, `recommendations`, and the new `cases` table. Owner seeded; the trigger sync path is unaffected (SECURITY DEFINER bypasses RLS). Verified with simulated-role transactions: allowlisted user sees rows, non-allowlisted user sees zero. Original analysis retained below for the record.
+
+---
+
+### Original analysis (Phase 7 audit, 2026-05-28)
 
 ### The issue
 

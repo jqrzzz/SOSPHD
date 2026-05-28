@@ -44,6 +44,16 @@ export type CaseStatus = "open" | "active" | "closed";
  */
 export type Severity = 1 | 2 | 3 | 4;
 
+/**
+ * Where a Case row originated:
+ *  - "operational" = projected from public.cases (live SOSCOMMAND data)
+ *  - "historical"  = a research.cases row (backfilled 2018–2023, or any
+ *    research-native case). See docs/backfill-plan.md.
+ * Optional so existing construction sites stay valid; the read layer
+ * sets it explicitly.
+ */
+export type CaseSource = "operational" | "historical";
+
 export interface Case {
   id: string;
   site_id: string;
@@ -53,6 +63,7 @@ export interface Case {
   chief_complaint: string;
   patient_ref: string;
   notes: string;
+  source?: CaseSource;
 }
 
 // ── Event (the provenance spine) ──────────────────────────────────────
