@@ -2,13 +2,8 @@ import { generateText } from "ai";
 import { z } from "zod";
 import { getDocById } from "@/lib/data/docs-store";
 import { createTask } from "@/lib/data/advisor-mutations";
-import {
-  modelFor,
-  requireAIKey,
-  MissingAIKeyError,
-  requireAuthenticatedUser,
-  UnauthenticatedError,
-} from "@/lib/ai/config";
+import { modelFor } from "@/lib/ai/config";
+import { gateAIRequest } from "@/lib/ai/gate";
 
 export const maxDuration = 60;
 
@@ -72,17 +67,21 @@ Keep it under 500 words. Use clear, persuasive academic prose. Output in Markdow
 };
 
 export async function POST(req: Request) {
-  try {
-    await requireAuthenticatedUser();
-    requireAIKey("doc_assistant");
-  } catch (err) {
-    if (err instanceof UnauthenticatedError || err instanceof MissingAIKeyError) {
-      return Response.json({ error: err.message }, { status: err.status });
-    }
-    throw err;
-  }
+  const gate = await gateAIRequest("doc_assistant");
+  if (!gate.ok) return gate.response;
 
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return Response.json(
+      {
+        error: "Malformed JSON in request body",
+        detail: err instanceof Error ? err.message : undefined,
+      },
+      { status: 400 },
+    );
+  }
   const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {

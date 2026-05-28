@@ -4,13 +4,8 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
-import {
-  modelFor,
-  requireAIKey,
-  MissingAIKeyError,
-  requireAuthenticatedUser,
-  UnauthenticatedError,
-} from "@/lib/ai/config";
+import { modelFor } from "@/lib/ai/config";
+import { gateAIRequest } from "@/lib/ai/gate";
 import { buildContextSnapshot } from "@/lib/data/context-builder";
 import { createTasksFromAI } from "@/lib/advisor-actions";
 import { addMessage } from "@/lib/data/advisor-mutations";
@@ -216,15 +211,8 @@ async function extractAndCreateTasks(text: string): Promise<void> {
 }
 
 export async function POST(req: Request) {
-  try {
-    await requireAuthenticatedUser();
-    requireAIKey("advisor");
-  } catch (err) {
-    if (err instanceof UnauthenticatedError || err instanceof MissingAIKeyError) {
-      return Response.json({ error: err.message }, { status: err.status });
-    }
-    throw err;
-  }
+  const gate = await gateAIRequest("advisor");
+  if (!gate.ok) return gate.response;
 
   const {
     messages,

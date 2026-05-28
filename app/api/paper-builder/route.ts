@@ -1,13 +1,8 @@
 import { generateText } from "ai";
 import { z } from "zod";
 import { buildPaperContext } from "@/lib/data/analytics";
-import {
-  modelFor,
-  requireAIKey,
-  MissingAIKeyError,
-  requireAuthenticatedUser,
-  UnauthenticatedError,
-} from "@/lib/ai/config";
+import { modelFor } from "@/lib/ai/config";
+import { gateAIRequest } from "@/lib/ai/gate";
 
 export const maxDuration = 60;
 
@@ -116,15 +111,8 @@ Output in Markdown. No preamble.`,
 };
 
 export async function POST(req: Request) {
-  try {
-    await requireAuthenticatedUser();
-    requireAIKey("paper_builder");
-  } catch (err) {
-    if (err instanceof UnauthenticatedError || err instanceof MissingAIKeyError) {
-      return Response.json({ error: err.message }, { status: err.status });
-    }
-    throw err;
-  }
+  const gate = await gateAIRequest("paper_builder");
+  if (!gate.ok) return gate.response;
 
   let body: unknown;
   try {

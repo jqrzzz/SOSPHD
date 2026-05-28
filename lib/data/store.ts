@@ -9,6 +9,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { createClient } from "@/lib/supabase/server";
+import { withSupabaseRetry } from "./retry";
 import type { Case, CaseEvent, CaseStatus, Severity, Recommendation } from "./types";
 
 async function tryCreateClient() {
@@ -170,20 +171,21 @@ export async function getCases(filters?: {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
 
-  let query = supabase
-    .from("cases")
-    .select(CASE_COLUMNS)
-    .order("created_at", { ascending: false });
-
-  // Push status bucket → operational status set as an .in() filter so
-  // we don't transfer rows we'll drop. Search stays in JS — it tests
-  // `incident_description` and joined `patients.medical_id`, which
-  // isn't an exact-match filter we can express cheaply on the server.
-  if (filters?.status) {
-    query = query.in("status", OP_STATUSES_BY_RESEARCH_BUCKET[filters.status]);
-  }
-
-  const { data, error } = await query;
+  // Wrap in retry — buildContextSnapshot/buildPaperContext depend on
+  // this read and a transient blip would corrupt the AI context.
+  const { data, error } = await withSupabaseRetry(() => {
+    let query = supabase
+      .from("cases")
+      .select(CASE_COLUMNS)
+      .order("created_at", { ascending: false });
+    if (filters?.status) {
+      query = query.in(
+        "status",
+        OP_STATUSES_BY_RESEARCH_BUCKET[filters.status],
+      );
+    }
+    return query;
+  }, "getCases");
   if (error || !data) return [];
 
   let result = data.map(toCase);
@@ -203,11 +205,15 @@ export async function getCases(filters?: {
 export async function getCaseById(id: string): Promise<Case | undefined> {
   const supabase = await tryCreateClient();
   if (!supabase) return undefined;
-  const { data, error } = await supabase
-    .from("cases")
-    .select(CASE_COLUMNS)
-    .eq("id", id)
-    .single();
+  const { data, error } = await withSupabaseRetry(
+    () =>
+      supabase
+        .from("cases")
+        .select(CASE_COLUMNS)
+        .eq("id", id)
+        .single(),
+    "getCaseById",
+  );
 
   if (error || !data) return undefined;
   return toCase(data);
@@ -231,12 +237,16 @@ export async function getEventsByCaseId(caseId: string): Promise<CaseEvent[]> {
   // triggers (migrations 003 + 006), not application code. Events
   // appear in research.case_events the moment SOSCOMMAND writes to
   // the operational tables. See docs/audit-action-plan.md Decision B.
-  const { data, error } = await supabase
-    .schema("research")
-    .from("case_events")
-    .select("*")
-    .eq("case_id", caseId)
-    .order("occurred_at", { ascending: true });
+  const { data, error } = await withSupabaseRetry(
+    () =>
+      supabase
+        .schema("research")
+        .from("case_events")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("occurred_at", { ascending: true }),
+    "getEventsByCaseId",
+  );
 
   if (error || !data) return [];
 
@@ -336,15 +346,17 @@ export async function getAllRecommendations(
 ): Promise<Recommendation[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
-  let query = supabase
-    .schema("research")
-    .from("recommendations")
-    .select("*")
-    .order("created_at", { ascending: true });
-  if (caseIds && caseIds.length > 0) {
-    query = query.in("case_id", caseIds);
-  }
-  const { data, error } = await query;
+  const { data, error } = await withSupabaseRetry(() => {
+    let query = supabase
+      .schema("research")
+      .from("recommendations")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (caseIds && caseIds.length > 0) {
+      query = query.in("case_id", caseIds);
+    }
+    return query;
+  }, "getAllRecommendations");
   if (error || !data) return [];
   return data.map((row) => toRecommendation(row as Record<string, unknown>));
 }
@@ -359,15 +371,17 @@ export async function getAllCaseEvents(
 ): Promise<CaseEvent[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
-  let query = supabase
-    .schema("research")
-    .from("case_events")
-    .select("*")
-    .order("occurred_at", { ascending: true });
-  if (caseIds && caseIds.length > 0) {
-    query = query.in("case_id", caseIds);
-  }
-  const { data, error } = await query;
+  const { data, error } = await withSupabaseRetry(() => {
+    let query = supabase
+      .schema("research")
+      .from("case_events")
+      .select("*")
+      .order("occurred_at", { ascending: true });
+    if (caseIds && caseIds.length > 0) {
+      query = query.in("case_id", caseIds);
+    }
+    return query;
+  }, "getAllCaseEvents");
   if (error || !data) return [];
   return data.map((row) => ({
     id: row.id as string,
