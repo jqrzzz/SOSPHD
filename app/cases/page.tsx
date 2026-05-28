@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { getCases, getEventCountByCaseId } from "@/lib/data/store";
+import { getCases, getEventCountsByCaseIds } from "@/lib/data/store";
 import { SeverityBadge } from "@/components/severity-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { CaseListFilters } from "@/components/case-list-filters";
@@ -27,10 +27,7 @@ export default async function CasesPage(props: {
     search: searchQuery,
   });
 
-  const eventCounts = await Promise.all(
-    cases.map((c) => getEventCountByCaseId(c.id)),
-  );
-  const eventCountMap = new Map(cases.map((c, i) => [c.id, eventCounts[i]]));
+  const eventCountMap = await getEventCountsByCaseIds(cases.map((c) => c.id));
 
   const openCount = cases.filter((c) => c.status === "open").length;
   const activeCount = cases.filter((c) => c.status === "active").length;

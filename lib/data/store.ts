@@ -133,6 +133,38 @@ function toCase(row: Record<string, unknown>): Case {
 
 // ── Query functions ─────────────────────────────────────────────────
 
+// Explicit column projection — matches the fields toCase() reads.
+// `public.cases` has ~40 columns; selecting "*" pulls every one across
+// the wire (including PHI-adjacent fields SOSPHD has no business
+// touching). Keep this list minimal and document additions.
+const CASE_COLUMNS =
+  "id, case_number, patient_id, status, priority, country, incident_description, notes, created_at, patients(full_name, medical_id)";
+
+// Inverse of mapStatus — given a research bucket, the set of
+// operational statuses that project into it. Used to push the status
+// filter to the database so we don't transfer rows we'll discard.
+// Keep this in lockstep with mapStatus.
+const OP_STATUSES_BY_RESEARCH_BUCKET: Record<CaseStatus, string[]> = {
+  open: [
+    "intake",
+    "pending",
+    "pending_info",
+    "pending_authorization",
+    "pending_external",
+    "needs_review",
+    "verified",
+    "rejected",
+  ],
+  active: [
+    "active",
+    "in_progress",
+    "in_treatment",
+    "transport_arranged",
+    "triage",
+  ],
+  closed: ["discharged", "resolved", "billing", "claims", "closed", "cancelled"],
+};
+
 export async function getCases(filters?: {
   status?: CaseStatus;
   search?: string;
@@ -140,20 +172,24 @@ export async function getCases(filters?: {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
 
-  const query = supabase
+  let query = supabase
     .from("cases")
-    .select("*, patients(full_name, medical_id)")
+    .select(CASE_COLUMNS)
     .order("created_at", { ascending: false });
 
-  // We filter in JS since operational statuses don't map 1:1
+  // Push status bucket → operational status set as an .in() filter so
+  // we don't transfer rows we'll drop. Search stays in JS — it tests
+  // `incident_description` and joined `patients.medical_id`, which
+  // isn't an exact-match filter we can express cheaply on the server.
+  if (filters?.status) {
+    query = query.in("status", OP_STATUSES_BY_RESEARCH_BUCKET[filters.status]);
+  }
+
   const { data, error } = await query;
   if (error || !data) return [];
 
   let result = data.map(toCase);
 
-  if (filters?.status) {
-    result = result.filter((c) => c.status === filters.status);
-  }
   if (filters?.search) {
     const q = filters.search.toLowerCase();
     result = result.filter(
@@ -171,7 +207,7 @@ export async function getCaseById(id: string): Promise<Case | undefined> {
   if (!supabase) return undefined;
   const { data, error } = await supabase
     .from("cases")
-    .select("*, patients(full_name, medical_id)")
+    .select(CASE_COLUMNS)
     .eq("id", id)
     .single();
 
@@ -651,4 +687,32 @@ export async function getEventCountByCaseId(caseId: string): Promise<number> {
 
   if (error) return 0;
   return count ?? 0;
+}
+
+/**
+ * Single-roundtrip event counts for a set of cases. Replaces the
+ * N+1 anti-pattern of `Promise.all(cases.map(c => getEventCountByCaseId(c.id)))`
+ * on the cases list page: one case_id projection query, grouped in memory.
+ *
+ * For N cases this collapses N count queries into one bulk fetch.
+ * Empty input array short-circuits to an empty Map without a network call.
+ */
+export async function getEventCountsByCaseIds(
+  caseIds: string[],
+): Promise<Map<string, number>> {
+  if (caseIds.length === 0) return new Map();
+  const supabase = await tryCreateClient();
+  if (!supabase) return new Map();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("case_events")
+    .select("case_id")
+    .in("case_id", caseIds);
+  if (error || !data) return new Map();
+  const counts = new Map<string, number>();
+  for (const row of data) {
+    const id = row.case_id as string;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }

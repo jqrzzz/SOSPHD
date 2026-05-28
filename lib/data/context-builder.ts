@@ -5,10 +5,10 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import type { ContextSnapshot, MissingMilestones } from "./advisor-types";
-import { getCases, getEventsByCaseId } from "./store";
+import { getCases, getAllCaseEvents } from "./store";
 import { getNotes, getTasks } from "./advisor-store";
 import { computeAllMetrics } from "./metrics";
-import type { EventType } from "./types";
+import type { CaseEvent, EventType } from "./types";
 
 const MILESTONE_EVENTS: EventType[] = [
   "FIRST_CONTACT",
@@ -20,14 +20,29 @@ const MILESTONE_EVENTS: EventType[] = [
   "DISCHARGE",
 ];
 
-async function getMissingMilestones(caseId: string): Promise<string[]> {
-  const events = await getEventsByCaseId(caseId);
+function missingFromEvents(events: CaseEvent[]): string[] {
   const present = new Set(events.map((e) => e.event_type));
   return MILESTONE_EVENTS.filter((m) => !present.has(m));
 }
 
 export async function buildContextSnapshot(): Promise<ContextSnapshot> {
-  const allCases = await getCases();
+  // 4 parallel queries, regardless of case count. Was previously
+  // 2 + N (per-case events fetched in a loop for missing-milestone
+  // derivation). All event work now happens in memory from a single
+  // research.case_events scan.
+  const [allCases, allEvents, topTasksRaw, recentNotesRaw] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+    getTasks({ limit: 5 }),
+    getNotes(5),
+  ]);
+
+  const eventsByCaseId = new Map<string, CaseEvent[]>();
+  for (const ev of allEvents) {
+    const arr = eventsByCaseId.get(ev.case_id) ?? [];
+    arr.push(ev);
+    eventsByCaseId.set(ev.case_id, arr);
+  }
 
   const recentCases = allCases.slice(0, 10).map((c) => ({
     id: c.id,
@@ -43,7 +58,7 @@ export async function buildContextSnapshot(): Promise<ContextSnapshot> {
   let activeCaseMetrics: ContextSnapshot["active_case_metrics"] = null;
 
   if (activeCase) {
-    const events = await getEventsByCaseId(activeCase.id);
+    const events = eventsByCaseId.get(activeCase.id) ?? [];
     const metrics = computeAllMetrics(events);
     const ttta = metrics.find((m) => m.abbreviation === "TTTA");
     const ttgp = metrics.find((m) => m.abbreviation === "TTGP");
@@ -57,20 +72,19 @@ export async function buildContextSnapshot(): Promise<ContextSnapshot> {
       ttta_running: ttta?.is_running ?? false,
       ttgp_running: ttgp?.is_running ?? false,
       ttdc_running: ttdc?.is_running ?? false,
-      missing_milestones: await getMissingMilestones(activeCase.id),
+      missing_milestones: missingFromEvents(events),
     };
   }
 
   const missingAll: MissingMilestones[] = [];
-  for (const c of allCases.filter((c) => c.status !== "closed")) {
-    const missing = await getMissingMilestones(c.id);
+  for (const c of allCases) {
+    if (c.status === "closed") continue;
+    const missing = missingFromEvents(eventsByCaseId.get(c.id) ?? []);
     if (missing.length > 0) {
       missingAll.push({ case_id: c.id, patient_ref: c.patient_ref, missing });
     }
   }
 
-  // Tasks and notes
-  const topTasksRaw = await getTasks({ limit: 5 });
   const topTasks = topTasksRaw.map((t) => ({
     id: t.id,
     title: t.title,
@@ -78,7 +92,6 @@ export async function buildContextSnapshot(): Promise<ContextSnapshot> {
     priority: t.priority,
   }));
 
-  const recentNotesRaw = await getNotes(5);
   const recentNotes = recentNotesRaw.map((n) => ({
     id: n.id,
     title: n.title,
