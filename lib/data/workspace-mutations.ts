@@ -54,12 +54,16 @@ export async function createUpload(data: {
 }
 
 export async function deleteUpload(id: string): Promise<void> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  // Defense-in-depth: RLS enforces owner-only delete, but also bound
+  // the query by user_id so a misconfigured policy can't permit
+  // cross-user deletes.
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { error } = await sb
     .schema("research")
     .from("uploads")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
   if (error) {
     throw new Error(`Failed to delete upload: ${error.message}`);
   }
@@ -96,12 +100,13 @@ export async function updateMindMap(
     edges?: MindMapEdge[];
   },
 ): Promise<MindMap> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("mind_maps")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error || !row) {
@@ -111,12 +116,13 @@ export async function updateMindMap(
 }
 
 export async function deleteMindMap(id: string): Promise<void> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { error } = await sb
     .schema("research")
     .from("mind_maps")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
   if (error) {
     throw new Error(`Failed to delete mind map: ${error.message}`);
   }

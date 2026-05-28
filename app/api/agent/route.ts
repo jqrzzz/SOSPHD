@@ -38,8 +38,17 @@ const requestSchema = z.object({
   }).optional(),
 });
 
-/** GET /api/agent — Discover agent capabilities */
+/** GET /api/agent — Discover agent capabilities. Auth-gated so capability
+ *  discovery doesn't leak the action surface to unauthenticated callers. */
 export async function GET() {
+  try {
+    await requireAuthenticatedUser();
+  } catch (err) {
+    if (err instanceof UnauthenticatedError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
   return Response.json(getAgentCapabilities());
 }
 

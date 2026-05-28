@@ -81,12 +81,16 @@ export async function updateJournalEntry(
     >
   >,
 ): Promise<JournalEntry> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  // Defense-in-depth: RLS already enforces ownership, but bound the
+  // query by user_id so a misconfigured policy can't permit cross-user
+  // writes. Same pattern for every UPDATE/DELETE in this file.
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("journal_entries")
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error || !row) {
@@ -96,8 +100,13 @@ export async function updateJournalEntry(
 }
 
 export async function deleteJournalEntry(id: string): Promise<void> {
-  const { supabase: sb } = await requireAuthOrThrow();
-  const { error } = await sb.schema("research").from("journal_entries").delete().eq("id", id);
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const { error } = await sb
+    .schema("research")
+    .from("journal_entries")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId);
   if (error) {
     throw new Error(`Failed to delete journal entry: ${error.message}`);
   }
@@ -168,12 +177,13 @@ export async function updateContact(
     >
   >,
 ): Promise<Contact> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("contacts")
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error || !row) {
@@ -183,8 +193,13 @@ export async function updateContact(
 }
 
 export async function deleteContact(id: string): Promise<void> {
-  const { supabase: sb } = await requireAuthOrThrow();
-  const { error } = await sb.schema("research").from("contacts").delete().eq("id", id);
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const { error } = await sb
+    .schema("research")
+    .from("contacts")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId);
   if (error) {
     throw new Error(`Failed to delete contact: ${error.message}`);
   }
@@ -242,12 +257,13 @@ export async function updateProtocol(
     >
   >,
 ): Promise<FieldProtocol> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("protocols")
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error || !row) {

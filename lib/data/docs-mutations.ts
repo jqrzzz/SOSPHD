@@ -84,12 +84,16 @@ export async function updateDoc(
     >
   >,
 ): Promise<Doc> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  // Defense-in-depth: RLS already enforces this, but bound the query
+  // by user_id so a misconfigured policy can't let a researcher edit
+  // someone else's doc by id.
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("docs")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error || !row) {

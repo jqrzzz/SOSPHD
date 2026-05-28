@@ -60,12 +60,17 @@ export async function updateNote(
     content?: string;
   },
 ): Promise<ResearchNote> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  // RLS enforces ownership at the DB layer. The extra .eq("user_id",
+  // userId) is defense-in-depth so a misconfigured policy can't let
+  // user A edit user B's note. Same pattern repeated for every
+  // user-scoped UPDATE/DELETE in this file.
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("notes")
     .update(data)
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error || !row) {
@@ -75,12 +80,13 @@ export async function updateNote(
 }
 
 export async function deleteNote(id: string): Promise<void> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { error } = await sb
     .schema("research")
     .from("notes")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
   if (error) {
     throw new Error(`Failed to delete note: ${error.message}`);
   }
@@ -120,12 +126,13 @@ export async function updateTaskStatus(
   id: string,
   status: TaskStatus,
 ): Promise<ResearchTask> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("tasks")
     .update({ status })
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error || !row) {
@@ -143,12 +150,13 @@ export async function updateTask(
     due_date?: string | null;
   },
 ): Promise<ResearchTask> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("tasks")
     .update(data)
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error || !row) {
@@ -158,12 +166,13 @@ export async function updateTask(
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  const { supabase: sb } = await requireAuthOrThrow();
+  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { error } = await sb
     .schema("research")
     .from("tasks")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
   if (error) {
     throw new Error(`Failed to delete task: ${error.message}`);
   }
