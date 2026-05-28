@@ -32,7 +32,17 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
 // ── Case ──────────────────────────────────────────────────────────────
 
 export type CaseStatus = "open" | "active" | "closed";
-export type Severity = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * Clinical severity scale, derived from `public.cases.priority` via
+ * `mapPriority` in lib/data/store.ts. Cardinality (1-4) matches the
+ * operational enum's 4 values: low → 1, normal → 2, high → 3,
+ * critical → 4. Widen this if richer severity data (e.g. acuity_level)
+ * becomes the source of truth.
+ *
+ * 1 = Low, 2 = Normal, 3 = High, 4 = Critical.
+ */
+export type Severity = 1 | 2 | 3 | 4;
 
 export interface Case {
   id: string;

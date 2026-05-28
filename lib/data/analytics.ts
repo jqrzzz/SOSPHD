@@ -373,7 +373,10 @@ export function computePaper2Coordination(
     sevMap.set(d.severity, arr);
   }
   const by_severity: SeverityStat[] = [];
-  for (let sev = 1; sev <= 5; sev++) {
+  // Severity is 1-4 (see lib/data/types.ts:Severity). Loop covers the
+  // full reachable range; if mapPriority is widened later this loop's
+  // upper bound moves with it.
+  for (let sev = 1; sev <= 4; sev++) {
     const recs = sevMap.get(sev) ?? [];
     const acc = recs.filter((d) => d.rec.accepted === true).length;
     const ovr = recs.filter((d) => d.rec.accepted === false).length;

@@ -7,7 +7,7 @@ import type { Recommendation } from "../types";
 type TestCase = { id: string; patient_ref: string; severity: number };
 
 const cases: TestCase[] = [
-  { id: "case-1", patient_ref: "SOS-001", severity: 5 },
+  { id: "case-1", patient_ref: "SOS-001", severity: 4 },
   { id: "case-2", patient_ref: "SOS-002", severity: 3 },
   { id: "case-3", patient_ref: "SOS-003", severity: 1 },
 ];
@@ -46,8 +46,8 @@ describe("computePaper2Coordination — empty / edge", () => {
     expect(r.median_time_to_decision_ms).toBeNull();
     expect(r.by_engine).toEqual([]);
     expect(r.cases_with_recommendations).toBe(0);
-    // Severity grid is always 1..5 even when empty
-    expect(r.by_severity.map((s) => s.severity)).toEqual([1, 2, 3, 4, 5]);
+    // Severity grid is always 1..4 (matches Severity type cardinality)
+    expect(r.by_severity.map((s) => s.severity)).toEqual([1, 2, 3, 4]);
     expect(r.by_severity.every((s) => s.total === 0)).toBe(true);
     expect(r.by_severity.every((s) => s.accept_rate === null)).toBe(true);
     // Confidence buckets always 4 ranges

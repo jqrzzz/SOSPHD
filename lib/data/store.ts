@@ -27,36 +27,92 @@ async function tryCreateClient() {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Map operational case_status to SOSPHD's simpler 3-state model */
+/**
+ * Map operational `public.cases.status` enum (19 values) to SOSPHD's
+ * 3-state research model. THIS FUNCTION IS THE MEASUREMENT PROJECTION
+ * that determines what "open / active / closed" means for Paper 1
+ * sample counts. Reviewer-defensible only if every operational status
+ * is explicitly handled, not silently bucketed by a `default` clause.
+ *
+ * Rationale per bucket:
+ *  - "open"   = case is in the system but no operational work has
+ *               started or is being actively pursued (intake, awaiting
+ *               info, awaiting authorization, queued for review)
+ *  - "active" = work is actively in progress (triage running, transport
+ *               arranged, treatment underway, generic in_progress)
+ *  - "closed" = terminal state (discharged, billed, claimed, formally
+ *               closed, cancelled, resolved)
+ *
+ * Unknown values from future enum extensions are mapped to "open" with
+ * a `[SOSPHD:UNKNOWN_STATUS]` console.warn so we discover drift before
+ * it corrupts dashboard counts.
+ */
 function mapStatus(opStatus: string): CaseStatus {
   switch (opStatus) {
+    // Open: intake / awaiting next step
     case "intake":
+    case "pending":
     case "pending_info":
     case "pending_authorization":
+    case "pending_external":
+    case "needs_review":
+    case "verified":
+    case "rejected":
       return "open";
+
+    // Active: work currently happening
     case "active":
+    case "in_progress":
     case "in_treatment":
     case "transport_arranged":
+    case "triage":
       return "active";
+
+    // Closed: terminal
     case "discharged":
+    case "resolved":
     case "billing":
     case "claims":
     case "closed":
     case "cancelled":
       return "closed";
+
     default:
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[SOSPHD:UNKNOWN_STATUS] Unhandled operational case status: "${opStatus}". Defaulting to "open". Add an explicit case to mapStatus in lib/data/store.ts.`,
+      );
       return "open";
   }
 }
 
-/** Map operational case_priority to SOSPHD severity (1-5) */
+/**
+ * Map operational `public.cases.priority` enum (4 values) to SOSPHD's
+ * Severity scale (1 = lowest, 4 = highest). THIS FUNCTION IS THE
+ * MEASUREMENT PROJECTION for clinical severity in Paper 1. The TS
+ * `Severity` type is `1 | 2 | 3 | 4` to match the operational enum's
+ * cardinality — no synthetic level beyond what operational data
+ * actually carries.
+ *
+ * If a finer-grained severity ever becomes available (e.g. via
+ * `public.cases.acuity_level`), widen this projection then.
+ */
 function mapPriority(priority: string): Severity {
   switch (priority) {
-    case "low": return 1;
-    case "normal": return 2;
-    case "high": return 3;
-    case "critical": return 4;
-    default: return 2;
+    case "low":
+      return 1;
+    case "normal":
+      return 2;
+    case "high":
+      return 3;
+    case "critical":
+      return 4;
+    default:
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[SOSPHD:UNKNOWN_PRIORITY] Unhandled operational case priority: "${priority}". Defaulting to 2 (normal). Add an explicit case to mapPriority in lib/data/store.ts.`,
+      );
+      return 2;
   }
 }
 

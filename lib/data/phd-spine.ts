@@ -69,9 +69,9 @@ export const PHD_PHASES: Phase[] = [
         id: "step-3",
         label: "Baseline Workflow",
         description:
-          "Hub-and-spoke flow: remote → initial clinic/EMS → imaging/diagnosis → payment → transport → hub → specialist acceptance. Identifies dominant gates and friction points.",
+          "Hub-and-spoke flow: remote → initial clinic/EMS → imaging/diagnosis → payment → transport → hub → specialist acceptance. Identifies dominant gates and friction points. Framed around the six Thailand corridors (Koh Samui, Phuket, Chiang Mai, Pattaya, Krabi → Bangkok). Indonesia and Vietnam are future expansion corridors per docs/agent-strategy.md.",
         status: "done",
-        deliverable: "Baseline Workflow v1.0 (Indonesia framing)",
+        deliverable: "Baseline Workflow v1.0 (Thailand framing)",
       },
       {
         id: "step-3-5",
@@ -93,16 +93,16 @@ export const PHD_PHASES: Phase[] = [
         id: "step-4",
         label: "Corridor Map + Pilot Brief",
         description:
-          "Indonesia corridors (Penida/Lembongan/Ubud/Gili/Lombok → Denpasar). Initial partner/hub list + transport reality. Cohort definition for first 20 cases. Logging SOP. Seed registry: 10–20 facilities + key transport providers.",
+          "Six Thailand corridors (Koh Samui, Phuket, Chiang Mai, Pattaya, Krabi → Bangkok, plus Bangkok hub). Initial partner/hub list + transport reality per corridor. Cohort definition for first 20 cases. Logging SOP. Seed registry: 10–20 facilities + key transport providers.",
         status: "done",
-        deliverable: "Corridor Archetypes A1–A6 v1.1",
+        deliverable: "Corridor Archetypes A1–A6 v1.1 (Thailand)",
       },
       {
         id: "step-5a",
         label: "Backfill (2018–2023 data)",
         description:
-          "843 historical cases from operational spreadsheet. Needs insurer normalization (448 strings → ~30 entities) and diagnosis bucketing (free text → coarse categories).",
-        status: "in_progress",
+          "843 historical cases from operational spreadsheet. Needs insurer normalization (448 strings → ~30 entities) and diagnosis bucketing (free text → coarse categories). Awaiting backfill — research.case_events is currently empty in the live DB.",
+        status: "next",
         deliverable: "Baseline Case Registry CSV",
       },
       {
@@ -277,6 +277,13 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
     question:
       "What is the exact operational difference between how cases are handled today (baseline) vs under the Tourist SOS coordination layer (intervention)? This defines the treatment.",
     source: "Research Execution Plan, Step 7",
+    options: [
+      "Operational only (no AI surface)",
+      "Operational + AI surface (recommendations visible but optional)",
+      "Operational + AI surface with operator decision logged (current implementation)",
+    ],
+    answer:
+      "The intervention IS the recommendation+decision flow documented in docs/agent-strategy.md and at /protocol. Baseline: an operator coordinates the case using existing SOSCOMMAND tools, with no AI recommendation surface. Intervention: for each case, the SOSPHD recommendation engine (currently llm-paper2-v0.1, see lib/recommendations.ts) generates 1–3 structured recommendations under SOSPHD Intervention Protocol v0.1; the operator accepts or overrides each one with a reason, and every decision lands in research.recommendations (decided_by + decided_at) and research.case_events (NOTE event with kind=rec_decision). A case is classified as having the intervention iff at least one recommendation was generated and decided for it before the relevant outcome milestone (DEFINITIVE_CARE_START for TTDC; GUARANTEED_PAYMENT for TTGP; TRANSPORT_ACTIVATED for TTTA). Per-corridor stepped-wedge activation is the natural unit for the impact evaluation in Paper 3.",
   },
 ];
 
