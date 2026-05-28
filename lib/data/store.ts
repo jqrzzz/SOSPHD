@@ -48,7 +48,7 @@ async function tryCreateClient() {
  * a `[SOSPHD:UNKNOWN_STATUS]` console.warn so we discover drift before
  * it corrupts dashboard counts.
  */
-function mapStatus(opStatus: string): CaseStatus {
+export function mapStatus(opStatus: string): CaseStatus {
   switch (opStatus) {
     // Open: intake / awaiting next step
     case "intake":
@@ -97,7 +97,7 @@ function mapStatus(opStatus: string): CaseStatus {
  * If a finer-grained severity ever becomes available (e.g. via
  * `public.cases.acuity_level`), widen this projection then.
  */
-function mapPriority(priority: string): Severity {
+export function mapPriority(priority: string): Severity {
   switch (priority) {
     case "low":
       return 1;
@@ -138,7 +138,7 @@ function toCase(row: Record<string, unknown>): Case {
  * 1–4, and there is no raw PHI — patient_ref is the pseudonym. See
  * docs/backfill-plan.md.
  */
-function toResearchCase(row: Record<string, unknown>): Case {
+export function toResearchCase(row: Record<string, unknown>): Case {
   const sev = row.severity as number | null;
   return {
     id: row.id as string,
@@ -166,7 +166,7 @@ const CASE_COLUMNS =
 // operational statuses that project into it. Used to push the status
 // filter to the database so we don't transfer rows we'll discard.
 // Keep this in lockstep with mapStatus.
-const OP_STATUSES_BY_RESEARCH_BUCKET: Record<CaseStatus, string[]> = {
+export const OP_STATUSES_BY_RESEARCH_BUCKET: Record<CaseStatus, string[]> = {
   open: [
     "intake",
     "pending",
@@ -238,6 +238,34 @@ export async function getResearchCases(
 }
 
 /**
+ * Pure merge of operational + research case lists: concatenate, sort
+ * newest-first, then apply the free-text search over patient_ref +
+ * chief_complaint. Extracted from getCases so the merge/sort/search
+ * logic is unit-testable without a database.
+ */
+export function mergeAndFilterCases(
+  operational: Case[],
+  research: Case[],
+  search?: string,
+): Case[] {
+  let result = [...operational, ...research].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+
+  if (search) {
+    const q = search.toLowerCase();
+    result = result.filter(
+      (c) =>
+        c.patient_ref.toLowerCase().includes(q) ||
+        c.chief_complaint.toLowerCase().includes(q),
+    );
+  }
+
+  return result;
+}
+
+/**
  * Unified case list: operational (public.cases) ∪ research-native
  * (research.cases), newest first. The analytics layer and dashboards
  * call this, so backfilled historical cases become first-class
@@ -251,22 +279,7 @@ export async function getCases(filters?: {
     getOperationalCases(filters?.status),
     getResearchCases(filters?.status),
   ]);
-
-  let result = [...operational, ...research].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-
-  if (filters?.search) {
-    const q = filters.search.toLowerCase();
-    result = result.filter(
-      (c) =>
-        c.patient_ref.toLowerCase().includes(q) ||
-        c.chief_complaint.toLowerCase().includes(q),
-    );
-  }
-
-  return result;
+  return mergeAndFilterCases(operational, research, filters?.search);
 }
 
 export async function getCaseById(id: string): Promise<Case | undefined> {

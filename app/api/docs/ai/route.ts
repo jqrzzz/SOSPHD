@@ -4,6 +4,7 @@ import { getDocById } from "@/lib/data/docs-store";
 import { createTask } from "@/lib/data/advisor-mutations";
 import { modelFor } from "@/lib/ai/config";
 import { gateAIRequest } from "@/lib/ai/gate";
+import { sanitizeForDocument } from "@/lib/ai/sanitize";
 
 export const maxDuration = 60;
 
@@ -110,12 +111,8 @@ export async function POST(req: Request) {
   // Doc titles and bodies are researcher-authored — treat them as data,
   // not instructions, by wrapping in delimiters and neutering closing
   // tags inside the content.
-  const safeTitle = doc.title
-    .replace(/<\/document>/gi, "</_document>")
-    .replace(/<document>/gi, "<_document>");
-  const safeContent = contentToProcess
-    .replace(/<\/document>/gi, "</_document>")
-    .replace(/<document>/gi, "<_document>");
+  const safeTitle = sanitizeForDocument(doc.title);
+  const safeContent = sanitizeForDocument(contentToProcess);
 
   const systemPrompt = `${MODE_PROMPTS[mode]}
 

@@ -2,7 +2,7 @@
 
 > Cross-cutting audit after Phases 1–9. Six read-only agents swept UI/UX, accessibility, frontend resilience, test coverage, technical debt, and the Phase 9 union's blast radius. This doc records the findings (each verified against source — agent claims that didn't hold up are marked) and a prioritized remediation plan.
 
-**Status**: PLAN (2026-05-28). Awaiting greenlight on sequence + the one open decision (QD-1).
+**Status**: IN PROGRESS (2026-05-28). **P0 + P2-2 DONE** (branch `claude/quality-p0`). Next: QD-1 decision → P1. P2/P3 remain.
 
 ---
 
@@ -18,9 +18,11 @@
 
 ## Findings (verified) → prioritized plan
 
-### P0 — Correctness & research integrity (do first)
+### P0 — Correctness & research integrity (do first) — ✅ DONE
 
-**P0-1 · Test the measurement projection + Phase 9 union.** *(quick, high value)*
+> Shipped on `claude/quality-p0`. Tests 49 → 91 (+42). `mapStatus`/`mapPriority`/`toResearchCase`/`mergeAndFilterCases`/`OP_STATUSES_BY_RESEARCH_BUCKET` exported and covered; sanitizers extracted to `lib/ai/sanitize.ts` and covered; advisor chat now surfaces stream/429 errors with retry + has `role="log"`/`aria-live` (P2-2 folded in). All gates green.
+
+**P0-1 · Test the measurement projection + Phase 9 union.** *(quick, high value)* ✅
 `mapStatus` / `mapPriority` (`lib/data/store.ts`) ARE Paper 1's methodology and have **zero tests** — a silent change here corrupts every sample count and the thesis. Same for the freshest code: `getCases()` union (merge/sort/search), `getCaseById()` operational→research fallback, `toResearchCase`, and the `OP_STATUSES_BY_RESEARCH_BUCKET` ↔ `mapStatus` symmetry (if a status is added to one and not the other, the DB filter silently returns wrong rows). All pure or mockable. Effort: **S** (~1.5h, ~8 suites).
 
 **P0-2 · Test the prompt-injection sanitizers.** *(quick, security)*

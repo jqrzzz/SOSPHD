@@ -17,6 +17,7 @@ import {
 } from "@/lib/data/store";
 import { computeAllMetrics, formatDuration } from "@/lib/data/metrics";
 import { modelFor, requireAIKey, MissingAIKeyError } from "@/lib/ai/config";
+import { safeFreeText } from "@/lib/ai/sanitize";
 import { PROTOCOL_VERSION } from "@/lib/protocol";
 import type { Recommendation } from "@/lib/data/types";
 
@@ -99,21 +100,6 @@ Be calibrated — Paper 2's reliability diagram depends on it.
     }
   ]
 }`;
-
-/**
- * Sanitize a free-form operator-authored string before embedding it
- * in the case-context prompt. Neuters closing tags so the value can't
- * break out of the <case>…</case> envelope, and clips at 2000 chars
- * to limit how much adversarial content can reach the model in one
- * call.
- */
-function safeFreeText(value: string | null | undefined): string {
-  if (!value) return "";
-  const trimmed = value.slice(0, 2000);
-  return trimmed
-    .replace(/<\/case>/gi, "</_case>")
-    .replace(/<case>/gi, "<_case>");
-}
 
 function formatCaseContext(
   caseRow: NonNullable<Awaited<ReturnType<typeof getCaseById>>>,
