@@ -1,10 +1,8 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
-  createCase,
   addEvent,
   decideRecommendation,
   getRecommendationById,
@@ -18,13 +16,6 @@ import { EVENT_TYPES } from "@/lib/data/types";
 
 // ── Schemas ──────────────────────────────────────────────────────────
 
-const createCaseSchema = z.object({
-  patient_ref: z.string().min(1, "Patient reference is required"),
-  severity: z.coerce.number().int().min(1).max(5),
-  chief_complaint: z.string().min(1, "Chief complaint is required"),
-  notes: z.string().default(""),
-});
-
 const addEventSchema = z.object({
   case_id: z.string().min(1),
   event_type: z.enum(EVENT_TYPES),
@@ -32,34 +23,13 @@ const addEventSchema = z.object({
   payload: z.string().default(""),
 });
 
+// Per docs/audit-action-plan.md Decision C: SOSPHD does not create
+// cases. Cases originate in SOSCOMMAND. The former createCaseAction
+// inserted a placeholder patient_id that violated the FK and would
+// have polluted SOSCOMMAND's operational table if it had ever
+// succeeded. Function and UI removed.
+
 // ── Actions ─────────────────────────────────────────────────────────
-
-export async function createCaseAction(
-  _prevState: { error?: string } | null,
-  formData: FormData,
-) {
-  const raw = {
-    patient_ref: formData.get("patient_ref"),
-    severity: formData.get("severity"),
-    chief_complaint: formData.get("chief_complaint"),
-    notes: formData.get("notes") ?? "",
-  };
-
-  const parsed = createCaseSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-
-  const newCase = await createCase({
-    severity: parsed.data.severity as 1 | 2 | 3 | 4 | 5,
-    chief_complaint: parsed.data.chief_complaint,
-    patient_ref: parsed.data.patient_ref,
-    notes: parsed.data.notes,
-  });
-
-  redirect(`/cases/${newCase.id}`);
-}
 
 export async function addEventAction(
   _prevState: { error?: string; success?: boolean } | null,

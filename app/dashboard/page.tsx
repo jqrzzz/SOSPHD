@@ -100,9 +100,9 @@ export default async function DashboardPage() {
                     delay source.
                   </p>
                 </div>
-                <Button asChild size="sm">
-                  <Link href="/cases/new">Create first case</Link>
-                </Button>
+                <p className="text-xs text-muted-foreground/80">
+                  Waiting on SOSCOMMAND to surface cases.
+                </p>
               </CardContent>
             </Card>
           </FadeIn>

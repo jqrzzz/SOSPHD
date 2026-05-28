@@ -123,44 +123,13 @@ export async function getCaseById(id: string): Promise<Case | undefined> {
   return toCase(data);
 }
 
-export async function createCase(data: {
-  severity: Severity;
-  chief_complaint: string;
-  patient_ref: string;
-  notes: string;
-}): Promise<Case> {
-  // Creating a case in the operational system is complex (requires patient_id, etc.)
-  // For the research layer, we create a minimal case entry.
-  // In production, cases originate from SOSCOMMAND — SOSPHD is read-mostly.
-  const supabase = await tryCreateClient();
-  if (!supabase) {
-    throw new Error("Supabase is not configured. Cannot create case.");
-  }
-  // Time-ordered prefix + 4-char random suffix so two creates in the
-  // same millisecond don't collide. ~1 in 1.6M collision per ms-bucket.
-  const millis = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  const caseNumber = `SOS-${millis}-${random}`;
-
-  const { data: newCase, error } = await supabase
-    .from("cases")
-    .insert({
-      case_number: caseNumber,
-      patient_id: "00000000-0000-0000-0000-000000000000", // placeholder
-      status: "intake",
-      priority: data.severity >= 4 ? "critical" : data.severity >= 3 ? "high" : "normal",
-      incident_description: data.chief_complaint,
-      notes: data.notes,
-    })
-    .select("*, patients(full_name, medical_id)")
-    .single();
-
-  if (error || !newCase) {
-    throw new Error(`Failed to create case: ${error?.message}`);
-  }
-
-  return toCase(newCase);
-}
+// Per docs/audit-action-plan.md Decision C: SOSPHD does not create
+// cases. Cases originate in SOSCOMMAND; SOSPHD reads them via the
+// public.cases table. The former createCase function inserted a
+// placeholder patient_id that violated the FK to public.patients
+// (ON DELETE RESTRICT) and would have polluted SOSCOMMAND's
+// operational table with phantom-patient cases if the FK hadn't
+// blocked it. Function removed.
 
 // ── Events (research schema) ────────────────────────────────────────
 
@@ -168,17 +137,10 @@ export async function getEventsByCaseId(caseId: string): Promise<CaseEvent[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
 
-  // Materialize any new SOSCOMMAND timestamps before reading. Idempotent
-  // and best-effort: if the sync fails, we still return the events we
-  // have. This is what makes Paper 1's TTTA/TTGP/TTDC numbers come
-  // from operational reality rather than operator data entry.
-  try {
-    const { syncCaseFromOperational } = await import("./sync");
-    await syncCaseFromOperational(caseId);
-  } catch {
-    // Sync failure should never block reading existing events.
-  }
-
+  // SOSCOMMAND → research event materialization is handled by DB
+  // triggers (migrations 003 + 006), not application code. Events
+  // appear in research.case_events the moment SOSCOMMAND writes to
+  // the operational tables. See docs/audit-action-plan.md Decision B.
   const { data, error } = await supabase
     .schema("research")
     .from("case_events")

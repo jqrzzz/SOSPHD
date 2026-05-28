@@ -6,7 +6,6 @@ import { PROTOCOL_VERSION } from "@/lib/protocol";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SyncOperationalButton } from "@/components/sync-operational-button";
 import { FadeIn } from "@/components/motion/fade-in";
 import { CountUp } from "@/components/motion/count-up";
 import { ProgressRing } from "@/components/motion/progress-ring";
@@ -64,7 +63,6 @@ export default async function Paper2DashboardPage() {
         description="Every AI recommendation, every operator decision, every override reason. This is the provenance figure-set Paper 2 cites."
         actions={
           <div className="flex items-center gap-2">
-            <SyncOperationalButton />
             <Button variant="outline" size="sm" asChild>
               <Link
                 href="/protocol"

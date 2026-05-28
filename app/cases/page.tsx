@@ -41,14 +41,7 @@ export default async function CasesPage(props: {
       <PageHeader
         eyebrow="Operational data"
         title="Cases"
-        description="Every case the operational system has surfaced. Open one to see its event timeline, computed metrics, and AI recommendations."
-        actions={
-          <Button asChild size="sm">
-            <Link href="/cases/new">
-              <span className="mr-1 text-base leading-none">+</span> New case
-            </Link>
-          </Button>
-        }
+        description="Every case SOSCOMMAND has surfaced. Open one to see its event timeline, computed metrics, and AI recommendations. Cases originate in SOSCOMMAND; SOSPHD is read-only."
       />
 
       <div className="flex flex-col gap-5 p-4 sm:p-6">
@@ -125,9 +118,10 @@ export default async function CasesPage(props: {
                   </p>
                 </div>
                 {!statusFilter && !searchQuery && (
-                  <Button asChild size="sm">
-                    <Link href="/cases/new">Create first case</Link>
-                  </Button>
+                  <p className="text-xs text-muted-foreground/80">
+                    Cases originate in SOSCOMMAND. SOSPHD will see them
+                    here as soon as SOSCOMMAND creates the first one.
+                  </p>
                 )}
               </CardContent>
             </Card>
