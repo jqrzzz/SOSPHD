@@ -1,5 +1,5 @@
 /* ─── Fieldwork Store — READ paths ─────────────────────────────────────
- *  Queries phd_journal_entries, phd_contacts, phd_protocols.
+ *  Queries research.journal_entries, research.contacts, research.protocols.
  *  Falls back to seed data when Supabase is unavailable (with a
  *  [SOSPHD:DEGRADED] warning so it's not silent).
  *
@@ -317,7 +317,8 @@ export async function getJournalEntries(filters?: {
   if (sb) {
     try {
       let query = sb
-        .from("phd_journal_entries")
+        .schema("research")
+        .from("journal_entries")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(filters?.limit ?? 50);
@@ -366,7 +367,8 @@ export async function getJournalEntryById(id: string): Promise<JournalEntry | nu
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_journal_entries")
+        .schema("research")
+        .from("journal_entries")
         .select("*")
         .eq("id", id)
         .single();
@@ -388,7 +390,8 @@ export async function getContacts(filters?: {
   if (sb) {
     try {
       let query = sb
-        .from("phd_contacts")
+        .schema("research")
+        .from("contacts")
         .select("*")
         .order("updated_at", { ascending: false })
         .limit(filters?.limit ?? 100);
@@ -435,7 +438,8 @@ export async function getContactById(id: string): Promise<Contact | null> {
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_contacts")
+        .schema("research")
+        .from("contacts")
         .select("*")
         .eq("id", id)
         .single();
@@ -455,7 +459,8 @@ export async function getProtocols(filters?: {
   if (sb) {
     try {
       let query = sb
-        .from("phd_protocols")
+        .schema("research")
+        .from("protocols")
         .select("*")
         .order("updated_at", { ascending: false })
         .limit(filters?.limit ?? 50);
@@ -478,7 +483,8 @@ export async function getProtocolById(id: string): Promise<FieldProtocol | null>
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_protocols")
+        .schema("research")
+        .from("protocols")
         .select("*")
         .eq("id", id)
         .single();

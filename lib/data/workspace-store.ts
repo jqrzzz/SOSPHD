@@ -1,12 +1,12 @@
 /* ─── Workspace Store (Supabase) ───────────────────────────────────────
- *  Queries phd_uploads, phd_mind_maps.
+ *  Queries research.uploads, research.mind_maps.
  *  Falls back to seed data when Supabase is unavailable.
  *
- *  KNOWN ISSUE — same shape as advisor-store: writes use the BROWSER
- *  Supabase client and silently fail server-side. Fieldwork was split
- *  into store + mutations (see fieldwork-mutations.ts) to fix this.
- *  workspace + advisor stores follow the same migration path; tracked
- *  as a follow-up. Existing behavior unchanged by today's work.
+ *  KNOWN ISSUE (will be fixed in Track A Phase 3) — same shape as
+ *  advisor-store: writes use the BROWSER Supabase client and silently
+ *  fail server-side. Phase 3 splits this into workspace-store.ts
+ *  (reads) + workspace-mutations.ts (writes), matching the fieldwork
+ *  pattern.
  * ────────────────────────────────────────────────────────────────────── */
 
 import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
@@ -105,7 +105,8 @@ export async function getUploads(filters?: {
   if (sb) {
     try {
       let query = sb
-        .from("phd_uploads")
+        .schema("research")
+        .from("uploads")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -149,7 +150,8 @@ export async function createUpload(data: {
 
   if (sb && userId) {
     const { data: row, error } = await sb
-      .from("phd_uploads")
+      .schema("research")
+      .from("uploads")
       .insert({
         user_id: userId,
         filename: data.filename,
@@ -172,7 +174,7 @@ export async function createUpload(data: {
 export async function deleteUpload(id: string): Promise<boolean> {
   const sb = getSupabase();
   if (sb) {
-    const { error } = await sb.from("phd_uploads").delete().eq("id", id);
+    const { error } = await sb.schema("research").from("uploads").delete().eq("id", id);
     return !error;
   }
   return false;
@@ -185,7 +187,8 @@ export async function getMindMaps(): Promise<MindMap[]> {
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_mind_maps")
+        .schema("research")
+        .from("mind_maps")
         .select("*")
         .order("updated_at", { ascending: false });
       if (!error && data) return data as MindMap[];
@@ -201,7 +204,8 @@ export async function getMindMapById(id: string): Promise<MindMap | null> {
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_mind_maps")
+        .schema("research")
+        .from("mind_maps")
         .select("*")
         .eq("id", id)
         .single();
@@ -217,7 +221,8 @@ export async function createMindMap(title: string): Promise<MindMap | null> {
 
   if (sb && userId) {
     const { data: row, error } = await sb
-      .from("phd_mind_maps")
+      .schema("research")
+      .from("mind_maps")
       .insert({
         user_id: userId,
         title,
@@ -242,7 +247,8 @@ export async function updateMindMap(
   const sb = getSupabase();
   if (sb) {
     const { data: row, error } = await sb
-      .from("phd_mind_maps")
+      .schema("research")
+      .from("mind_maps")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
@@ -255,7 +261,7 @@ export async function updateMindMap(
 export async function deleteMindMap(id: string): Promise<boolean> {
   const sb = getSupabase();
   if (sb) {
-    const { error } = await sb.from("phd_mind_maps").delete().eq("id", id);
+    const { error } = await sb.schema("research").from("mind_maps").delete().eq("id", id);
     return !error;
   }
   return false;

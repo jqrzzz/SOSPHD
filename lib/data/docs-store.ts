@@ -1,9 +1,14 @@
 /* ─── Docs Store (Supabase) ────────────────────────────────────────────
- *  Queries phd_docs, phd_doc_versions.
+ *  Queries research.docs, research.doc_versions.
  *  Falls back to seed data when Supabase is unavailable.
  *
- *  Note: DB column `change_note` maps to TypeScript `note` field.
- *  DB has no `site_id` or `user_id` on doc_versions — handled in mapping.
+ *  research.docs has no `site_id` column; the TS `Doc.site_id` field
+ *  is coerced to null in mapDbDoc. (Pending Phase 6 hygiene — remove
+ *  site_id from the Doc type entirely.)
+ *
+ *  research.doc_versions has real `user_id` and `note` columns —
+ *  earlier history of mapping `change_note` → `note` came from the
+ *  never-applied phd_doc_versions schema and is now obsolete.
  * ────────────────────────────────────────────────────────────────────── */
 
 import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
@@ -218,9 +223,9 @@ function mapDbVersion(row: Record<string, unknown>): DocVersion {
     id: row.id as string,
     created_at: row.created_at as string,
     doc_id: row.doc_id as string,
-    user_id: DEMO_USER_ID,
+    user_id: (row.user_id as string) ?? DEMO_USER_ID,
     content_md: row.content_md as string,
-    note: (row.change_note as string) ?? null,
+    note: (row.note as string | null) ?? null,
   };
 }
 
@@ -245,7 +250,8 @@ export async function getDocs(filters?: {
   if (sb) {
     try {
       let query = sb
-        .from("phd_docs")
+        .schema("research")
+        .from("docs")
         .select("*")
         .order("updated_at", { ascending: false });
 
@@ -290,7 +296,8 @@ export async function getDocById(id: string): Promise<Doc | null> {
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_docs")
+        .schema("research")
+        .from("docs")
         .select("*")
         .eq("id", id)
         .single();
@@ -315,7 +322,8 @@ export async function createDoc(data: {
     .replace(/^-|-$/g, "");
 
   const { data: row, error } = await sb
-    .from("phd_docs")
+    .schema("research")
+    .from("docs")
     .insert({
       user_id: userId,
       title: data.title,
@@ -341,7 +349,8 @@ export async function updateDoc(
   const sb = getSupabase();
   if (sb) {
     const { data: row, error } = await sb
-      .from("phd_docs")
+      .schema("research")
+    .from("docs")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
@@ -358,7 +367,8 @@ export async function getVersionsByDocId(docId: string): Promise<DocVersion[]> {
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_doc_versions")
+        .schema("research")
+        .from("doc_versions")
         .select("*")
         .eq("doc_id", docId)
         .order("created_at", { ascending: false });
@@ -374,21 +384,24 @@ export async function createVersion(data: {
   doc_id: string;
   content_md: string;
   note?: string | null;
-}): Promise<DocVersion | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .from("phd_doc_versions")
-      .insert({
-        doc_id: data.doc_id,
-        content_md: data.content_md,
-        change_note: data.note ?? "",
-      })
-      .select()
-      .single();
-    if (!error && row) return mapDbVersion(row as Record<string, unknown>);
+}): Promise<DocVersion> {
+  // research.doc_versions.user_id is NOT NULL — must resolve auth.
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const { data: row, error } = await sb
+    .schema("research")
+    .from("doc_versions")
+    .insert({
+      doc_id: data.doc_id,
+      user_id: userId,
+      content_md: data.content_md,
+      note: data.note ?? "",
+    })
+    .select()
+    .single();
+  if (error || !row) {
+    throw new Error(`Failed to create version: ${error?.message}`);
   }
-  return null;
+  return mapDbVersion(row as Record<string, unknown>);
 }
 
 export async function getVersionById(id: string): Promise<DocVersion | null> {
@@ -396,7 +409,8 @@ export async function getVersionById(id: string): Promise<DocVersion | null> {
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_doc_versions")
+        .schema("research")
+        .from("doc_versions")
         .select("*")
         .eq("id", id)
         .single();

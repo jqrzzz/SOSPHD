@@ -131,11 +131,17 @@ export async function saveVersionAction(
     return { error: "Document not found" };
   }
 
-  await createVersion({
-    doc_id: parsed.data.doc_id,
-    content_md: doc.content_md,
-    note: parsed.data.note || null,
-  });
+  try {
+    await createVersion({
+      doc_id: parsed.data.doc_id,
+      content_md: doc.content_md,
+      note: parsed.data.note || null,
+    });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to save version",
+    };
+  }
 
   revalidatePath(`/docs/${parsed.data.doc_id}`);
   return { success: true };
@@ -149,11 +155,17 @@ export async function restoreVersionAction(data: {
   const doc = await getDocById(data.doc_id);
   if (!doc) return { error: "Document not found" };
 
-  await createVersion({
-    doc_id: data.doc_id,
-    content_md: doc.content_md,
-    note: "Auto-saved before version restore",
-  });
+  try {
+    await createVersion({
+      doc_id: data.doc_id,
+      content_md: doc.content_md,
+      note: "Auto-saved before version restore",
+    });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to save version",
+    };
+  }
 
   const result = await updateDoc(data.doc_id, { content_md: data.version_content });
   if (!result) return { error: "Failed to restore version" };

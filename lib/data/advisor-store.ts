@@ -1,14 +1,14 @@
 /* ─── Advisor Store (Supabase) ─────────────────────────────────────────
- *  Queries phd_notes, phd_tasks, phd_advisor_sessions, phd_advisor_messages.
+ *  Queries research.notes, research.tasks, research.advisor_sessions,
+ *  research.advisor_messages.
  *  Falls back to seed data when Supabase is unavailable.
  *
- *  KNOWN ISSUE — uses the BROWSER Supabase client (via lib/supabase/db).
- *  When called from a server context (which is currently every call
- *  site — verified), auth.getUser() returns null and writes silently
- *  fail. The fix is to migrate write functions to requireAuthOrThrow
- *  from server-auth (as fieldwork-mutations.ts does), then await the
- *  server client at each call site. Tracked as a follow-up; the
- *  existing behavior matches what was on main pre-cleanup.
+ *  KNOWN ISSUE (will be fixed in Track A Phase 3) — uses the BROWSER
+ *  Supabase client (via lib/supabase/db). When called from a server
+ *  context (which is currently every call site — verified), auth.getUser()
+ *  returns null and writes silently fail. Phase 3 splits this file
+ *  into advisor-store.ts (reads) + advisor-mutations.ts (server-only
+ *  writes via requireAuthOrThrow), matching the fieldwork pattern.
  * ────────────────────────────────────────────────────────────────────── */
 
 import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
@@ -161,7 +161,8 @@ export async function getNotes(limit = 10): Promise<ResearchNote[]> {
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_notes")
+        .schema("research")
+        .from("notes")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -184,10 +185,10 @@ export async function createNote(data: {
 
   if (sb && userId) {
     const { data: row, error } = await sb
-      .from("phd_notes")
+      .schema("research")
+      .from("notes")
       .insert({
         user_id: userId,
-        site_id: "site_001",
         title: data.title ?? null,
         content: data.content,
         tags: data.tags ?? [],
@@ -207,7 +208,8 @@ export async function updateNote(id: string, data: {
   const sb = getSupabase();
   if (sb) {
     const { data: row, error } = await sb
-      .from("phd_notes")
+      .schema("research")
+      .from("notes")
       .update(data)
       .eq("id", id)
       .select()
@@ -220,7 +222,7 @@ export async function updateNote(id: string, data: {
 export async function deleteNote(id: string): Promise<boolean> {
   const sb = getSupabase();
   if (sb) {
-    const { error } = await sb.from("phd_notes").delete().eq("id", id);
+    const { error } = await sb.schema("research").from("notes").delete().eq("id", id);
     return !error;
   }
   return false;
@@ -236,7 +238,8 @@ export async function getTasks(filters?: {
   if (sb) {
     try {
       let query = sb
-        .from("phd_tasks")
+        .schema("research")
+        .from("tasks")
         .select("*")
         .order("priority", { ascending: true })
         .order("created_at", { ascending: false })
@@ -270,10 +273,10 @@ export async function createTask(data: {
 
   if (sb && userId) {
     const { data: row, error } = await sb
-      .from("phd_tasks")
+      .schema("research")
+      .from("tasks")
       .insert({
         user_id: userId,
-        site_id: null,
         status: "todo",
         priority: data.priority ?? 2,
         due_date: data.due_date ?? null,
@@ -292,7 +295,8 @@ export async function updateTaskStatus(id: string, status: TaskStatus): Promise<
   const sb = getSupabase();
   if (sb) {
     const { data: row, error } = await sb
-      .from("phd_tasks")
+      .schema("research")
+      .from("tasks")
       .update({ status })
       .eq("id", id)
       .select()
@@ -311,7 +315,8 @@ export async function updateTask(id: string, data: {
   const sb = getSupabase();
   if (sb) {
     const { data: row, error } = await sb
-      .from("phd_tasks")
+      .schema("research")
+      .from("tasks")
       .update(data)
       .eq("id", id)
       .select()
@@ -324,7 +329,7 @@ export async function updateTask(id: string, data: {
 export async function deleteTask(id: string): Promise<boolean> {
   const sb = getSupabase();
   if (sb) {
-    const { error } = await sb.from("phd_tasks").delete().eq("id", id);
+    const { error } = await sb.schema("research").from("tasks").delete().eq("id", id);
     return !error;
   }
   return false;
@@ -337,7 +342,8 @@ export async function getSessions(): Promise<AdvisorSession[]> {
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_advisor_sessions")
+        .schema("research")
+        .from("advisor_sessions")
         .select("*")
         .order("created_at", { ascending: false });
       if (!error && data) return data as AdvisorSession[];
@@ -354,7 +360,8 @@ export async function createSession(title?: string): Promise<AdvisorSession | nu
 
   if (sb && userId) {
     const { data: row, error } = await sb
-      .from("phd_advisor_sessions")
+      .schema("research")
+      .from("advisor_sessions")
       .insert({
         user_id: userId,
         title: title ?? "New Session",
@@ -371,7 +378,8 @@ export async function getSessionById(id: string): Promise<AdvisorSession | null>
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_advisor_sessions")
+        .schema("research")
+        .from("advisor_sessions")
         .select("*")
         .eq("id", id)
         .single();
@@ -388,7 +396,8 @@ export async function getMessagesBySessionId(sessionId: string): Promise<Advisor
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_advisor_messages")
+        .schema("research")
+        .from("advisor_messages")
         .select("*")
         .eq("session_id", sessionId)
         .order("created_at", { ascending: true });
@@ -407,7 +416,8 @@ export async function addMessage(data: {
   const sb = getSupabase();
   if (sb) {
     const { data: row, error } = await sb
-      .from("phd_advisor_messages")
+      .schema("research")
+      .from("advisor_messages")
       .insert({
         session_id: data.session_id,
         role: data.role,

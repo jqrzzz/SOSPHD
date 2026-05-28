@@ -1,5 +1,6 @@
 /* ─── Fieldwork Mutations — SERVER ONLY ────────────────────────────────
- *  Write paths for phd_journal_entries, phd_contacts, phd_protocols.
+ *  Write paths for research.journal_entries, research.contacts,
+ *  research.protocols.
  *
  *  Lives in its own file (separate from fieldwork-store.ts) because it
  *  imports the server-side Supabase auth helper, which transitively
@@ -39,7 +40,8 @@ export async function createJournalEntry(data: {
   const { supabase: sb, userId } = await requireAuthOrThrow();
 
   const { data: row, error } = await sb
-    .from("phd_journal_entries")
+    .schema("research")
+    .from("journal_entries")
     .insert({
       user_id: userId,
       entry_type: data.entry_type,
@@ -81,7 +83,8 @@ export async function updateJournalEntry(
 ): Promise<JournalEntry> {
   const { supabase: sb } = await requireAuthOrThrow();
   const { data: row, error } = await sb
-    .from("phd_journal_entries")
+    .schema("research")
+    .from("journal_entries")
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
@@ -94,7 +97,7 @@ export async function updateJournalEntry(
 
 export async function deleteJournalEntry(id: string): Promise<void> {
   const { supabase: sb } = await requireAuthOrThrow();
-  const { error } = await sb.from("phd_journal_entries").delete().eq("id", id);
+  const { error } = await sb.schema("research").from("journal_entries").delete().eq("id", id);
   if (error) {
     throw new Error(`Failed to delete journal entry: ${error.message}`);
   }
@@ -118,7 +121,8 @@ export async function createContact(data: {
 }): Promise<Contact> {
   const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
-    .from("phd_contacts")
+    .schema("research")
+    .from("contacts")
     .insert({
       user_id: userId,
       name: data.name,
@@ -166,7 +170,8 @@ export async function updateContact(
 ): Promise<Contact> {
   const { supabase: sb } = await requireAuthOrThrow();
   const { data: row, error } = await sb
-    .from("phd_contacts")
+    .schema("research")
+    .from("contacts")
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
@@ -179,7 +184,7 @@ export async function updateContact(
 
 export async function deleteContact(id: string): Promise<void> {
   const { supabase: sb } = await requireAuthOrThrow();
-  const { error } = await sb.from("phd_contacts").delete().eq("id", id);
+  const { error } = await sb.schema("research").from("contacts").delete().eq("id", id);
   if (error) {
     throw new Error(`Failed to delete contact: ${error.message}`);
   }
@@ -201,7 +206,8 @@ export async function createProtocolFromTemplate(
   }
   const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
-    .from("phd_protocols")
+    .schema("research")
+    .from("protocols")
     .insert({
       user_id: userId,
       template_id: templateId,
@@ -238,7 +244,8 @@ export async function updateProtocol(
 ): Promise<FieldProtocol> {
   const { supabase: sb } = await requireAuthOrThrow();
   const { data: row, error } = await sb
-    .from("phd_protocols")
+    .schema("research")
+    .from("protocols")
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
