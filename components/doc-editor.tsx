@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { updateDocAction } from "@/lib/docs-actions";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Select,

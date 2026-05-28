@@ -15,7 +15,6 @@ import type {
   ResearchTask,
   TaskStatus,
   AdvisorSession,
-  AdvisorMessage,
 } from "./advisor-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────
@@ -232,43 +231,17 @@ export async function getSessions(): Promise<AdvisorSession[]> {
         .select("*")
         .order("created_at", { ascending: false });
       if (!error && data) return data as AdvisorSession[];
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getSessions", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getSessions",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getSessions", "supabase env vars missing");
   }
   return [...seedSessions].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
-}
-
-export async function getSessionById(id: string): Promise<AdvisorSession | null> {
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      const { data, error } = await sb
-        .schema("research")
-        .from("advisor_sessions")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (!error && data) return data as AdvisorSession;
-    } catch { /* fall through */ }
-  }
-  return seedSessions.find((s) => s.id === id) ?? null;
-}
-
-// ── Messages (reads only) ───────────────────────────────────────────
-
-export async function getMessagesBySessionId(sessionId: string): Promise<AdvisorMessage[]> {
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      const { data, error } = await sb
-        .schema("research")
-        .from("advisor_messages")
-        .select("*")
-        .eq("session_id", sessionId)
-        .order("created_at", { ascending: true });
-      if (!error && data) return data as AdvisorMessage[];
-    } catch { /* fall through */ }
-  }
-  return [];
 }

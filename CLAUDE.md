@@ -71,10 +71,11 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
 
 ## Key Architecture
 
-- **In-memory stores** (`lib/data/*-store.ts`) — designed to swap for Supabase. Each store has seed data for local dev and exports functions with signatures that map 1:1 to Supabase queries.
-- **Server actions** (`lib/*-actions.ts`) — zod-validated, call store functions, revalidate paths.
+- **Read paths** (`lib/data/*-store.ts`) — typed wrappers over Supabase queries. Seed-data fallback in dev with `[SOSPHD:DEGRADED]` warnings.
+- **Write paths** (`lib/data/*-mutations.ts`) — server-only mutation files. All use `requireAuthOrThrow` from `lib/data/server-auth.ts`; errors are thrown loudly (no silent failure).
+- **Server actions** (`lib/*-actions.ts`) — zod-validated, call mutation functions, revalidate paths. Return `{ error }` envelopes on failure.
 - **Config** (`lib/config.ts`) — single source of truth for owner, corridors, thesis, app metadata.
-- **Auth** (`lib/auth.ts`) — resolves real Supabase user, falls back to config for local dev.
+- **Auth** — server-side via `lib/data/server-auth.ts:requireAuthOrThrow` (used by mutations). Browser-side via `lib/supabase/db.ts:getCurrentUserId`. Middleware in `middleware.ts` handles route protection.
 
 ## App Pages
 

@@ -10,18 +10,18 @@ This app is the research workbench: it captures the field data, runs the AI inte
 
 ## Where SOSPHD fits
 
-SOSPHD is **one of six apps** sharing a single Supabase project (`jnbxkvlkqmwnqlmetknj`). It owns the `research.*` schema and the `phd_*` tables in `public`; it reads from but does not write to the other apps' tables.
+SOSPHD is **one of six apps** sharing a single Supabase project (`jnbxkvlkqmwnqlmetknj`). It owns the `research.*` schema only; it reads from but does not write to the other apps' tables.
 
 | App | Role | What SOSPHD does with it |
 |---|---|---|
-| **SOSPHD** | This repo. Research workbench. | Owns `research.*` (case_events, recommendations, docs, notes, tasks, …) + `phd_*` tables |
+| **SOSPHD** | This repo. Research workbench. | Owns `research.*` (case_events, recommendations, docs, notes, tasks, journal_entries, contacts, protocols, …) |
 | SOSCOMMAND | Ops command center | SOSPHD **reads** `public.cases`, `case_status_history`, `case_transport`, `guarantees_of_payment`, `claims`, `case_episodes`, `insurer_interactions` |
 | SOSWEBSITE | Public site + ops console | shared `cases` schema |
 | SOSTRAVEL | Traveler app | shared incident / facility tables |
 | SOSPRO | Clinic tools | shared clinic tables |
 | SOSSAFE | Insurance / payment | shared payer tables |
 
-**Boundary rule:** SOSPHD only creates/updates rows in `research.*` or `phd_*`. Reads from `public.*` are read-only.
+**Boundary rule:** SOSPHD only creates/updates rows in `research.*`. Reads from `public.*` are read-only. The legacy `public.phd_*` schema mentioned in earlier docs was never applied to the live database and has been retired.
 
 ---
 
@@ -53,7 +53,7 @@ The **central paper-2 mechanism** is at `/cases/[id]`: an AI recommendation engi
 
 Event timestamps come from two sources, distinguishable by `actor_id`:
 1. **Operator-entered** events (`actor_id` = the signed-in user's UUID) — typed via the case detail event form.
-2. **SOSCOMMAND-synced** events (`actor_id = 'soscommand_sync'`) — materialized from `public.cases.{intake_at, triage_at, …}` + `case_transport.*` + `guarantees_of_payment.*` + `case_episodes.*`. The sync is idempotent and runs lazily on case page load; there's a "Sync from SOSCOMMAND" button on `/dashboard/paper2` for bulk backfill.
+2. **SOSCOMMAND-synced** events (`actor_id = 'soscommand_sync'`) — materialized by **database triggers** in `supabase/migrations/20260402_003_auto_sync_triggers.sql` and `20260519_006_case_events_dedup_and_triage.sql`. Whenever SOSCOMMAND writes to `public.cases.intake_date`/`triage_at`/etc., `case_transport.*`, `guarantees_of_payment.*`, or `case_episodes.*`, the trigger emits the corresponding `research.case_events` row, dedup'd at `(case_id, event_type, occurred_at, actor_id)`.
 
 ---
 
@@ -116,10 +116,11 @@ The shared Supabase project has 400+ other migrations owned by SOSCOMMAND, SOSWE
 
 ## Architecture notes
 
-- **Server actions** (`lib/*-actions.ts`) — zod-validated, call store functions, revalidate paths. Auth-gated.
-- **Stores** (`lib/data/*-store.ts`) — typed wrappers over Supabase queries. Reads can fall back to seed data in dev (with a `[SOSPHD:DEGRADED]` log); writes throw `AuthRequiredError` when auth is missing.
-- **Analytics** (`lib/data/analytics.ts`) — pure aggregators with a strict performance contract: every aggregator uses exactly **three** database round-trips regardless of dataset size. Per-case loop fetches are forbidden in this file.
-- **Sync** (`lib/data/sync.ts`) — pure mapper + idempotent runtime that materializes SOSCOMMAND timestamps as `research.case_events` rows.
+- **Server actions** (`lib/*-actions.ts`) — zod-validated, call mutation functions, revalidate paths. Auth-gated, return `{ error }` envelopes on failure.
+- **Reads** (`lib/data/*-store.ts`) — typed wrappers over Supabase queries. Reads can fall back to seed data in dev (with a `[SOSPHD:DEGRADED]` log).
+- **Writes** (`lib/data/*-mutations.ts`) — server-only mutation paths using `requireAuthOrThrow`. Surface errors loudly via thrown exceptions; no silent failure.
+- **Analytics** (`lib/data/analytics.ts`) — pure aggregators with a strict performance contract: every aggregator uses exactly **three** database round-trips regardless of dataset size. Pure `computeDashboardSummary` / `computeCaseMetricRows` allow callers to share a single batch across multiple aggregators (e.g. `buildPaperContext`).
+- **Sync** — handled by **database triggers** (migration `20260402_003_auto_sync_triggers.sql`), not application code. SOSCOMMAND writes → `research.case_events` is automatic.
 - **AI config** (`lib/ai/config.ts`) — single source of truth for model selection + auth-gate helpers for LLM endpoints. Per-surface env overrides for Paper 2 engine comparison.
 - **Protocol** (`lib/protocol.ts`) — `PROTOCOL_VERSION` constant. The full prose lives at `/protocol`.
 

@@ -13,12 +13,10 @@ import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
 import type {
   JournalEntry,
   JournalEntryType,
-  JournalAttachment,
   Contact,
   ContactRole,
   FieldProtocol,
   ProtocolStatus,
-  ProtocolSection,
 } from "./fieldwork-types";
 
 // ── Seed data (fallback when Supabase unavailable) ─────────────────
@@ -114,23 +112,28 @@ const seedJournal: JournalEntry[] = [
   },
 ];
 
+// Pseudonymized fixtures only. Realistic-looking names were removed
+// per the Phase 6 hygiene audit so that demo / degraded-mode views
+// never display anything resembling a real research contact. Real
+// contacts live in research.contacts (Supabase) and are scoped per
+// user_id via RLS.
 const seedContacts: Contact[] = [
   {
     id: "ct_001",
     created_at: "2026-03-15T09:00:00Z",
     updated_at: "2026-03-15T09:00:00Z",
     user_id: DEMO_USER_ID,
-    name: "Dr. Somchai Rattanakorn",
+    name: "Demo Contact A — ER physician",
     role: "doctor",
-    organization: "Bumrungrad International Hospital",
+    organization: "Demo Hospital A",
     title: "Head of Emergency Department",
     email: null,
     phone: null,
     whatsapp: null,
     location: "Bangkok, Thailand",
     corridor: "Bangkok Hub",
-    tags: ["er", "key-informant", "bumrungrad"],
-    notes: "Very supportive of the research. Offered to provide de-identified case flow data. Follow up after IRB approval.",
+    tags: ["er", "key-informant"],
+    notes: "Pseudonymized seed contact. Replace via /contacts when running against Supabase.",
     linked_journal_ids: ["je_001"],
     business_card_url: null,
   },
@@ -139,9 +142,9 @@ const seedContacts: Contact[] = [
     created_at: "2026-03-18T13:00:00Z",
     updated_at: "2026-03-18T13:00:00Z",
     user_id: DEMO_USER_ID,
-    name: "Maria Chen",
+    name: "Demo Contact B — claims manager",
     role: "insurance",
-    organization: "Allianz Partners Asia",
+    organization: "Demo Insurer B",
     title: "Regional Claims Manager",
     email: null,
     phone: null,
@@ -149,7 +152,7 @@ const seedContacts: Contact[] = [
     location: "Singapore",
     corridor: null,
     tags: ["insurance", "data-partner", "ttgp"],
-    notes: "Open to data-sharing agreement. Send formal request with IRB approval letter.",
+    notes: "Pseudonymized seed contact. Replace via /contacts when running against Supabase.",
     linked_journal_ids: ["je_002"],
     business_card_url: null,
   },
@@ -158,9 +161,9 @@ const seedContacts: Contact[] = [
     created_at: "2026-03-10T10:00:00Z",
     updated_at: "2026-03-10T10:00:00Z",
     user_id: DEMO_USER_ID,
-    name: "Dr. Anil Gupta",
+    name: "Demo Contact C — academic advisor",
     role: "academic",
-    organization: "National University of Singapore",
+    organization: "Demo University C",
     title: "Associate Professor, Health Systems",
     email: null,
     phone: null,
@@ -168,7 +171,7 @@ const seedContacts: Contact[] = [
     location: "Singapore",
     corridor: null,
     tags: ["advisor", "methodology", "stepped-wedge"],
-    notes: "Potential PhD supervisor or committee member. Expert in stepped-wedge designs for health interventions.",
+    notes: "Pseudonymized seed contact. Replace via /contacts when running against Supabase.",
     linked_journal_ids: [],
     business_card_url: null,
   },
@@ -177,7 +180,7 @@ const seedContacts: Contact[] = [
     created_at: "2026-03-20T08:00:00Z",
     updated_at: "2026-03-20T08:00:00Z",
     user_id: DEMO_USER_ID,
-    name: "Nong Ploy",
+    name: "Demo Contact D — local coordinator",
     role: "fixer",
     organization: null,
     title: "Local Coordinator",
@@ -187,7 +190,7 @@ const seedContacts: Contact[] = [
     location: "Koh Samui, Thailand",
     corridor: "Koh Samui → Bangkok",
     tags: ["local", "koh-samui", "transport"],
-    notes: "Knows every clinic and ambulance driver on the island. Essential for field logistics.",
+    notes: "Pseudonymized seed contact. Replace via /contacts when running against Supabase.",
     linked_journal_ids: [],
     business_card_url: null,
   },

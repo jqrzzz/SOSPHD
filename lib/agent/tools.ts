@@ -14,7 +14,6 @@ import { createTask, createNote } from "@/lib/data/advisor-mutations";
 import { getDocs } from "@/lib/data/docs-store";
 import { getCases, getEventsByCaseId } from "@/lib/data/store";
 import { computeAllMetrics } from "@/lib/data/metrics";
-import type { MetricKey } from "./domain";
 
 // ── Tool type definitions ───────────────────────────────────────────
 

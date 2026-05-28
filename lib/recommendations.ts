@@ -107,7 +107,7 @@ function formatCaseContext(
   const lines: string[] = [
     `## Case ${caseRow.patient_ref}`,
     `- Status: ${caseRow.status}`,
-    `- Severity: ${caseRow.severity}/5`,
+    `- Severity: ${caseRow.severity}/4 (1=low, 2=normal, 3=high, 4=critical)`,
     `- Chief complaint: ${caseRow.chief_complaint}`,
     `- Created: ${caseRow.created_at}`,
   ];
@@ -190,12 +190,23 @@ export async function generateRecommendationsForCase({
   try {
     parsedResult = recommendationSchema.parse(JSON.parse(jsonText));
   } catch (err) {
+    // Do NOT include the raw model output in the response — it
+    // could contain PHI-adjacent text (case context, patient_ref,
+    // chief_complaint) that gets parroted back. Log it server-side
+    // for debugging instead.
+    console.error(
+      "[SOSPHD] generateRecommendationsForCase: AI returned malformed JSON",
+      {
+        case_id: caseId,
+        parse_error: err instanceof Error ? err.message : "parse failure",
+        raw_preview: result.text.slice(0, 500),
+      },
+    );
     throw new RecommendationError(
       "AI returned malformed recommendations",
       502,
       {
         detail: err instanceof Error ? err.message : "parse failure",
-        raw: result.text.slice(0, 500),
       },
     );
   }

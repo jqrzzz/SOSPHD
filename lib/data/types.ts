@@ -89,27 +89,6 @@ export interface Recommendation {
   decided_at: string | null;
 }
 
-// ── Site ──────────────────────────────────────────────────────────────
-
-export interface Site {
-  id: string;
-  name: string;
-  country_code: string;
-  city: string;
-}
-
-// ── Profile ──────────────────────────────────────────────────────────
-
-export type UserRole = "operator" | "coordinator" | "supervisor" | "researcher";
-
-export interface Profile {
-  id: string;
-  email: string;
-  full_name: string;
-  role: UserRole;
-  site_id: string;
-}
-
 // ── Computed metric result ───────────────────────────────────────────
 
 export interface MetricResult {

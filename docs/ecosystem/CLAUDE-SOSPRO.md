@@ -48,7 +48,7 @@ This repo connects to a **shared Supabase instance** used by 6 projects:
 ### CRITICAL: Database Boundaries
 
 - **DO NOT modify tables owned by other projects:**
-  - `phd_*` tables → owned by SOSPHD (PhD research — reads from your cases/transfers for metrics)
+  - `research.*` schema → owned by SOSPHD (PhD research — reads from your cases/transfers for metrics)
   - `claims`, `guarantees_of_payment`, `invoices`, `payments`, `payers` → owned by SOSCOMMAND
   - `medical_*`, `health_*`, `emergency_*`, `chat_*`, `facilities` → owned by SOSTRAVEL
 - All projects share `auth.users` and `profiles` for authentication.

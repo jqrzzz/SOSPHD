@@ -35,7 +35,18 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  const body = await req.json().catch(() => null);
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return Response.json(
+      {
+        error: "Malformed JSON in request body",
+        detail: err instanceof Error ? err.message : undefined,
+      },
+      { status: 400 },
+    );
+  }
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(

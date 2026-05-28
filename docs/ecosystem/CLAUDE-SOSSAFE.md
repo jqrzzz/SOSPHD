@@ -32,7 +32,7 @@ This project works with insurance and payment data. It may read from SOSCOMMAND-
 ### CRITICAL: Database Boundaries
 
 - **DO NOT modify tables owned by other projects:**
-  - `phd_*` tables → owned by SOSPHD
+  - `research.*` schema → owned by SOSPHD
   - `cases`, `providers`, `partners`, teams/ops tables → owned by SOSCOMMAND
   - `medical_*`, `health_*`, `emergency_*`, `chat_*` → owned by SOSTRAVEL
 - May READ from `claims`, `payers`, `invoices`, `payments` (owned by SOSCOMMAND) and `insurance_policies` (owned by SOSTRAVEL).

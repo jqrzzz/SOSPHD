@@ -78,7 +78,6 @@ function mapStatus(opStatus: string): CaseStatus {
       return "closed";
 
     default:
-      // eslint-disable-next-line no-console
       console.warn(
         `[SOSPHD:UNKNOWN_STATUS] Unhandled operational case status: "${opStatus}". Defaulting to "open". Add an explicit case to mapStatus in lib/data/store.ts.`,
       );
@@ -108,7 +107,6 @@ function mapPriority(priority: string): Severity {
     case "critical":
       return 4;
     default:
-      // eslint-disable-next-line no-console
       console.warn(
         `[SOSPHD:UNKNOWN_PRIORITY] Unhandled operational case priority: "${priority}". Defaulting to 2 (normal). Add an explicit case to mapPriority in lib/data/store.ts.`,
       );

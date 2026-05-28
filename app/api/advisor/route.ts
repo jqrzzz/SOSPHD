@@ -169,13 +169,27 @@ async function extractAndCreateTasks(text: string): Promise<void> {
   const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
   if (!jsonMatch) return;
 
+  // The AI is instructed to emit a fenced JSON block when it identifies
+  // tasks. A parse failure means the model returned malformed JSON —
+  // worth knowing about because every parse failure = lost task data.
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(jsonMatch[1]);
-    if (parsed.tasks && Array.isArray(parsed.tasks)) {
-      await createTasksFromAI(parsed.tasks);
-    }
-  } catch {
-    // Invalid JSON — skip task creation silently
+    parsed = JSON.parse(jsonMatch[1]);
+  } catch (err) {
+    console.warn(
+      "[SOSPHD] advisor.extractAndCreateTasks: model emitted malformed JSON in fenced ```json``` block — task suggestions lost:",
+      err instanceof Error ? err.message : err,
+    );
+    return;
+  }
+
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    "tasks" in parsed &&
+    Array.isArray((parsed as { tasks: unknown }).tasks)
+  ) {
+    await createTasksFromAI((parsed as { tasks: unknown[] }).tasks);
   }
 }
 
@@ -237,7 +251,7 @@ export async function POST(req: Request) {
               >,
             });
           } catch (err) {
-            // eslint-disable-next-line no-console
+             
             console.warn(
               "[SOSPHD] advisor.onFinish: failed to persist assistant message:",
               err instanceof Error ? err.message : err,
