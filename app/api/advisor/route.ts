@@ -13,7 +13,7 @@ import {
 } from "@/lib/ai/config";
 import { buildContextSnapshot } from "@/lib/data/context-builder";
 import { createTasksFromAI } from "@/lib/advisor-actions";
-import { addMessage } from "@/lib/data/advisor-store";
+import { addMessage } from "@/lib/data/advisor-mutations";
 import { formatDuration } from "@/lib/data/metrics";
 import { getResearchPulse, suggestNextActions, detectGaps } from "@/lib/agent";
 
@@ -226,15 +226,23 @@ export async function POST(req: Request) {
         await extractAndCreateTasks(textContent);
 
         if (sessionId) {
-          await addMessage({
-            session_id: sessionId,
-            role: "assistant",
-            content: textContent,
-            context_snapshot: contextSnapshot as unknown as Record<
-              string,
-              unknown
-            >,
-          });
+          try {
+            await addMessage({
+              session_id: sessionId,
+              role: "assistant",
+              content: textContent,
+              context_snapshot: contextSnapshot as unknown as Record<
+                string,
+                unknown
+              >,
+            });
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              "[SOSPHD] advisor.onFinish: failed to persist assistant message:",
+              err instanceof Error ? err.message : err,
+            );
+          }
         }
       }
     },

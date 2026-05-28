@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { z } from "zod";
-import { getDocById, updateDoc } from "@/lib/data/docs-store";
-import { createTask } from "@/lib/data/advisor-store";
+import { getDocById } from "@/lib/data/docs-store";
+import { createTask } from "@/lib/data/advisor-mutations";
 import {
   modelFor,
   requireAIKey,

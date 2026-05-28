@@ -1,22 +1,16 @@
-/* ─── Workspace Store (Supabase) ───────────────────────────────────────
+/* ─── Workspace Store — READ paths ─────────────────────────────────────
  *  Queries research.uploads, research.mind_maps.
- *  Falls back to seed data when Supabase is unavailable.
+ *  Falls back to seed data when Supabase is unavailable (with a
+ *  [SOSPHD:DEGRADED] warning so it's not silent).
  *
- *  KNOWN ISSUE (will be fixed in Track A Phase 3) — same shape as
- *  advisor-store: writes use the BROWSER Supabase client and silently
- *  fail server-side. Phase 3 splits this into workspace-store.ts
- *  (reads) + workspace-mutations.ts (writes), matching the fieldwork
- *  pattern.
+ *  Writes live in workspace-mutations.ts (server-only) so importing
+ *  the server Supabase client doesn't pollute the client bundle.
+ *
+ *  Per Phase 3 of audit-action-plan.md, this file is reads-only.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
-import type {
-  Upload,
-  UploadCategory,
-  MindMap,
-  MindMapNode,
-  MindMapEdge,
-} from "./workspace-types";
+import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
+import type { Upload, UploadCategory, MindMap } from "./workspace-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────
 
@@ -117,7 +111,15 @@ export async function getUploads(filters?: {
 
       const { data, error } = await query;
       if (!error && data) return data as Upload[];
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getUploads", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getUploads",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getUploads", "supabase env vars missing");
   }
 
   let result = [...seedUploads];
@@ -134,53 +136,7 @@ export async function getUploads(filters?: {
   return result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
-export async function createUpload(data: {
-  filename: string;
-  mime_type: string;
-  size_bytes: number;
-  category: UploadCategory;
-  url: string;
-  tags?: string[];
-  notes?: string;
-  linked_case_id?: string | null;
-  linked_doc_id?: string | null;
-}): Promise<Upload | null> {
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
-
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .schema("research")
-      .from("uploads")
-      .insert({
-        user_id: userId,
-        filename: data.filename,
-        mime_type: data.mime_type,
-        size_bytes: data.size_bytes,
-        category: data.category,
-        url: data.url,
-        tags: data.tags ?? [],
-        notes: data.notes ?? "",
-        linked_case_id: data.linked_case_id ?? null,
-        linked_doc_id: data.linked_doc_id ?? null,
-      })
-      .select()
-      .single();
-    if (!error && row) return row as Upload;
-  }
-  return null;
-}
-
-export async function deleteUpload(id: string): Promise<boolean> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.schema("research").from("uploads").delete().eq("id", id);
-    return !error;
-  }
-  return false;
-}
-
-// ── Mind Maps ───────────────────────────────────────────────────────
+// ── Mind Maps (reads only — writes in workspace-mutations.ts) ──────
 
 export async function getMindMaps(): Promise<MindMap[]> {
   const sb = getSupabase();
@@ -192,7 +148,15 @@ export async function getMindMaps(): Promise<MindMap[]> {
         .select("*")
         .order("updated_at", { ascending: false });
       if (!error && data) return data as MindMap[];
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getMindMaps", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getMindMaps",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getMindMaps", "supabase env vars missing");
   }
   return [...seedMindMaps].sort(
     (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
@@ -215,54 +179,3 @@ export async function getMindMapById(id: string): Promise<MindMap | null> {
   return seedMindMaps.find((m) => m.id === id) ?? null;
 }
 
-export async function createMindMap(title: string): Promise<MindMap | null> {
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
-
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .schema("research")
-      .from("mind_maps")
-      .insert({
-        user_id: userId,
-        title,
-        nodes: [{ id: "n1", x: 400, y: 250, label: title, color: "#3b82f6", radius: 36 }],
-        edges: [],
-      })
-      .select()
-      .single();
-    if (!error && row) return row as MindMap;
-  }
-  return null;
-}
-
-export async function updateMindMap(
-  id: string,
-  updates: {
-    title?: string;
-    nodes?: MindMapNode[];
-    edges?: MindMapEdge[];
-  },
-): Promise<MindMap | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .schema("research")
-      .from("mind_maps")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
-    if (!error && row) return row as MindMap;
-  }
-  return null;
-}
-
-export async function deleteMindMap(id: string): Promise<boolean> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.schema("research").from("mind_maps").delete().eq("id", id);
-    return !error;
-  }
-  return false;
-}

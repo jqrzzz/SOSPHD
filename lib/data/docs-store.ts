@@ -1,18 +1,17 @@
-/* ─── Docs Store (Supabase) ────────────────────────────────────────────
+/* ─── Docs Store — READ paths ──────────────────────────────────────────
  *  Queries research.docs, research.doc_versions.
- *  Falls back to seed data when Supabase is unavailable.
+ *  Falls back to seed data when Supabase is unavailable (with a
+ *  [SOSPHD:DEGRADED] warning so it's not silent).
+ *
+ *  Writes live in docs-mutations.ts (server-only) so this file
+ *  stays safe to import from any context.
  *
  *  research.docs has no `site_id` column; the TS `Doc.site_id` field
  *  is coerced to null in mapDbDoc. (Pending Phase 6 hygiene — remove
  *  site_id from the Doc type entirely.)
- *
- *  research.doc_versions has real `user_id` and `note` columns —
- *  earlier history of mapping `change_note` → `note` came from the
- *  never-applied phd_doc_versions schema and is now obsolete.
  * ────────────────────────────────────────────────────────────────────── */
 
 import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
-import { requireAuthOrThrow } from "@/lib/supabase/server-auth";
 import type { Doc, DocVersion, DocStatus } from "./docs-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────
@@ -307,60 +306,7 @@ export async function getDocById(id: string): Promise<Doc | null> {
   return seedDocs.find((d) => d.id === id) ?? null;
 }
 
-export async function createDoc(data: {
-  title: string;
-  folder?: string;
-  tags?: string[];
-  content_md?: string;
-  linked_case_id?: string | null;
-}): Promise<Doc> {
-  const { supabase: sb, userId } = await requireAuthOrThrow();
-
-  const slug = data.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  const { data: row, error } = await sb
-    .schema("research")
-    .from("docs")
-    .insert({
-      user_id: userId,
-      title: data.title,
-      slug,
-      folder: data.folder ?? "General",
-      tags: data.tags ?? [],
-      content_md: data.content_md ?? "",
-      status: "draft",
-      linked_case_id: data.linked_case_id ?? null,
-    })
-    .select()
-    .single();
-  if (error || !row) {
-    throw new Error(`Failed to create doc: ${error?.message}`);
-  }
-  return mapDbDoc(row as Record<string, unknown>);
-}
-
-export async function updateDoc(
-  id: string,
-  updates: Partial<Pick<Doc, "title" | "content_md" | "folder" | "tags" | "status" | "linked_case_id">>,
-): Promise<Doc | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .schema("research")
-    .from("docs")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
-    if (!error && row) return mapDbDoc(row as Record<string, unknown>);
-  }
-  return null;
-}
-
-// ── Versions ────────────────────────────────────────────────────────
+// ── Versions (reads only — writes in docs-mutations.ts) ─────────────
 
 export async function getVersionsByDocId(docId: string): Promise<DocVersion[]> {
   const sb = getSupabase();
@@ -378,30 +324,6 @@ export async function getVersionsByDocId(docId: string): Promise<DocVersion[]> {
   return seedVersions
     .filter((v) => v.doc_id === docId)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-}
-
-export async function createVersion(data: {
-  doc_id: string;
-  content_md: string;
-  note?: string | null;
-}): Promise<DocVersion> {
-  // research.doc_versions.user_id is NOT NULL — must resolve auth.
-  const { supabase: sb, userId } = await requireAuthOrThrow();
-  const { data: row, error } = await sb
-    .schema("research")
-    .from("doc_versions")
-    .insert({
-      doc_id: data.doc_id,
-      user_id: userId,
-      content_md: data.content_md,
-      note: data.note ?? "",
-    })
-    .select()
-    .single();
-  if (error || !row) {
-    throw new Error(`Failed to create version: ${error?.message}`);
-  }
-  return mapDbVersion(row as Record<string, unknown>);
 }
 
 export async function getVersionById(id: string): Promise<DocVersion | null> {

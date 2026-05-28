@@ -3,13 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { getDocById } from "@/lib/data/docs-store";
 import {
   createDoc,
   updateDoc,
   createVersion,
-  getDocById,
-} from "@/lib/data/docs-store";
-import { DOC_FOLDERS } from "@/lib/data/docs-types";
+} from "@/lib/data/docs-mutations";
 
 // ── Schemas ──────────────────────────────────────────────────────────
 
@@ -102,9 +101,12 @@ export async function updateDocAction(data: {
     updates.linked_case_id = parsed.data.linked_case_id || null;
   }
 
-  const result = await updateDoc(parsed.data.id, updates);
-  if (!result) {
-    return { error: "Document not found" };
+  try {
+    await updateDoc(parsed.data.id, updates);
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to update document",
+    };
   }
 
   revalidatePath(`/docs/${parsed.data.id}`);
@@ -167,8 +169,13 @@ export async function restoreVersionAction(data: {
     };
   }
 
-  const result = await updateDoc(data.doc_id, { content_md: data.version_content });
-  if (!result) return { error: "Failed to restore version" };
+  try {
+    await updateDoc(data.doc_id, { content_md: data.version_content });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to restore version",
+    };
+  }
 
   revalidatePath(`/docs/${data.doc_id}`);
   return { success: true };
