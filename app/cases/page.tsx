@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { getCases, getEventCountsByCaseIds } from "@/lib/data/store";
 import { SeverityBadge } from "@/components/severity-badge";
 import { StatusBadge } from "@/components/status-badge";
+import { HistoricalCaseBadge } from "@/components/historical-case-badge";
 import { CaseListFilters } from "@/components/case-list-filters";
 import { PageHeader } from "@/components/page-header";
 import { CountUp } from "@/components/motion/count-up";
@@ -157,12 +158,17 @@ export default async function CasesPage(props: {
                         className="group border-b border-border/30 transition-colors last:border-0 hover:bg-accent/40"
                       >
                         <td className="px-4 py-3">
-                          <Link
-                            href={`/cases/${c.id}`}
-                            className="font-mono text-sm font-medium text-primary underline-offset-4 transition-colors group-hover:underline"
-                          >
-                            {c.patient_ref}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/cases/${c.id}`}
+                              className="font-mono text-sm font-medium text-primary underline-offset-4 transition-colors group-hover:underline"
+                            >
+                              {c.patient_ref}
+                            </Link>
+                            {c.source === "historical" && (
+                              <HistoricalCaseBadge />
+                            )}
+                          </div>
                         </td>
                         <td className="hidden px-4 py-3 sm:table-cell">
                           <SeverityBadge severity={c.severity} />

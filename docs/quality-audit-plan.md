@@ -2,7 +2,7 @@
 
 > Cross-cutting audit after Phases 1–9. Six read-only agents swept UI/UX, accessibility, frontend resilience, test coverage, technical debt, and the Phase 9 union's blast radius. This doc records the findings (each verified against source — agent claims that didn't hold up are marked) and a prioritized remediation plan.
 
-**Status**: IN PROGRESS (2026-05-28). **P0 + P2-2 DONE** (branch `claude/quality-p0`). Next: QD-1 decision → P1. P2/P3 remain.
+**Status**: IN PROGRESS (2026-05-28). **P0 + P2-2 DONE** (`claude/quality-p0`, 91 tests). **QD-1 decided** (Allow but tag) + **P1 DONE** (`claude/quality-p1`, 95 tests). Next: P2 remainder. P3 remains.
 
 ---
 
@@ -31,13 +31,13 @@
 **P0-3 · Surface advisor stream/429 errors.** *(confirmed regression from Phase 8)*
 `components/advisor-chat.tsx` destructures `useChat()` without `error`/`onError`. When the stream 500s or the **Phase-8 rate-limit 429** fires, the "thinking…" dots vanish and the user's message sits unanswered with **no feedback**. We added the 429 but the client can't show it. Add `error` handling + a retry affordance + surface the `Retry-After`. Effort: **S–M**.
 
-### P1 — One decision + the Phase 9 UX gap
+### P1 — One decision + the Phase 9 UX gap — ✅ DONE
 
-**QD-1 (DECISION) · Recommendations on historical cases.** `getCaseById` now resolves historical ids, so `POST /api/recommendations/generate` will happily generate AI recommendations against a closed 2019 backfill case. Intended (retrospective analysis) or not (operational-only)?
-- *Recommend*: **allow but mark** — historical recs are useful for retrospective Paper 2 analysis, but tag them (engine_version suffix or a flag) so they're separable from live-intervention recs. Alternatively guard to operational-only if Paper 2's intervention definition requires it. **Needs your call.**
+> Shipped on `claude/quality-p1`. Tests 91 → 95. **QD-1 decided: Allow but tag.** Historical recs get an `/historical` `engine_version` suffix; `HistoricalCaseBadge` rendered on `/cases` + `/cases/[id]`; methods-section paraphrase added to `measurement-projection.md` §6.5.
 
-**P1-1 · Badge historical vs operational cases.** *(we built the union; surface it)*
-`Case.source` exists but nothing renders it. A user can't tell a 2019 backfill case from a live one in `/cases` or `/cases/[id]`. Add a small "Historical" badge. Effort: **S**.
+**QD-1 (DECISION) ✅ Allow but tag.** When `generateRecommendationsForCase` runs against a `source = "historical"` case, the persisted row's `engine_version` is suffixed `…/historical` (e.g. `llm-paper2-v0.1/transport/historical`). Paper 2's intervention set = recs WITHOUT this suffix; the full set is in the same `llm-paper2-v0.1/%` lineage. Already integrates with the existing by-engine analytics breakdown — no further analytics work needed.
+
+**P1-1 · `HistoricalCaseBadge` ✅.** Small purple badge rendered when `Case.source === "historical"` on the cases list (next to patient_ref) and the case detail header. Operational cases stay visually clean.
 
 ### P2 — Resilience & accessibility (user-facing robustness)
 

@@ -117,6 +117,18 @@ The seven event types Paper 1 measures over, defined in `lib/data/types.ts:EVENT
 
 ---
 
+## 6.5 Recommendation provenance for historical (backfilled) cases
+
+When `generateRecommendationsForCase` runs against a `source = "historical"` case (a research.cases row from the 2018–2023 backfill), the persisted `research.recommendations` row carries an `engine_version` suffixed with `/historical` (e.g. `llm-paper2-v0.1/transport/historical`). Live-intervention recommendations have no such suffix.
+
+**Why**: historical cases never received the Tourist SOS coordination intervention (the intervention didn't exist yet); their recommendations are retrospective AI projections useful for Paper 2's calibration analysis but are NOT part of the intervention set itself.
+
+**Paper 2 filter**: the intervention set is `WHERE engine_version NOT LIKE '%/historical'`. The full set (intervention ∪ retrospective) is `WHERE engine_version LIKE 'llm-paper2-v0.1/%'`.
+
+**Methods-section paraphrase**: "AI recommendations generated against historical (pre-intervention) cases were retained for retrospective calibration but excluded from intervention-effect analyses. Provenance was preserved at write-time via an `engine_version` suffix (`/historical`) on `research.recommendations` rows so the two populations remain separable for the lifetime of the data."
+
+---
+
 ## 7. What this doc is NOT
 
 - Not the intervention specification — see `/protocol` and `app/protocol/page.tsx` for that.

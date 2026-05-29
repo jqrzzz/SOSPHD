@@ -216,11 +216,17 @@ export async function generateRecommendationsForCase({
   }
 
   const persisted: Recommendation[] = [];
+  // QD-1: recommendations on historical (backfilled 2018–2023) cases
+  // are allowed for retrospective Paper 2 analysis, but tagged via an
+  // engine_version suffix so they're separable from live-intervention
+  // recommendations. Paper 2's intervention set = recs WITHOUT this
+  // "/historical" suffix.
+  const historicalSuffix = caseRow.source === "historical" ? "/historical" : "";
   for (const rec of parsedResult.recommendations) {
     const row = await createRecommendation({
       case_id: caseId,
       engine_type: "llm",
-      engine_version: `${ENGINE_VERSION}/${rec.category}`,
+      engine_version: `${ENGINE_VERSION}/${rec.category}${historicalSuffix}`,
       confidence_type: "probability",
       confidence_value: rec.confidence,
       recommendation: rec.recommendation,
