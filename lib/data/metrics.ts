@@ -9,6 +9,19 @@
 
 import type { CaseEvent, EventType, MetricResult } from "./types";
 
+/**
+ * Returns the FIRST event of a given type by array order. The events
+ * array is sorted by `occurred_at` ascending upstream (see
+ * `getEventsByCaseId` and `getAllCaseEvents` in store.ts), so this
+ * function returns the EARLIEST event of that type for a case.
+ *
+ * MEASUREMENT PROJECTION NOTE: when a case has multiple events of
+ * the same type (e.g. a multi-leg journey with two FACILITY_ARRIVAL
+ * events), only the first leg contributes to TTTA/TTGP/TTDC. This is
+ * reinforced by the DB trigger dedup at (case_id, event_type) — see
+ * `migrations/003_auto_sync_triggers.sql`. Paper 1's methods section
+ * must document this assumption.
+ */
 function findEvent(events: CaseEvent[], type: EventType): CaseEvent | undefined {
   return events.find((e) => e.event_type === type);
 }

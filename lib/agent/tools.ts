@@ -9,11 +9,11 @@
 import { RESEARCH_DOMAIN } from "./domain";
 import { categorizeText as pureCategorize } from "./categorize";
 import { getJournalEntries, getContacts, getProtocols, getProtocolProgress } from "@/lib/data/fieldwork-store";
-import { getNotes, getTasks, createTask, createNote } from "@/lib/data/advisor-store";
+import { getNotes, getTasks } from "@/lib/data/advisor-store";
+import { createTask, createNote } from "@/lib/data/advisor-mutations";
 import { getDocs } from "@/lib/data/docs-store";
 import { getCases, getEventsByCaseId } from "@/lib/data/store";
 import { computeAllMetrics } from "@/lib/data/metrics";
-import type { MetricKey } from "./domain";
 
 // ── Tool type definitions ───────────────────────────────────────────
 

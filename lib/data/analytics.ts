@@ -10,7 +10,7 @@
 
 import { getCases, getAllCaseEvents, getAllRecommendations } from "./store";
 import { computeTTTA, computeTTGP, computeTTDC, formatDuration } from "./metrics";
-import type { Recommendation } from "./types";
+import type { Case, CaseEvent, Recommendation } from "./types";
 
 function groupByCaseId<T extends { case_id: string }>(
   items: T[],
@@ -56,14 +56,17 @@ function average(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-export async function getDashboardSummary(): Promise<DashboardSummary> {
-  // 3 parallel queries, regardless of case count.
-  const [allCases, allEvents, allRecs] = await Promise.all([
-    getCases(),
-    getAllCaseEvents(),
-    getAllRecommendations(),
-  ]);
-
+/**
+ * Pure aggregator: given cases + events + recs, compute the
+ * dashboard summary. Extracted from getDashboardSummary so the same
+ * data batch can be shared with computeCaseMetricRows /
+ * buildPaperContext without re-querying.
+ */
+export function computeDashboardSummary(
+  allCases: Case[],
+  allEvents: CaseEvent[],
+  allRecs: Recommendation[],
+): DashboardSummary {
   const eventsByCaseId = groupByCaseId(allEvents);
   const recsByCaseId = groupByCaseId(allRecs);
 
@@ -107,6 +110,16 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   };
 }
 
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  // 3 parallel queries, regardless of case count.
+  const [allCases, allEvents, allRecs] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+    getAllRecommendations(),
+  ]);
+  return computeDashboardSummary(allCases, allEvents, allRecs);
+}
+
 // ── Per-case metric table ───────────────────────────────────────────
 
 export interface CaseMetricRow {
@@ -127,13 +140,17 @@ export interface CaseMetricRow {
   override_count: number;
 }
 
-export async function getCaseMetricRows(): Promise<CaseMetricRow[]> {
-  const [allCases, allEvents, allRecs] = await Promise.all([
-    getCases(),
-    getAllCaseEvents(),
-    getAllRecommendations(),
-  ]);
-
+/**
+ * Pure aggregator: given cases + events + recs, compute the per-case
+ * metric rows. Extracted from getCaseMetricRows so the same data
+ * batch can be shared with computeDashboardSummary / buildPaperContext
+ * without re-querying.
+ */
+export function computeCaseMetricRows(
+  allCases: Case[],
+  allEvents: CaseEvent[],
+  allRecs: Recommendation[],
+): CaseMetricRow[] {
   const eventsByCaseId = groupByCaseId(allEvents);
   const recsByCaseId = groupByCaseId(allRecs);
 
@@ -170,6 +187,15 @@ export async function getCaseMetricRows(): Promise<CaseMetricRow[]> {
   }
 
   return rows;
+}
+
+export async function getCaseMetricRows(): Promise<CaseMetricRow[]> {
+  const [allCases, allEvents, allRecs] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+    getAllRecommendations(),
+  ]);
+  return computeCaseMetricRows(allCases, allEvents, allRecs);
 }
 
 // ── Paper 2: human-AI coordination analytics ─────────────────────────
@@ -373,7 +399,10 @@ export function computePaper2Coordination(
     sevMap.set(d.severity, arr);
   }
   const by_severity: SeverityStat[] = [];
-  for (let sev = 1; sev <= 5; sev++) {
+  // Severity is 1-4 (see lib/data/types.ts:Severity). Loop covers the
+  // full reachable range; if mapPriority is widened later this loop's
+  // upper bound moves with it.
+  for (let sev = 1; sev <= 4; sev++) {
     const recs = sevMap.get(sev) ?? [];
     const acc = recs.filter((d) => d.rec.accepted === true).length;
     const ovr = recs.filter((d) => d.rec.accepted === false).length;
@@ -438,8 +467,16 @@ export interface PaperBuilderContext {
 }
 
 export async function buildPaperContext(): Promise<PaperBuilderContext> {
-  const summary = await getDashboardSummary();
-  const rows = await getCaseMetricRows();
+  // 3 parallel queries shared between summary + rows. Previously this
+  // function awaited getDashboardSummary then getCaseMetricRows
+  // sequentially — six identical queries (cases/events/recs twice).
+  const [allCases, allEvents, allRecs] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+    getAllRecommendations(),
+  ]);
+  const summary = computeDashboardSummary(allCases, allEvents, allRecs);
+  const rows = computeCaseMetricRows(allCases, allEvents, allRecs);
 
   const completedCases = rows.filter((r) => r.status === "closed");
   const delayedCases = rows.filter((r) => r.payment_delayed);

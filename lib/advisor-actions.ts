@@ -11,7 +11,7 @@ import {
   deleteNote,
   updateTask,
   deleteTask,
-} from "@/lib/data/advisor-store";
+} from "@/lib/data/advisor-mutations";
 
 // ── Schemas ──────────────────────────────────────────────────────────
 
@@ -50,11 +50,17 @@ export async function createNoteAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  await createNote({
-    title: parsed.data.title || null,
-    content: parsed.data.content,
-    linked_case_id: parsed.data.linked_case_id || null,
-  });
+  try {
+    await createNote({
+      title: parsed.data.title || null,
+      content: parsed.data.content,
+      linked_case_id: parsed.data.linked_case_id || null,
+    });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to create note",
+    };
+  }
 
   revalidatePath("/advisor");
   return { success: true };
@@ -76,21 +82,34 @@ export async function createTaskAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  await createTask({
-    title: parsed.data.title,
-    description: parsed.data.description || null,
-    priority: parsed.data.priority,
-    linked_case_id: parsed.data.linked_case_id || null,
-  });
+  try {
+    await createTask({
+      title: parsed.data.title,
+      description: parsed.data.description || null,
+      priority: parsed.data.priority,
+      linked_case_id: parsed.data.linked_case_id || null,
+    });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to create task",
+    };
+  }
 
   revalidatePath("/advisor");
   return { success: true };
 }
 
-export async function createSessionAction(): Promise<{ id: string }> {
-  const session = await createSession();
-  revalidatePath("/advisor");
-  return { id: session?.id ?? "" };
+export async function createSessionAction(): Promise<{ id: string; error?: string }> {
+  try {
+    const session = await createSession();
+    revalidatePath("/advisor");
+    return { id: session.id };
+  } catch (err) {
+    return {
+      id: "",
+      error: err instanceof Error ? err.message : "Failed to create session",
+    };
+  }
 }
 
 export async function updateTaskStatusAction(
@@ -107,9 +126,12 @@ export async function updateTaskStatusAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const result = await updateTaskStatus(parsed.data.id, parsed.data.status);
-  if (!result) {
-    return { error: "Task not found" };
+  try {
+    await updateTaskStatus(parsed.data.id, parsed.data.status);
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to update task status",
+    };
   }
 
   revalidatePath("/advisor");
@@ -129,15 +151,26 @@ export async function updateNoteAction(
   const content = formData.get("content") as string;
   if (!content) return { error: "Content is required" };
 
-  const result = await updateNote(id, { title, content });
-  if (!result) return { error: "Note not found" };
+  try {
+    await updateNote(id, { title, content });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to update note",
+    };
+  }
 
   revalidatePath("/workspace");
   return { success: true };
 }
 
 export async function deleteNoteAction(id: string) {
-  await deleteNote(id);
+  try {
+    await deleteNote(id);
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to delete note",
+    };
+  }
   revalidatePath("/workspace");
   return { success: true };
 }
@@ -157,34 +190,96 @@ export async function updateTaskAction(
   const description = (formData.get("description") as string) || null;
   const priority = parseInt(formData.get("priority") as string) || 2;
 
-  const result = await updateTask(id, { title, description, priority });
-  if (!result) return { error: "Task not found" };
+  try {
+    await updateTask(id, { title, description, priority });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to update task",
+    };
+  }
 
   revalidatePath("/workspace");
   return { success: true };
 }
 
 export async function deleteTaskAction(id: string) {
-  await deleteTask(id);
+  try {
+    await deleteTask(id);
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to delete task",
+    };
+  }
   revalidatePath("/workspace");
   return { success: true };
 }
 
-/** Called by the API route after AI suggests tasks */
+const aiTaskSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  priority: z.number().int().min(1).max(3).optional(),
+  linked_case_id: z.string().optional(),
+});
+
+export interface CreateTasksFromAIResult {
+  attempted: number;
+  created: number;
+  skipped_invalid: number;
+  failed: number;
+}
+
+/**
+ * Called by the API route after AI suggests tasks. Best-effort:
+ * failed inserts are logged and skipped so a single bad task doesn't
+ * lose the rest. Returns a count breakdown so the caller can surface
+ * partial failure to the user.
+ *
+ * Input is `unknown[]` because it comes from JSON.parse output — we
+ * validate each task with Zod before insertion.
+ */
 export async function createTasksFromAI(
-  taskList: Array<{
-    title: string;
-    description?: string;
-    priority?: number;
-    linked_case_id?: string;
-  }>,
-) {
-  for (const t of taskList) {
-    await createTask({
-      title: t.title,
-      description: t.description ?? null,
-      priority: t.priority ?? 2,
-      linked_case_id: t.linked_case_id ?? null,
-    });
+  taskList: unknown[],
+): Promise<CreateTasksFromAIResult> {
+  const result: CreateTasksFromAIResult = {
+    attempted: taskList.length,
+    created: 0,
+    skipped_invalid: 0,
+    failed: 0,
+  };
+
+  for (const raw of taskList) {
+    const parsed = aiTaskSchema.safeParse(raw);
+    if (!parsed.success) {
+      result.skipped_invalid += 1;
+      console.warn(
+        "[SOSPHD] createTasksFromAI: skipping malformed task from AI:",
+        parsed.error.issues[0]?.message,
+      );
+      continue;
+    }
+
+    try {
+      await createTask({
+        title: parsed.data.title,
+        description: parsed.data.description ?? null,
+        priority: parsed.data.priority ?? 2,
+        linked_case_id: parsed.data.linked_case_id ?? null,
+      });
+      result.created += 1;
+    } catch (err) {
+      result.failed += 1;
+      console.warn(
+        `[SOSPHD] createTasksFromAI: failed to create task "${parsed.data.title}":`,
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
+
+  if (result.failed > 0 || result.skipped_invalid > 0) {
+    console.warn(
+      `[SOSPHD] createTasksFromAI: partial failure — attempted=${result.attempted}, created=${result.created}, skipped_invalid=${result.skipped_invalid}, failed=${result.failed}`,
+    );
+  }
+
+  return result;
 }

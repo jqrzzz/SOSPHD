@@ -121,9 +121,9 @@ export function CaseTimeline({ events }: { events: CaseEvent[] }) {
                     ? `Decision · ${decision.decision}`
                     : EVENT_TYPE_LABELS[event.event_type]}
                 </span>
-                {event.actor_id === "soscommand_sync" && (
+                {event.payload.startsWith("Auto-synced:") && (
                   <span
-                    title="Materialized from SOSCOMMAND operational tables"
+                    title="Emitted by SOSCOMMAND → research DB trigger"
                     className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-primary/90"
                   >
                     <span

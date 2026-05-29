@@ -13,10 +13,7 @@ import {
   generateRecommendationsForCase,
   RecommendationError,
 } from "@/lib/recommendations";
-import {
-  requireAuthenticatedUser,
-  UnauthenticatedError,
-} from "@/lib/ai/config";
+import { gateAIRequest } from "@/lib/ai/gate";
 
 export const maxDuration = 60;
 
@@ -26,16 +23,21 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  try {
-    await requireAuthenticatedUser();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      return Response.json({ error: err.message }, { status: err.status });
-    }
-    throw err;
-  }
+  const gate = await gateAIRequest("recommendations");
+  if (!gate.ok) return gate.response;
 
-  const body = await req.json().catch(() => null);
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return Response.json(
+      {
+        error: "Malformed JSON in request body",
+        detail: err instanceof Error ? err.message : undefined,
+      },
+      { status: 400 },
+    );
+  }
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(

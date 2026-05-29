@@ -45,7 +45,7 @@ This project owns the patient-facing data tables:
 ### CRITICAL: Database Boundaries
 
 - **DO NOT modify tables owned by other projects:**
-  - `phd_*` tables → owned by SOSPHD
+  - `research.*` schema → owned by SOSPHD
   - `cases`, `claims`, `providers`, `payers`, `partners`, billing tables → owned by SOSCOMMAND
 - All projects share `auth.users` and `profiles` for authentication.
 - Super admin: `juanquirozjr@gmail.com`

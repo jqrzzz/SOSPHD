@@ -38,8 +38,17 @@ const requestSchema = z.object({
   }).optional(),
 });
 
-/** GET /api/agent — Discover agent capabilities */
+/** GET /api/agent — Discover agent capabilities. Auth-gated so capability
+ *  discovery doesn't leak the action surface to unauthenticated callers. */
 export async function GET() {
+  try {
+    await requireAuthenticatedUser();
+  } catch (err) {
+    if (err instanceof UnauthenticatedError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
   return Response.json(getAgentCapabilities());
 }
 
@@ -54,7 +63,19 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return Response.json(
+      {
+        error: "Malformed JSON in request body",
+        detail: err instanceof Error ? err.message : undefined,
+      },
+      { status: 400 },
+    );
+  }
+
   const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -77,8 +98,12 @@ export async function POST(req: Request) {
 
     return Response.json(response);
   } catch (err) {
+    console.error("[SOSPHD] /api/agent: executeAgent failed:", err);
     return Response.json(
-      { error: "Agent execution failed", message: String(err) },
+      {
+        error: "Agent execution failed",
+        message: err instanceof Error ? err.message : "Unknown error",
+      },
       { status: 500 },
     );
   }

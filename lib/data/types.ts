@@ -32,7 +32,27 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
 // ── Case ──────────────────────────────────────────────────────────────
 
 export type CaseStatus = "open" | "active" | "closed";
-export type Severity = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * Clinical severity scale, derived from `public.cases.priority` via
+ * `mapPriority` in lib/data/store.ts. Cardinality (1-4) matches the
+ * operational enum's 4 values: low → 1, normal → 2, high → 3,
+ * critical → 4. Widen this if richer severity data (e.g. acuity_level)
+ * becomes the source of truth.
+ *
+ * 1 = Low, 2 = Normal, 3 = High, 4 = Critical.
+ */
+export type Severity = 1 | 2 | 3 | 4;
+
+/**
+ * Where a Case row originated:
+ *  - "operational" = projected from public.cases (live SOSCOMMAND data)
+ *  - "historical"  = a research.cases row (backfilled 2018–2023, or any
+ *    research-native case). See docs/backfill-plan.md.
+ * Optional so existing construction sites stay valid; the read layer
+ * sets it explicitly.
+ */
+export type CaseSource = "operational" | "historical";
 
 export interface Case {
   id: string;
@@ -43,6 +63,7 @@ export interface Case {
   chief_complaint: string;
   patient_ref: string;
   notes: string;
+  source?: CaseSource;
 }
 
 // ── Event (the provenance spine) ──────────────────────────────────────
@@ -77,27 +98,6 @@ export interface Recommendation {
   decided_by: string | null;
   /** ISO timestamp of decision. NULL until decided. */
   decided_at: string | null;
-}
-
-// ── Site ──────────────────────────────────────────────────────────────
-
-export interface Site {
-  id: string;
-  name: string;
-  country_code: string;
-  city: string;
-}
-
-// ── Profile ──────────────────────────────────────────────────────────
-
-export type UserRole = "operator" | "coordinator" | "supervisor" | "researcher";
-
-export interface Profile {
-  id: string;
-  email: string;
-  full_name: string;
-  role: UserRole;
-  site_id: string;
 }
 
 // ── Computed metric result ───────────────────────────────────────────

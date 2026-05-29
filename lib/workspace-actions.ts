@@ -8,7 +8,7 @@ import {
   createMindMap,
   updateMindMap,
   deleteMindMap,
-} from "@/lib/data/workspace-store";
+} from "@/lib/data/workspace-mutations";
 import type { UploadCategory, MindMapNode, MindMapEdge } from "@/lib/data/workspace-types";
 
 // ── Schemas ──────────────────────────────────────────────────────────
@@ -62,46 +62,80 @@ export async function createUploadAction(
         .filter(Boolean)
     : [];
 
-  await createUpload({
-    filename: parsed.data.filename,
-    mime_type: parsed.data.mime_type,
-    size_bytes: parsed.data.size_bytes,
-    category: parsed.data.category as UploadCategory,
-    url: parsed.data.url,
-    tags: tagList,
-    notes: parsed.data.notes,
-    linked_case_id: parsed.data.linked_case_id || null,
-    linked_doc_id: parsed.data.linked_doc_id || null,
-  });
+  try {
+    await createUpload({
+      filename: parsed.data.filename,
+      mime_type: parsed.data.mime_type,
+      size_bytes: parsed.data.size_bytes,
+      category: parsed.data.category as UploadCategory,
+      url: parsed.data.url,
+      tags: tagList,
+      notes: parsed.data.notes,
+      linked_case_id: parsed.data.linked_case_id || null,
+      linked_doc_id: parsed.data.linked_doc_id || null,
+    });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to create upload",
+    };
+  }
 
   revalidatePath("/workspace");
   return { success: true };
 }
 
 export async function deleteUploadAction(id: string) {
-  await deleteUpload(id);
+  try {
+    await deleteUpload(id);
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to delete upload",
+    };
+  }
   revalidatePath("/workspace");
+  return { success: true };
 }
 
 // ── Mind Map actions ─────────────────────────────────────────────────
 
-export async function createMindMapAction(title: string) {
-  const mm = await createMindMap(title || "Untitled Map");
-  revalidatePath("/workspace");
-  return { id: mm?.id ?? "" };
+export async function createMindMapAction(
+  title: string,
+): Promise<{ id: string; error?: string }> {
+  try {
+    const mm = await createMindMap(title || "Untitled Map");
+    revalidatePath("/workspace");
+    return { id: mm.id };
+  } catch (err) {
+    return {
+      id: "",
+      error: err instanceof Error ? err.message : "Failed to create mind map",
+    };
+  }
 }
 
 export async function saveMindMapAction(
   id: string,
   data: { title?: string; nodes?: MindMapNode[]; edges?: MindMapEdge[] },
 ) {
-  const result = await updateMindMap(id, data);
-  if (!result) return { error: "Mind map not found" };
+  try {
+    await updateMindMap(id, data);
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to save mind map",
+    };
+  }
   revalidatePath("/workspace");
   return { success: true };
 }
 
 export async function deleteMindMapAction(id: string) {
-  await deleteMindMap(id);
+  try {
+    await deleteMindMap(id);
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to delete mind map",
+    };
+  }
   revalidatePath("/workspace");
+  return { success: true };
 }

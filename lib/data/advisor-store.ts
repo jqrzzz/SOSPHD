@@ -1,24 +1,20 @@
-/* ─── Advisor Store (Supabase) ─────────────────────────────────────────
- *  Queries phd_notes, phd_tasks, phd_advisor_sessions, phd_advisor_messages.
- *  Falls back to seed data when Supabase is unavailable.
+/* ─── Advisor Store — READ paths ───────────────────────────────────────
+ *  Queries research.{notes, tasks, advisor_sessions, advisor_messages}.
+ *  Falls back to seed data when Supabase is unavailable (with a
+ *  [SOSPHD:DEGRADED] warning so it's not silent).
  *
- *  KNOWN ISSUE — uses the BROWSER Supabase client (via lib/supabase/db).
- *  When called from a server context (which is currently every call
- *  site — verified), auth.getUser() returns null and writes silently
- *  fail. The fix is to migrate write functions to requireAuthOrThrow
- *  from server-auth (as fieldwork-mutations.ts does), then await the
- *  server client at each call site. Tracked as a follow-up; the
- *  existing behavior matches what was on main pre-cleanup.
+ *  Writes live in advisor-mutations.ts (server-only) so importing
+ *  the server Supabase client doesn't pollute the client bundle.
+ *
+ *  Per Phase 3 of audit-action-plan.md, this file is reads-only.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
+import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
 import type {
   ResearchNote,
   ResearchTask,
   TaskStatus,
   AdvisorSession,
-  AdvisorMessage,
-  AdvisorRole,
 } from "./advisor-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────
@@ -154,79 +150,35 @@ const seedSessions: AdvisorSession[] = [
   },
 ];
 
-// ── Notes ────────────────────────────────────────────────────────────
+// ── Notes (reads only — writes in advisor-mutations.ts) ─────────────
 
 export async function getNotes(limit = 10): Promise<ResearchNote[]> {
   const sb = getSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_notes")
+        .schema("research")
+        .from("notes")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(limit);
       if (!error && data) return data as ResearchNote[];
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getNotes", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getNotes",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getNotes", "supabase env vars missing");
   }
   return [...seedNotes]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, limit);
 }
 
-export async function createNote(data: {
-  title?: string | null;
-  content: string;
-  tags?: string[];
-  linked_case_id?: string | null;
-}): Promise<ResearchNote | null> {
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
-
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .from("phd_notes")
-      .insert({
-        user_id: userId,
-        site_id: "site_001",
-        title: data.title ?? null,
-        content: data.content,
-        tags: data.tags ?? [],
-        linked_case_id: data.linked_case_id ?? null,
-      })
-      .select()
-      .single();
-    if (!error && row) return row as ResearchNote;
-  }
-  return null;
-}
-
-export async function updateNote(id: string, data: {
-  title?: string | null;
-  content?: string;
-}): Promise<ResearchNote | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .from("phd_notes")
-      .update(data)
-      .eq("id", id)
-      .select()
-      .single();
-    if (!error && row) return row as ResearchNote;
-  }
-  return null;
-}
-
-export async function deleteNote(id: string): Promise<boolean> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.from("phd_notes").delete().eq("id", id);
-    return !error;
-  }
-  return false;
-}
-
-// ── Tasks ───────────────────────────────────────────────────────────
+// ── Tasks (reads only) ──────────────────────────────────────────────
 
 export async function getTasks(filters?: {
   status?: TaskStatus;
@@ -236,7 +188,8 @@ export async function getTasks(filters?: {
   if (sb) {
     try {
       let query = sb
-        .from("phd_tasks")
+        .schema("research")
+        .from("tasks")
         .select("*")
         .order("priority", { ascending: true })
         .order("created_at", { ascending: false })
@@ -246,7 +199,15 @@ export async function getTasks(filters?: {
 
       const { data, error } = await query;
       if (!error && data) return data as ResearchTask[];
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getTasks", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getTasks",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getTasks", "supabase env vars missing");
   }
 
   let result = [...seedTasks];
@@ -258,165 +219,29 @@ export async function getTasks(filters?: {
   return result.slice(0, filters?.limit ?? 50);
 }
 
-export async function createTask(data: {
-  title: string;
-  description?: string | null;
-  priority?: number;
-  due_date?: string | null;
-  linked_case_id?: string | null;
-}): Promise<ResearchTask | null> {
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
-
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .from("phd_tasks")
-      .insert({
-        user_id: userId,
-        site_id: null,
-        status: "todo",
-        priority: data.priority ?? 2,
-        due_date: data.due_date ?? null,
-        title: data.title,
-        description: data.description ?? null,
-        linked_case_id: data.linked_case_id ?? null,
-      })
-      .select()
-      .single();
-    if (!error && row) return row as ResearchTask;
-  }
-  return null;
-}
-
-export async function updateTaskStatus(id: string, status: TaskStatus): Promise<ResearchTask | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .from("phd_tasks")
-      .update({ status })
-      .eq("id", id)
-      .select()
-      .single();
-    if (!error && row) return row as ResearchTask;
-  }
-  return null;
-}
-
-export async function updateTask(id: string, data: {
-  title?: string;
-  description?: string | null;
-  priority?: number;
-  due_date?: string | null;
-}): Promise<ResearchTask | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .from("phd_tasks")
-      .update(data)
-      .eq("id", id)
-      .select()
-      .single();
-    if (!error && row) return row as ResearchTask;
-  }
-  return null;
-}
-
-export async function deleteTask(id: string): Promise<boolean> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.from("phd_tasks").delete().eq("id", id);
-    return !error;
-  }
-  return false;
-}
-
-// ── Sessions ────────────────────────────────────────────────────────
+// ── Sessions (reads only) ───────────────────────────────────────────
 
 export async function getSessions(): Promise<AdvisorSession[]> {
   const sb = getSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
-        .from("phd_advisor_sessions")
+        .schema("research")
+        .from("advisor_sessions")
         .select("*")
         .order("created_at", { ascending: false });
       if (!error && data) return data as AdvisorSession[];
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getSessions", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getSessions",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getSessions", "supabase env vars missing");
   }
   return [...seedSessions].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
-}
-
-export async function createSession(title?: string): Promise<AdvisorSession | null> {
-  const sb = getSupabase();
-  const userId = await getCurrentUserId();
-
-  if (sb && userId) {
-    const { data: row, error } = await sb
-      .from("phd_advisor_sessions")
-      .insert({
-        user_id: userId,
-        title: title ?? "New Session",
-      })
-      .select()
-      .single();
-    if (!error && row) return row as AdvisorSession;
-  }
-  return null;
-}
-
-export async function getSessionById(id: string): Promise<AdvisorSession | null> {
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      const { data, error } = await sb
-        .from("phd_advisor_sessions")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (!error && data) return data as AdvisorSession;
-    } catch { /* fall through */ }
-  }
-  return seedSessions.find((s) => s.id === id) ?? null;
-}
-
-// ── Messages ────────────────────────────────────────────────────────
-
-export async function getMessagesBySessionId(sessionId: string): Promise<AdvisorMessage[]> {
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      const { data, error } = await sb
-        .from("phd_advisor_messages")
-        .select("*")
-        .eq("session_id", sessionId)
-        .order("created_at", { ascending: true });
-      if (!error && data) return data as AdvisorMessage[];
-    } catch { /* fall through */ }
-  }
-  return [];
-}
-
-export async function addMessage(data: {
-  session_id: string;
-  role: AdvisorRole;
-  content: string;
-  context_snapshot?: Record<string, unknown> | null;
-}): Promise<AdvisorMessage | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data: row, error } = await sb
-      .from("phd_advisor_messages")
-      .insert({
-        session_id: data.session_id,
-        role: data.role,
-        content: data.content,
-        context_snapshot: data.context_snapshot ?? null,
-      })
-      .select()
-      .single();
-    if (!error && row) return row as AdvisorMessage;
-  }
-  return null;
 }

@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { getCases, getEventCountByCaseId } from "@/lib/data/store";
+import { getCases, getEventCountsByCaseIds } from "@/lib/data/store";
 import { SeverityBadge } from "@/components/severity-badge";
 import { StatusBadge } from "@/components/status-badge";
+import { HistoricalCaseBadge } from "@/components/historical-case-badge";
 import { CaseListFilters } from "@/components/case-list-filters";
 import { PageHeader } from "@/components/page-header";
 import { CountUp } from "@/components/motion/count-up";
 import { FadeIn } from "@/components/motion/fade-in";
 import { formatDate } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function CasesPage(props: {
@@ -27,10 +27,7 @@ export default async function CasesPage(props: {
     search: searchQuery,
   });
 
-  const eventCounts = await Promise.all(
-    cases.map((c) => getEventCountByCaseId(c.id)),
-  );
-  const eventCountMap = new Map(cases.map((c, i) => [c.id, eventCounts[i]]));
+  const eventCountMap = await getEventCountsByCaseIds(cases.map((c) => c.id));
 
   const openCount = cases.filter((c) => c.status === "open").length;
   const activeCount = cases.filter((c) => c.status === "active").length;
@@ -41,14 +38,7 @@ export default async function CasesPage(props: {
       <PageHeader
         eyebrow="Operational data"
         title="Cases"
-        description="Every case the operational system has surfaced. Open one to see its event timeline, computed metrics, and AI recommendations."
-        actions={
-          <Button asChild size="sm">
-            <Link href="/cases/new">
-              <span className="mr-1 text-base leading-none">+</span> New case
-            </Link>
-          </Button>
-        }
+        description="Every case SOSCOMMAND has surfaced. Open one to see its event timeline, computed metrics, and AI recommendations. Cases originate in SOSCOMMAND; SOSPHD is read-only."
       />
 
       <div className="flex flex-col gap-5 p-4 sm:p-6">
@@ -125,9 +115,10 @@ export default async function CasesPage(props: {
                   </p>
                 </div>
                 {!statusFilter && !searchQuery && (
-                  <Button asChild size="sm">
-                    <Link href="/cases/new">Create first case</Link>
-                  </Button>
+                  <p className="text-xs text-muted-foreground/80">
+                    Cases originate in SOSCOMMAND. SOSPHD will see them
+                    here as soon as SOSCOMMAND creates the first one.
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -167,12 +158,17 @@ export default async function CasesPage(props: {
                         className="group border-b border-border/30 transition-colors last:border-0 hover:bg-accent/40"
                       >
                         <td className="px-4 py-3">
-                          <Link
-                            href={`/cases/${c.id}`}
-                            className="font-mono text-sm font-medium text-primary underline-offset-4 transition-colors group-hover:underline"
-                          >
-                            {c.patient_ref}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/cases/${c.id}`}
+                              className="font-mono text-sm font-medium text-primary underline-offset-4 transition-colors group-hover:underline"
+                            >
+                              {c.patient_ref}
+                            </Link>
+                            {c.source === "historical" && (
+                              <HistoricalCaseBadge />
+                            )}
+                          </div>
                         </td>
                         <td className="hidden px-4 py-3 sm:table-cell">
                           <SeverityBadge severity={c.severity} />

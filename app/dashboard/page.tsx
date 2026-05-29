@@ -5,7 +5,6 @@ import { DashboardMetricChart } from "@/components/dashboard-metric-chart";
 import { DashboardCaseTable } from "@/components/dashboard-case-table";
 import { DashboardExport } from "@/components/dashboard-export";
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CountUp } from "@/components/motion/count-up";
@@ -42,12 +41,6 @@ const HEALTH_COLORS: Record<string, { text: string; from: string; to: string }> 
     from: "hsl(0 72% 51%)",
     to: "hsl(25 95% 53%)",
   },
-};
-
-const SEVERITY_STYLES: Record<string, string> = {
-  high: "border-red-500/30 bg-red-500/10 text-red-300",
-  medium: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-  low: "border-border bg-muted/30 text-muted-foreground",
 };
 
 const SEVERITY_DOT: Record<string, string> = {
@@ -100,9 +93,9 @@ export default async function DashboardPage() {
                     delay source.
                   </p>
                 </div>
-                <Button asChild size="sm">
-                  <Link href="/cases/new">Create first case</Link>
-                </Button>
+                <p className="text-xs text-muted-foreground/80">
+                  Waiting on SOSCOMMAND to surface cases.
+                </p>
               </CardContent>
             </Card>
           </FadeIn>

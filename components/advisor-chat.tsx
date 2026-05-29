@@ -24,20 +24,27 @@ export function AdvisorChat({ sessionId }: AdvisorChatProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/advisor",
-      prepareSendMessagesRequest: ({ id, messages: msgs }) => ({
-        body: {
-          id,
-          messages: msgs,
-          sessionId,
-        },
+  const { messages, sendMessage, status, error, regenerate, clearError } =
+    useChat({
+      transport: new DefaultChatTransport({
+        api: "/api/advisor",
+        prepareSendMessagesRequest: ({ id, messages: msgs }) => ({
+          body: {
+            id,
+            messages: msgs,
+            sessionId,
+          },
+        }),
       }),
-    }),
-  });
+    });
 
   const isLoading = status === "streaming" || status === "submitted";
+
+  // Surface rate-limit (429) and stream errors. The AI SDK puts the
+  // server's message in error.message; a 429 from gateAIRequest reads
+  // "Rate limit exceeded for AI surface …".
+  const isRateLimited =
+    !!error && /rate limit|too many requests|429/i.test(error.message);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -68,6 +75,10 @@ export function AdvisorChat({ sessionId }: AdvisorChatProps) {
       <ScrollArea className="flex-1">
         <div
           ref={scrollRef}
+          role="log"
+          aria-live="polite"
+          aria-atomic="false"
+          aria-label="Advisor conversation"
           className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8"
         >
           {messages.length === 0 && (
@@ -193,6 +204,45 @@ export function AdvisorChat({ sessionId }: AdvisorChatProps) {
                 <span className="text-xs text-muted-foreground">thinking…</span>
               </div>
             </motion.div>
+          )}
+
+          {error && (
+            <div
+              role="alert"
+              className="flex flex-col gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+            >
+              <span className="font-medium">
+                {isRateLimited
+                  ? "You're sending messages too fast."
+                  : "The advisor couldn't respond."}
+              </span>
+              <span className="text-xs text-red-200/80">
+                {isRateLimited
+                  ? "Rate limit reached. Wait a moment, then retry."
+                  : error.message || "A network or server error occurred."}
+              </span>
+              <div className="mt-1 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 border-red-500/40 bg-transparent text-xs text-red-100 hover:bg-red-500/15"
+                  onClick={() => {
+                    clearError();
+                    regenerate();
+                  }}
+                >
+                  Retry
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs text-red-200/70 hover:text-red-100"
+                  onClick={() => clearError()}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       </ScrollArea>

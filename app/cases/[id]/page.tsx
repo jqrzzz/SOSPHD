@@ -10,6 +10,7 @@ import { computeAllMetrics } from "@/lib/data/metrics";
 import { MetricCard } from "@/components/metric-card";
 import { SeverityBadge } from "@/components/severity-badge";
 import { StatusBadge } from "@/components/status-badge";
+import { HistoricalCaseBadge } from "@/components/historical-case-badge";
 import { CaseTimeline } from "@/components/case-timeline";
 import { CaseMetricTimeline } from "@/components/case-metric-timeline";
 import { EventForm } from "@/components/event-form";
@@ -63,6 +64,7 @@ export default async function CaseDetailPage(props: {
               </h1>
               <SeverityBadge severity={caseData.severity} />
               <StatusBadge status={caseData.status} />
+              {caseData.source === "historical" && <HistoricalCaseBadge />}
             </div>
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
               {caseData.chief_complaint}

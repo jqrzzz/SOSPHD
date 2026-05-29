@@ -9,6 +9,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { createClient } from "@/lib/supabase/server";
+import { withSupabaseRetry } from "./retry";
 import type { Case, CaseEvent, CaseStatus, Severity, Recommendation } from "./types";
 
 async function tryCreateClient() {
@@ -27,36 +28,90 @@ async function tryCreateClient() {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Map operational case_status to SOSPHD's simpler 3-state model */
-function mapStatus(opStatus: string): CaseStatus {
+/**
+ * Map operational `public.cases.status` enum (19 values) to SOSPHD's
+ * 3-state research model. THIS FUNCTION IS THE MEASUREMENT PROJECTION
+ * that determines what "open / active / closed" means for Paper 1
+ * sample counts. Reviewer-defensible only if every operational status
+ * is explicitly handled, not silently bucketed by a `default` clause.
+ *
+ * Rationale per bucket:
+ *  - "open"   = case is in the system but no operational work has
+ *               started or is being actively pursued (intake, awaiting
+ *               info, awaiting authorization, queued for review)
+ *  - "active" = work is actively in progress (triage running, transport
+ *               arranged, treatment underway, generic in_progress)
+ *  - "closed" = terminal state (discharged, billed, claimed, formally
+ *               closed, cancelled, resolved)
+ *
+ * Unknown values from future enum extensions are mapped to "open" with
+ * a `[SOSPHD:UNKNOWN_STATUS]` console.warn so we discover drift before
+ * it corrupts dashboard counts.
+ */
+export function mapStatus(opStatus: string): CaseStatus {
   switch (opStatus) {
+    // Open: intake / awaiting next step
     case "intake":
+    case "pending":
     case "pending_info":
     case "pending_authorization":
+    case "pending_external":
+    case "needs_review":
+    case "verified":
+    case "rejected":
       return "open";
+
+    // Active: work currently happening
     case "active":
+    case "in_progress":
     case "in_treatment":
     case "transport_arranged":
+    case "triage":
       return "active";
+
+    // Closed: terminal
     case "discharged":
+    case "resolved":
     case "billing":
     case "claims":
     case "closed":
     case "cancelled":
       return "closed";
+
     default:
+      console.warn(
+        `[SOSPHD:UNKNOWN_STATUS] Unhandled operational case status: "${opStatus}". Defaulting to "open". Add an explicit case to mapStatus in lib/data/store.ts.`,
+      );
       return "open";
   }
 }
 
-/** Map operational case_priority to SOSPHD severity (1-5) */
-function mapPriority(priority: string): Severity {
+/**
+ * Map operational `public.cases.priority` enum (4 values) to SOSPHD's
+ * Severity scale (1 = lowest, 4 = highest). THIS FUNCTION IS THE
+ * MEASUREMENT PROJECTION for clinical severity in Paper 1. The TS
+ * `Severity` type is `1 | 2 | 3 | 4` to match the operational enum's
+ * cardinality — no synthetic level beyond what operational data
+ * actually carries.
+ *
+ * If a finer-grained severity ever becomes available (e.g. via
+ * `public.cases.acuity_level`), widen this projection then.
+ */
+export function mapPriority(priority: string): Severity {
   switch (priority) {
-    case "low": return 1;
-    case "normal": return 2;
-    case "high": return 3;
-    case "critical": return 4;
-    default: return 2;
+    case "low":
+      return 1;
+    case "normal":
+      return 2;
+    case "high":
+      return 3;
+    case "critical":
+      return 4;
+    default:
+      console.warn(
+        `[SOSPHD:UNKNOWN_PRIORITY] Unhandled operational case priority: "${priority}". Defaulting to 2 (normal). Add an explicit case to mapPriority in lib/data/store.ts.`,
+      );
+      return 2;
   }
 }
 
@@ -72,34 +127,134 @@ function toCase(row: Record<string, unknown>): Case {
     chief_complaint: (row.incident_description as string) ?? "",
     patient_ref: (patient?.medical_id as string) ?? (row.case_number as string) ?? "Unknown",
     notes: (row.notes as string) ?? "",
+    source: "operational",
+  };
+}
+
+/**
+ * Map a research.cases row → the shared Case type. Unlike toCase (which
+ * projects the operational public.cases schema), research.cases already
+ * stores the research model: status is open/active/closed, severity is
+ * 1–4, and there is no raw PHI — patient_ref is the pseudonym. See
+ * docs/backfill-plan.md.
+ */
+export function toResearchCase(row: Record<string, unknown>): Case {
+  const sev = row.severity as number | null;
+  return {
+    id: row.id as string,
+    site_id: (row.country as string) ?? "unknown",
+    created_at: row.created_at as string,
+    status: (row.status as CaseStatus) ?? "closed",
+    severity: (sev && sev >= 1 && sev <= 4 ? sev : 2) as Severity,
+    chief_complaint: (row.incident_summary as string) ?? "",
+    patient_ref: (row.patient_ref as string) ?? "Unknown",
+    notes: "",
+    source: "historical",
   };
 }
 
 // ── Query functions ─────────────────────────────────────────────────
 
-export async function getCases(filters?: {
-  status?: CaseStatus;
-  search?: string;
-}): Promise<Case[]> {
+// Explicit column projection — matches the fields toCase() reads.
+// `public.cases` has ~40 columns; selecting "*" pulls every one across
+// the wire (including PHI-adjacent fields SOSPHD has no business
+// touching). Keep this list minimal and document additions.
+const CASE_COLUMNS =
+  "id, case_number, patient_id, status, priority, country, incident_description, notes, created_at, patients(full_name, medical_id)";
+
+// Inverse of mapStatus — given a research bucket, the set of
+// operational statuses that project into it. Used to push the status
+// filter to the database so we don't transfer rows we'll discard.
+// Keep this in lockstep with mapStatus.
+export const OP_STATUSES_BY_RESEARCH_BUCKET: Record<CaseStatus, string[]> = {
+  open: [
+    "intake",
+    "pending",
+    "pending_info",
+    "pending_authorization",
+    "pending_external",
+    "needs_review",
+    "verified",
+    "rejected",
+  ],
+  active: [
+    "active",
+    "in_progress",
+    "in_treatment",
+    "transport_arranged",
+    "triage",
+  ],
+  closed: ["discharged", "resolved", "billing", "claims", "closed", "cancelled"],
+};
+
+/** Operational cases projected from public.cases (live SOSCOMMAND data). */
+async function getOperationalCases(
+  statusFilter?: CaseStatus,
+): Promise<Case[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
 
-  const query = supabase
-    .from("cases")
-    .select("*, patients(full_name, medical_id)")
-    .order("created_at", { ascending: false });
-
-  // We filter in JS since operational statuses don't map 1:1
-  const { data, error } = await query;
+  // Wrap in retry — buildContextSnapshot/buildPaperContext depend on
+  // this read and a transient blip would corrupt the AI context.
+  const { data, error } = await withSupabaseRetry(() => {
+    let query = supabase
+      .from("cases")
+      .select(CASE_COLUMNS)
+      .order("created_at", { ascending: false });
+    if (statusFilter) {
+      query = query.in("status", OP_STATUSES_BY_RESEARCH_BUCKET[statusFilter]);
+    }
+    return query;
+  }, "getOperationalCases");
   if (error || !data) return [];
+  return data.map(toCase);
+}
 
-  let result = data.map(toCase);
+/**
+ * Research-native cases from research.cases (historical backfill +
+ * future prospective research cases). Status is already the research
+ * model, so the filter pushes down directly. See docs/backfill-plan.md.
+ */
+export async function getResearchCases(
+  statusFilter?: CaseStatus,
+): Promise<Case[]> {
+  const supabase = await tryCreateClient();
+  if (!supabase) return [];
+  const { data, error } = await withSupabaseRetry(() => {
+    let query = supabase
+      .schema("research")
+      .from("cases")
+      .select(
+        "id, status, severity, country, incident_summary, patient_ref, created_at",
+      )
+      .order("created_at", { ascending: false });
+    if (statusFilter) {
+      query = query.eq("status", statusFilter);
+    }
+    return query;
+  }, "getResearchCases");
+  if (error || !data) return [];
+  return data.map((row) => toResearchCase(row as Record<string, unknown>));
+}
 
-  if (filters?.status) {
-    result = result.filter((c) => c.status === filters.status);
-  }
-  if (filters?.search) {
-    const q = filters.search.toLowerCase();
+/**
+ * Pure merge of operational + research case lists: concatenate, sort
+ * newest-first, then apply the free-text search over patient_ref +
+ * chief_complaint. Extracted from getCases so the merge/sort/search
+ * logic is unit-testable without a database.
+ */
+export function mergeAndFilterCases(
+  operational: Case[],
+  research: Case[],
+  search?: string,
+): Case[] {
+  let result = [...operational, ...research].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+
+  if (search) {
+    const q = search.toLowerCase();
     result = result.filter(
       (c) =>
         c.patient_ref.toLowerCase().includes(q) ||
@@ -110,57 +265,59 @@ export async function getCases(filters?: {
   return result;
 }
 
+/**
+ * Unified case list: operational (public.cases) ∪ research-native
+ * (research.cases), newest first. The analytics layer and dashboards
+ * call this, so backfilled historical cases become first-class
+ * everywhere without those call sites changing.
+ */
+export async function getCases(filters?: {
+  status?: CaseStatus;
+  search?: string;
+}): Promise<Case[]> {
+  const [operational, research] = await Promise.all([
+    getOperationalCases(filters?.status),
+    getResearchCases(filters?.status),
+  ]);
+  return mergeAndFilterCases(operational, research, filters?.search);
+}
+
 export async function getCaseById(id: string): Promise<Case | undefined> {
   const supabase = await tryCreateClient();
   if (!supabase) return undefined;
-  const { data, error } = await supabase
-    .from("cases")
-    .select("*, patients(full_name, medical_id)")
-    .eq("id", id)
-    .single();
 
-  if (error || !data) return undefined;
-  return toCase(data);
+  // Operational first (the common case), then research-native.
+  const { data, error } = await withSupabaseRetry(
+    () =>
+      supabase.from("cases").select(CASE_COLUMNS).eq("id", id).maybeSingle(),
+    "getCaseById",
+  );
+  if (!error && data) return toCase(data);
+
+  const { data: rData, error: rErr } = await withSupabaseRetry(
+    () =>
+      supabase
+        .schema("research")
+        .from("cases")
+        .select(
+          "id, status, severity, country, incident_summary, patient_ref, created_at",
+        )
+        .eq("id", id)
+        .maybeSingle(),
+    "getCaseById.research",
+  );
+  if (!rErr && rData) return toResearchCase(rData as Record<string, unknown>);
+
+  return undefined;
 }
 
-export async function createCase(data: {
-  severity: Severity;
-  chief_complaint: string;
-  patient_ref: string;
-  notes: string;
-}): Promise<Case> {
-  // Creating a case in the operational system is complex (requires patient_id, etc.)
-  // For the research layer, we create a minimal case entry.
-  // In production, cases originate from SOSCOMMAND — SOSPHD is read-mostly.
-  const supabase = await tryCreateClient();
-  if (!supabase) {
-    throw new Error("Supabase is not configured. Cannot create case.");
-  }
-  // Time-ordered prefix + 4-char random suffix so two creates in the
-  // same millisecond don't collide. ~1 in 1.6M collision per ms-bucket.
-  const millis = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  const caseNumber = `SOS-${millis}-${random}`;
-
-  const { data: newCase, error } = await supabase
-    .from("cases")
-    .insert({
-      case_number: caseNumber,
-      patient_id: "00000000-0000-0000-0000-000000000000", // placeholder
-      status: "intake",
-      priority: data.severity >= 4 ? "critical" : data.severity >= 3 ? "high" : "normal",
-      incident_description: data.chief_complaint,
-      notes: data.notes,
-    })
-    .select("*, patients(full_name, medical_id)")
-    .single();
-
-  if (error || !newCase) {
-    throw new Error(`Failed to create case: ${error?.message}`);
-  }
-
-  return toCase(newCase);
-}
+// Per docs/audit-action-plan.md Decision C: SOSPHD does not create
+// cases. Cases originate in SOSCOMMAND; SOSPHD reads them via the
+// public.cases table. The former createCase function inserted a
+// placeholder patient_id that violated the FK to public.patients
+// (ON DELETE RESTRICT) and would have polluted SOSCOMMAND's
+// operational table with phantom-patient cases if the FK hadn't
+// blocked it. Function removed.
 
 // ── Events (research schema) ────────────────────────────────────────
 
@@ -168,23 +325,20 @@ export async function getEventsByCaseId(caseId: string): Promise<CaseEvent[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
 
-  // Materialize any new SOSCOMMAND timestamps before reading. Idempotent
-  // and best-effort: if the sync fails, we still return the events we
-  // have. This is what makes Paper 1's TTTA/TTGP/TTDC numbers come
-  // from operational reality rather than operator data entry.
-  try {
-    const { syncCaseFromOperational } = await import("./sync");
-    await syncCaseFromOperational(caseId);
-  } catch {
-    // Sync failure should never block reading existing events.
-  }
-
-  const { data, error } = await supabase
-    .schema("research")
-    .from("case_events")
-    .select("*")
-    .eq("case_id", caseId)
-    .order("occurred_at", { ascending: true });
+  // SOSCOMMAND → research event materialization is handled by DB
+  // triggers (migrations 003 + 006), not application code. Events
+  // appear in research.case_events the moment SOSCOMMAND writes to
+  // the operational tables. See docs/audit-action-plan.md Decision B.
+  const { data, error } = await withSupabaseRetry(
+    () =>
+      supabase
+        .schema("research")
+        .from("case_events")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("occurred_at", { ascending: true }),
+    "getEventsByCaseId",
+  );
 
   if (error || !data) return [];
 
@@ -284,15 +438,17 @@ export async function getAllRecommendations(
 ): Promise<Recommendation[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
-  let query = supabase
-    .schema("research")
-    .from("recommendations")
-    .select("*")
-    .order("created_at", { ascending: true });
-  if (caseIds && caseIds.length > 0) {
-    query = query.in("case_id", caseIds);
-  }
-  const { data, error } = await query;
+  const { data, error } = await withSupabaseRetry(() => {
+    let query = supabase
+      .schema("research")
+      .from("recommendations")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (caseIds && caseIds.length > 0) {
+      query = query.in("case_id", caseIds);
+    }
+    return query;
+  }, "getAllRecommendations");
   if (error || !data) return [];
   return data.map((row) => toRecommendation(row as Record<string, unknown>));
 }
@@ -307,15 +463,17 @@ export async function getAllCaseEvents(
 ): Promise<CaseEvent[]> {
   const supabase = await tryCreateClient();
   if (!supabase) return [];
-  let query = supabase
-    .schema("research")
-    .from("case_events")
-    .select("*")
-    .order("occurred_at", { ascending: true });
-  if (caseIds && caseIds.length > 0) {
-    query = query.in("case_id", caseIds);
-  }
-  const { data, error } = await query;
+  const { data, error } = await withSupabaseRetry(() => {
+    let query = supabase
+      .schema("research")
+      .from("case_events")
+      .select("*")
+      .order("occurred_at", { ascending: true });
+    if (caseIds && caseIds.length > 0) {
+      query = query.in("case_id", caseIds);
+    }
+    return query;
+  }, "getAllCaseEvents");
   if (error || !data) return [];
   return data.map((row) => ({
     id: row.id as string,
@@ -633,4 +791,32 @@ export async function getEventCountByCaseId(caseId: string): Promise<number> {
 
   if (error) return 0;
   return count ?? 0;
+}
+
+/**
+ * Single-roundtrip event counts for a set of cases. Replaces the
+ * N+1 anti-pattern of `Promise.all(cases.map(c => getEventCountByCaseId(c.id)))`
+ * on the cases list page: one case_id projection query, grouped in memory.
+ *
+ * For N cases this collapses N count queries into one bulk fetch.
+ * Empty input array short-circuits to an empty Map without a network call.
+ */
+export async function getEventCountsByCaseIds(
+  caseIds: string[],
+): Promise<Map<string, number>> {
+  if (caseIds.length === 0) return new Map();
+  const supabase = await tryCreateClient();
+  if (!supabase) return new Map();
+  const { data, error } = await supabase
+    .schema("research")
+    .from("case_events")
+    .select("case_id")
+    .in("case_id", caseIds);
+  if (error || !data) return new Map();
+  const counts = new Map<string, number>();
+  for (const row of data) {
+    const id = row.case_id as string;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }

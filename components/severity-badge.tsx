@@ -11,21 +11,16 @@ const SEVERITY_CONFIG: Record<
     glow: "shadow-[0_0_8px_0_hsl(142_71%_45%/0.35)] bg-emerald-400",
   },
   2: {
-    label: "Moderate",
+    label: "Normal",
     className: "border-teal-500/30 bg-teal-500/10 text-teal-300",
     glow: "shadow-[0_0_8px_0_hsl(170_60%_45%/0.35)] bg-teal-400",
   },
   3: {
-    label: "Elevated",
+    label: "High",
     className: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-    glow: "shadow-[0_0_8px_0_hsl(38_92%_50%/0.4)] bg-amber-400",
+    glow: "shadow-[0_0_10px_0_hsl(38_92%_50%/0.4)] bg-amber-400",
   },
   4: {
-    label: "High",
-    className: "border-orange-500/30 bg-orange-500/10 text-orange-300",
-    glow: "shadow-[0_0_10px_0_hsl(25_95%_53%/0.45)] bg-orange-400",
-  },
-  5: {
     label: "Critical",
     className: "border-red-500/30 bg-red-500/10 text-red-300",
     glow: "shadow-[0_0_12px_0_hsl(0_72%_51%/0.55)] bg-red-400",

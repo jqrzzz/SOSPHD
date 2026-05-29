@@ -18,41 +18,50 @@ This repo shares a **Supabase database** with 5 other projects:
 | SOSCOMMAND | jqrzzz/soscommand | Operations command center | cases, claims, providers, payers, partners, invoices, payments, teams, agreements, certifications |
 | SOSPRO | jqrzzz/sospro | Professional/clinic tools | clinic-related tables |
 | SOSSAFE | jqrzzz/sossafe | Insurance / payment | insurance/payment tables |
-| **SOSPHD** | jqrzzz/sosphd | **This repo** — PhD research | `phd_*` prefixed tables ONLY |
+| **SOSPHD** | jqrzzz/sosphd | **This repo** — PhD research | The `research.*` schema ONLY |
 
 ### CRITICAL: Database Boundaries
 
-- **SOSPHD owns ONLY `phd_*` tables.** Never create, modify, or delete any other table.
-- **SOSPHD may READ from other tables** (e.g. `cases`, `profiles`) for research analysis, but never write to them.
+- **SOSPHD owns ONLY the `research.*` schema.** Never create, modify, or delete any table outside it.
+- **SOSPHD may READ from `public.*` tables** (e.g. `cases`, `case_status_history`, `case_transport`, `guarantees_of_payment`) for research analysis, but never write to them.
+- **SOSPHD does NOT create cases.** Cases originate in SOSCOMMAND; SOSPHD is read-only against operational tables. See `docs/audit-action-plan.md` Decision C.
 - **SOSCOMMAND is the operational core** — it owns cases, claims, providers, payers, billing, and team management.
 - **SOSTRAVEL owns patient-facing data** — medical profiles, health records, emergency cases, AI chat, facility directory.
 - All projects share `auth.users` and `profiles` for authentication.
 - Super admin: `juanquirozjr@gmail.com`
 
+### Migration history
+
+The legacy `public.phd_*` schema (migration 001) was **never applied** to the live DB and has been removed from the repo. Earlier versions of this doc and the codebase mentioned phd_* tables; those are historical and all data now lives in `research.*`.
+
 ## Supabase
 
 - **Project ref**: `jnbxkvlkqmwnqlmetknj`
 - **URL**: `https://jnbxkvlkqmwnqlmetknj.supabase.co`
-- **MCP connector**: "SOS SUPABASE" (configured in Claude account-level settings)
+- **MCP connector**: "SOS SUPABASE" (configured in Claude account-level settings). ⚠️ **More than one Supabase MCP connector may be configured. Before any `apply_migration` / `execute_sql`, confirm `get_project_url` returns `jnbxkvlkqmwnqlmetknj.supabase.co` — another connector points at a different SOS project and applying SOSPHD migrations there would corrupt the wrong database.**
 - **Credentials**: in `.env.local` (gitignored)
-- **SOSPHD tables**: all prefixed `phd_*` — see `supabase/migrations/001_initial_schema.sql`
-- **RLS**: enabled on all tables, scoped to `auth.uid()`
+- **SOSPHD tables**: all in the `research` schema — see `supabase/migrations/20260516_004_research_schema_snapshot.sql` (core) + `20260519_007_research_journal_contacts_protocols.sql` (fieldwork) + `20260528_008_research_cases_allowlist.sql` (case dimension + allowlist)
+- **RLS**: enabled on all tables. User-scoped tables use `auth.uid() = user_id`; the shared research spine (`case_events`, `recommendations`, `cases`) is gated by the `research.allowed_users` allowlist via `research.is_allowed_user()` (SD-001).
 
-### SOSPHD Tables (phd_* prefix)
+### SOSPHD Tables (`research.*` schema)
 
 | Table | Purpose |
 |-------|---------|
-| `phd_journal_entries` | Field observations, conversations, site visits |
-| `phd_contacts` | Research network (doctors, fixers, academics) |
-| `phd_protocols` | Field visit checklists (templates + active) |
-| `phd_mind_maps` | Visual research mapping (nodes + edges as JSONB) |
-| `phd_uploads` | File metadata for research documents |
-| `phd_notes` | Quick research notes |
-| `phd_tasks` | Research task tracking |
-| `phd_advisor_sessions` | AI advisor chat sessions |
-| `phd_advisor_messages` | Chat messages with context snapshots |
-| `phd_docs` | Research papers, field logs, methods docs |
-| `phd_doc_versions` | Document version history |
+| `research.cases` | SOSPHD-owned case dimension — historical backfill + research-native cases (de-identified). Unified with `public.cases` in the read layer. |
+| `research.case_events` | The provenance spine — operational milestones |
+| `research.recommendations` | AI recommendations + operator decisions (Paper 2 core) |
+| `research.allowed_users` | SD-001 allowlist gating the shared research spine |
+| `research.journal_entries` | Field observations, conversations, site visits |
+| `research.contacts` | Research network (doctors, fixers, academics) |
+| `research.protocols` | Field visit checklists (templates + active) |
+| `research.mind_maps` | Visual research mapping (nodes + edges as JSONB) |
+| `research.uploads` | File metadata for research documents |
+| `research.notes` | Quick research notes |
+| `research.tasks` | Research task tracking |
+| `research.advisor_sessions` | AI advisor chat sessions |
+| `research.advisor_messages` | Chat messages with context snapshots |
+| `research.docs` | Research papers, field logs, methods docs |
+| `research.doc_versions` | Document version history |
 
 ## Tech Stack
 
@@ -64,10 +73,11 @@ This repo shares a **Supabase database** with 5 other projects:
 
 ## Key Architecture
 
-- **In-memory stores** (`lib/data/*-store.ts`) — designed to swap for Supabase. Each store has seed data for local dev and exports functions with signatures that map 1:1 to Supabase queries.
-- **Server actions** (`lib/*-actions.ts`) — zod-validated, call store functions, revalidate paths.
+- **Read paths** (`lib/data/*-store.ts`) — typed wrappers over Supabase queries. Seed-data fallback in dev with `[SOSPHD:DEGRADED]` warnings.
+- **Write paths** (`lib/data/*-mutations.ts`) — server-only mutation files. All use `requireAuthOrThrow` from `lib/data/server-auth.ts`; errors are thrown loudly (no silent failure).
+- **Server actions** (`lib/*-actions.ts`) — zod-validated, call mutation functions, revalidate paths. Return `{ error }` envelopes on failure.
 - **Config** (`lib/config.ts`) — single source of truth for owner, corridors, thesis, app metadata.
-- **Auth** (`lib/auth.ts`) — resolves real Supabase user, falls back to config for local dev.
+- **Auth** — server-side via `lib/data/server-auth.ts:requireAuthOrThrow` (used by mutations). Browser-side via `lib/supabase/db.ts:getCurrentUserId`. Middleware in `middleware.ts` handles route protection.
 
 ## App Pages
 
@@ -102,7 +112,7 @@ This repo shares a **Supabase database** with 5 other projects:
 - **No overbuilding** — each SOS project does its own job. SOSPHD handles research only.
 - **Clean, cohesive design** — match Tourist SOS brand, teal accents, dark mode.
 - **No errors, no complexity** — keep it simple and functional.
-- **Respect the shared database** — use `phd_` prefix, never modify other projects' tables.
+- **Respect the shared database** — only write to the `research.*` schema, never modify other projects' tables.
 - **Read-only access to operational data** — SOSPHD can read from other projects' tables for research but never writes to them. Key data sources:
   - SOSPRO: `cases` (status pipeline, gop_status), `case_activities` (timestamped audit log), `transfers` (picked_up_at, delivered_at) — clinic/transport-level metrics
   - SOSWEBSITE: `cases`, `case_status_history` (full audit trail), `case_episodes` (treatment events with timestamps), `guarantees_of_payment`, `insurer_interactions`, `providers`, `payers`, `patients` — the 39-table core operational schema and primary data source for TTTA/TTGP/TTDC

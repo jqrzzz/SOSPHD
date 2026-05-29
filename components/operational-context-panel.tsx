@@ -18,7 +18,7 @@ import type {
  * coherent with operational truth.
  *
  * If a case has no operational data at all (e.g. research-only test
- * cases created via /cases/new), the panel collapses to an empty
+ * cases SOSCOMMAND hasn't touched yet), the panel collapses to an empty
  * state and surfaces nothing else.
  */
 export function OperationalContextPanel({ ctx }: { ctx: OperationalContext }) {
