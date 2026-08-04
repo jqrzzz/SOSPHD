@@ -1,5 +1,15 @@
 # SOSSAFE — Claude Code Context
 
+> ⚠️ **DATED SNAPSHOT — not the source of truth.**
+> This is a frozen copy of another repository's `CLAUDE.md`, kept so SOSPHD can
+> reason about its data sources offline. It drifts the moment that repo changes,
+> and it has: audited 2026-08-04 and found describing a homepage and product
+> names that were retired months earlier. Treat it as orientation only — for
+> anything load-bearing (table names, ownership, schema), read the live
+> `CLAUDE.md` in **SOSSAFE** itself.
+>
+> Snapshot last reconciled: never. Audited: 2026-08-04.
+
 ## What This Is
 
 Insurance and payment tools within the **Tourist SOS ecosystem** (tourist-sos.com). Handles insurance verification, payment processing, claims interfaces, and financial safety nets for tourists.

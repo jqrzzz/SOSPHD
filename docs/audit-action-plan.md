@@ -1,9 +1,50 @@
 # SOSPHD Audit — Phased Action Plan
 
-> Companion to [`docs/agent-strategy.md`](./agent-strategy.md). The strategy doc is the long arc (Paper 2 → credentialed agent → revenue). This plan is the cleanup that has to happen first so the rest of the story is honest.
+> ## ✅ RESOLVED — all four decisions taken, Phase 1 shipped
+>
+> **Closed 2026-08-04.** Every decision below was answered with the recommended
+> option and the work landed. The `Your decision: ____` blanks further down were
+> never filled in, so for two months this document has described a repository
+> that no longer exists — read cold, it says almost nothing works, which is
+> false. **The analysis is kept for its reasoning; the state it describes is
+> historical.**
+>
+> Verified against the tree on 2026-08-04, not assumed:
+>
+> | Decision | Taken | Evidence in the code today |
+> |---|---|---|
+> | **A** — schema home | Option 2 · migrate to `research.*` | zero `phd_` references in `lib/` or `app/`; migrations 002–008 are all `research.*` |
+> | **B** — triggers vs app sync | Option 1 · DB triggers only | `lib/data/sync.ts` deleted; `SyncOperationalButton` deleted; migration 006 added dedup + triage |
+> | **C** — `createCase` direction | Option 1 · delete it | no `createCase` in `lib/`; no `app/cases/new` route |
+> | **D** — geographic scope | Option 1 · Thailand | `lib/data/phd-spine.ts` carries Samui / Phuket / Chiang Mai / Pattaya / Krabi / Bangkok; no Indonesian sites remain |
+>
+> Also shipped from Phase 1: the `intake_at` → `intake_date` bug is gone (zero
+> occurrences), and migrations 007–008 added the journal / contacts / protocols
+> tables plus the `research.allowed_users` allowlist (SD-001) the plan called for.
+>
+> Health at close: 95 tests passing across 8 files · typecheck clean · build
+> clean (29 pages) · lint 0 errors, 3 warnings.
+>
+> **One caveat that has NOT been retired.** This plan's core warning was that the
+> bugs were dormant because the research schema held no data — *"they activate
+> the moment data appears."* The wiring is fixed, but if `research.*` is still
+> empty then none of it has been exercised against real rows. Confirm before
+> trusting the pipeline under load.
 
 **Audit date**: 2026-05-19
 **Audit coverage**: 7 of 17 sections deep-reviewed before stopping. We have enough to act on; the remaining sections (UI pages, components, hooks, tests, docs) would mostly surface issues that cascade from the data-layer problems below.
+
+> **Dead link on `main` — but the file exists.** This document opens by citing
+> `docs/agent-strategy.md` as its companion (the long arc: Paper 2 →
+> credentialed agent → revenue). It is not on `main`, which is why the link
+> 404s. It was never lost: it lives on the unmerged branch
+> **`claude/agent-strategy-plan`** (`29f779e`, 2026-05-18, 181 lines) and is a
+> real document — 12-month and 24–36-month outcomes, an MCP-registered
+> callable agent, provenance receipts, x402 per-call billing.
+>
+> So the strategy this plan defers to was written, reviewed by nobody, and left
+> on a branch. **Merge that branch or the link stays broken** — and Phase 7
+> below, which sequences directly off it, has no readable source on `main`.
 
 ---
 
@@ -175,7 +216,12 @@ Low-risk cleanup so the codebase doesn't accumulate fossils:
 
 ### Phase 7 — Agent-economy foundation (4–8 weeks · the long arc)
 
-This is what [`docs/agent-strategy.md`](./agent-strategy.md) lays out as **Phase 1 of that doc**: service tokens, provenance receipts, PHI redaction, MCP wrap, agent-card. **Do not start until Phases 1–4 of THIS plan are done.** External agents calling a broken data layer is worse than no external agents.
+This is what `docs/agent-strategy.md` lays out as **Phase 1 of that doc**: service tokens, provenance receipts, PHI redaction, MCP wrap, agent-card. **Do not start until Phases 1–4 of THIS plan are done.** External agents calling a broken data layer is worse than no external agents.
+
+> The link here was live markdown pointing at a path that does not resolve on
+> `main`. Reduced to plain text so it stops reading as a file you can open. The
+> document itself is on the unmerged `claude/agent-strategy-plan` branch (see
+> the note at the top) — re-link it the moment that branch lands.
 
 The strategy doc is the canonical reference. This audit doesn't change its content — it just adds the prerequisite that the data layer be sound first.
 

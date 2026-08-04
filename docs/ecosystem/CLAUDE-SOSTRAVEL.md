@@ -1,8 +1,18 @@
 # SOSTRAVEL — Claude Code Context
 
+> ⚠️ **DATED SNAPSHOT — not the source of truth.**
+> This is a frozen copy of another repository's `CLAUDE.md`, kept so SOSPHD can
+> reason about its data sources offline. It drifts the moment that repo changes,
+> and it has: audited 2026-08-04 and found describing a homepage and product
+> names that were retired months earlier. Treat it as orientation only — for
+> anything load-bearing (table names, ownership, schema), read the live
+> `CLAUDE.md` in **SOSTRAVEL** itself.
+>
+> Snapshot last reconciled: never. Audited: 2026-08-04.
+
 ## What This Is
 
-Travel health and safety tools for tourists within the **Tourist SOS ecosystem** (tourist-sos.com). Manages medical profiles, health records, emergency cases, AI health chat (SOSA), facility directory, and WhatsApp integration.
+Travel health and safety tools for tourists within the **Tourist SOS ecosystem** (tourist-sos.com). Manages medical profiles, health records, emergency cases, AI health chat (Terra), facility directory, and WhatsApp integration.
 
 **Owner**: Juan Quiroz Jr. (juanquirozjr@gmail.com)
 
@@ -36,7 +46,7 @@ This project owns the patient-facing data tables:
 - `insurance_policies` — coverage information
 - `documents`, `health_records`, `health_record_documents` — medical documents
 - `emergency_cases`, `emergency_responders` — active incidents
-- `chat_sessions`, `chat_messages` — SOSA AI assistant
+- `chat_sessions`, `chat_messages` — Terra AI assistant
 - `photo_analyses` — AI medical image assessment
 - `facilities`, `facility_visits` — hospital/clinic directory
 - `whatsapp_sessions` — OpenClaw WhatsApp integration

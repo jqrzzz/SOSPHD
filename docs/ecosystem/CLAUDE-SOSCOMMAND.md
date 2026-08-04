@@ -1,5 +1,15 @@
 # SOSCOMMAND — Claude Code Context
 
+> ⚠️ **DATED SNAPSHOT — not the source of truth.**
+> This is a frozen copy of another repository's `CLAUDE.md`, kept so SOSPHD can
+> reason about its data sources offline. It drifts the moment that repo changes,
+> and it has: audited 2026-08-04 and found describing a homepage and product
+> names that were retired months earlier. Treat it as orientation only — for
+> anything load-bearing (table names, ownership, schema), read the live
+> `CLAUDE.md` in **SOSCOMMAND** itself.
+>
+> Snapshot last reconciled: never. Audited: 2026-08-04.
+
 ## What This Is
 
 The internal operations command center for **Tourist SOS** (tourist-sos.com). Manages emergency cases, insurance verification (Stedi EDI), claims processing, guarantees of payment, medical transport coordination, and provider/insurer relationships. This is the operational core of the ecosystem.
