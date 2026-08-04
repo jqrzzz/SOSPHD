@@ -1,8 +1,18 @@
 # SOSWEBSITE — Claude Code Context
 
+> ⚠️ **DATED SNAPSHOT — not the source of truth.**
+> This is a frozen copy of another repository's `CLAUDE.md`, kept so SOSPHD can
+> reason about its data sources offline. It drifts the moment that repo changes,
+> and it has: audited 2026-08-04 and found describing a homepage and product
+> names that were retired months earlier. Treat it as orientation only — for
+> anything load-bearing (table names, ownership, schema), read the live
+> `CLAUDE.md` in **SOSWEBSITE** itself.
+>
+> Snapshot last reconciled: never. Audited: 2026-08-04.
+
 ## What This Is
 
-The public-facing website (tourist-sos.com) AND the operational console for **Tourist SOS**. Serves two audiences: public visitors (marketing pages) and internal staff (auth-protected `/console` with case management, intake, and the SOSA AI front-door chatbot).
+The public-facing website (tourist-sos.com) AND the operational console for **Tourist SOS**. Serves two audiences: public visitors — marketing pages plus the Terra globe homepage and its front-door chat, with the earlier chat-first home preserved at `/classic` — and internal staff, via the auth-protected `/console` for case management and intake.
 
 **Owner**: Juan Quiroz Jr. (juanquirozjr@gmail.com)
 
@@ -51,7 +61,7 @@ This repo connects to a **shared Supabase instance** used by 6 projects:
 **Phase 8 — Financials**:
 `invoices`, `claims`, `payments`, `receivables`, `guarantees_of_payment`
 
-**Additional**: `inquiries` (SOSA AI chatbot intake queue)
+**Additional**: `inquiries` (Terra front-door chat intake queue)
 
 ### CRITICAL: Database Boundaries
 

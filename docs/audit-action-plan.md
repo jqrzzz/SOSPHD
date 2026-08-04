@@ -1,9 +1,47 @@
 # SOSPHD Audit — Phased Action Plan
 
-> Companion to [`docs/agent-strategy.md`](./agent-strategy.md). The strategy doc is the long arc (Paper 2 → credentialed agent → revenue). This plan is the cleanup that has to happen first so the rest of the story is honest.
+> ## ✅ RESOLVED — all four decisions taken, Phase 1 shipped
+>
+> **Closed 2026-08-04.** Every decision below was answered with the recommended
+> option and the work landed. The `Your decision: ____` blanks further down were
+> never filled in, so for two months this document has described a repository
+> that no longer exists — read cold, it says almost nothing works, which is
+> false. **The analysis is kept for its reasoning; the state it describes is
+> historical.**
+>
+> Verified against the tree on 2026-08-04, not assumed:
+>
+> | Decision | Taken | Evidence in the code today |
+> |---|---|---|
+> | **A** — schema home | Option 2 · migrate to `research.*` | zero `phd_` references in `lib/` or `app/`; migrations 002–008 are all `research.*` |
+> | **B** — triggers vs app sync | Option 1 · DB triggers only | `lib/data/sync.ts` deleted; `SyncOperationalButton` deleted; migration 006 added dedup + triage |
+> | **C** — `createCase` direction | Option 1 · delete it | no `createCase` in `lib/`; no `app/cases/new` route |
+> | **D** — geographic scope | Option 1 · Thailand | `lib/data/phd-spine.ts` carries Samui / Phuket / Chiang Mai / Pattaya / Krabi / Bangkok; no Indonesian sites remain |
+>
+> Also shipped from Phase 1: the `intake_at` → `intake_date` bug is gone (zero
+> occurrences), and migrations 007–008 added the journal / contacts / protocols
+> tables plus the `research.allowed_users` allowlist (SD-001) the plan called for.
+>
+> Health at close: 95 tests passing across 8 files · typecheck clean · build
+> clean (29 pages) · lint 0 errors, 3 warnings.
+>
+> **One caveat that has NOT been retired.** This plan's core warning was that the
+> bugs were dormant because the research schema held no data — *"they activate
+> the moment data appears."* The wiring is fixed, but if `research.*` is still
+> empty then none of it has been exercised against real rows. Confirm before
+> trusting the pipeline under load.
 
 **Audit date**: 2026-05-19
 **Audit coverage**: 7 of 17 sections deep-reviewed before stopping. We have enough to act on; the remaining sections (UI pages, components, hooks, tests, docs) would mostly surface issues that cascade from the data-layer problems below.
+
+> **Companion doc — resolved.** This document opens by citing
+> [`docs/agent-strategy.md`](./agent-strategy.md) (the long arc: Paper 2 →
+> credentialed agent → revenue). That link was dead for two and a half months:
+> the file had been written on 2026-05-18 and left on an unmerged branch, so
+> `main` never had it while this plan kept deferring to it — including Phase 7
+> below, which sequences directly off it.
+>
+> It landed with this change. The link works again.
 
 ---
 

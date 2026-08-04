@@ -17,22 +17,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # This repo ships pnpm-lock.yaml and no package-lock.json. CI previously
+      # ran `npm install --legacy-peer-deps`, which ignored the committed
+      # lockfile entirely and re-resolved the whole dependency tree on every
+      # run — so CI was never testing the versions a developer has, `cache: npm`
+      # had no lockfile to key on and cached nothing, and --legacy-peer-deps
+      # silently swallowed a real peer conflict rather than surfacing it.
+      #
+      # pnpm + --frozen-lockfile fixes all three: identical tree everywhere,
+      # a working cache, and the build fails loudly if the lockfile and
+      # package.json ever disagree.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Unit tests
-        run: npm test
+        run: pnpm test

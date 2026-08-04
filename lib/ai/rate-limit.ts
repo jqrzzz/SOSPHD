@@ -48,12 +48,40 @@ const LIMITS: Record<AISurface, SurfaceLimit> = {
 };
 
 // userId|surface → ringbuffer of recent request timestamps (ms epoch).
-// Old entries are pruned on each call so this map stays bounded to
-// the LIMITS.max for each active key.
+// Each VALUE is bounded to LIMITS.max by the per-call prune below.
+//
+// The number of KEYS was not. Pruning only ever touched the bucket being
+// read, so a user who made one request and never came back left their
+// timestamps in the map for the lifetime of the process — nothing revisits
+// a key that is no longer being queried. On an owner-operated deployment
+// that is five keys and harmless, which is why it went unnoticed; it grows
+// with the allowlist (SD-001 explicitly anticipates more researchers) and
+// leaks for as long as a warm serverless instance survives.
 const buckets = new Map<string, number[]>();
+
+// A bucket whose newest timestamp has aged out of its window can never
+// block a future request, so it is dead weight. Sweeping every N calls
+// keeps the amortized cost at O(1) per request rather than scanning the
+// whole map on every one.
+const SWEEP_EVERY_N_CALLS = 500;
+let callsSinceSweep = 0;
 
 function keyFor(userId: string, surface: AISurface): string {
   return `${userId}|${surface}`;
+}
+
+/** Drop buckets that can no longer affect any decision. */
+function sweepExpiredBuckets(now: number): void {
+  for (const [key, stamps] of buckets) {
+    // Surface is the segment after the final separator; surface names never
+    // contain one, so this holds even if a user id somehow does.
+    const surface = key.slice(key.lastIndexOf("|") + 1) as AISurface;
+    const windowMs = LIMITS[surface]?.windowMs ?? 60_000;
+    const newest = stamps[stamps.length - 1];
+    if (newest === undefined || newest <= now - windowMs) {
+      buckets.delete(key);
+    }
+  }
 }
 
 /**
@@ -72,6 +100,14 @@ export function requireWithinAILimit(
   const now = Date.now();
   const cutoff = now - limit.windowMs;
   const key = keyFor(userId, surface);
+
+  // Amortized cleanup of keys nobody is querying any more. Runs before the
+  // decision below so a sweep can never evict the bucket we are about to
+  // read — the key is re-read from the map immediately after.
+  if (++callsSinceSweep >= SWEEP_EVERY_N_CALLS) {
+    callsSinceSweep = 0;
+    sweepExpiredBuckets(now);
+  }
 
   const stamps = buckets.get(key) ?? [];
   // Prune anything outside the sliding window. Cheap because stamps is
@@ -94,4 +130,15 @@ export function requireWithinAILimit(
 /** Visible for tests — clears all in-memory state. */
 export function _resetRateLimitState(): void {
   buckets.clear();
+  callsSinceSweep = 0;
+}
+
+/** Visible for tests — how many buckets are currently retained. */
+export function _bucketCount(): number {
+  return buckets.size;
+}
+
+/** Visible for tests — force the amortized sweep to run now. */
+export function _sweepNow(now: number = Date.now()): void {
+  sweepExpiredBuckets(now);
 }

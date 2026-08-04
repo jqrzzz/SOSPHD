@@ -16,7 +16,13 @@ import {
   createRecommendation,
 } from "@/lib/data/store";
 import { computeAllMetrics, formatDuration } from "@/lib/data/metrics";
-import { modelFor, requireAIKey, MissingAIKeyError } from "@/lib/ai/config";
+import {
+  modelFor,
+  requireAIKey,
+  MissingAIKeyError,
+  UnknownProviderError,
+  ProviderNotInstalledError,
+} from "@/lib/ai/config";
 import { safeFreeText } from "@/lib/ai/sanitize";
 import { PROTOCOL_VERSION } from "@/lib/protocol";
 import type { Recommendation } from "@/lib/data/types";
@@ -156,7 +162,18 @@ export async function generateRecommendationsForCase({
   try {
     requireAIKey("recommendations");
   } catch (err) {
-    if (err instanceof MissingAIKeyError) {
+    // requireAIKey resolves the surface's provider in order to know which
+    // credential to check, so a misconfigured SOSPHD_MODEL_* value surfaces
+    // here too. Wrap all three in the RecommendationError envelope this
+    // function uses everywhere else — otherwise the server-action path
+    // (which shares this code, see the header) returns a raw throw instead
+    // of the { error } shape its callers expect, and the message naming the
+    // bad config never reaches the UI.
+    if (
+      err instanceof MissingAIKeyError ||
+      err instanceof UnknownProviderError ||
+      err instanceof ProviderNotInstalledError
+    ) {
       throw new RecommendationError(err.message, err.status);
     }
     throw err;
