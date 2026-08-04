@@ -13,10 +13,16 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'SOS PHD',
   },
-  icons: [
-    { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-    { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-  ],
+  // app/icon.svg supplies the tab favicon by file convention. appleWebApp is
+  // capable:true above, so iOS needs a real touch icon rather than falling back
+  // to a screenshot of the page.
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 }
 
 export const viewport: Viewport = {

@@ -119,4 +119,11 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
   - SOSCOMMAND: `cases`, `case_activity_log`, `case_transport` (actual_departure/arrival), `case_gop` (issued_at/settled_at), `claims` — extended operational data
   - SOSTRAVEL: `emergency_cases`, `facilities` — patient-facing incident data
 - **AI automation preferred** — lean into AI for categorization, analysis, guidance.
-- **Swap-for-Supabase pattern** — in-memory stores are scaffolding, function signatures match Supabase queries.
+- **Supabase is live — there are no in-memory stores.** This rule previously read
+  "in-memory stores are scaffolding, function signatures match Supabase queries",
+  which stopped being true when the `research.*` migration landed. Every store in
+  `lib/data/` queries Supabase directly. What remains is a *seed-data fallback*:
+  when a query fails or credentials are missing, the store logs
+  `[SOSPHD:DEGRADED]` and returns empty/seed data rather than crashing the page.
+  That is a resilience path, not scaffolding — if you see that warning in a log,
+  something is genuinely wrong and the data on screen is not real.

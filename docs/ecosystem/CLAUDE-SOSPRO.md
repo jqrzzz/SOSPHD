@@ -1,5 +1,15 @@
 # SOSPRO — Claude Code Context
 
+> ⚠️ **DATED SNAPSHOT — not the source of truth.**
+> This is a frozen copy of another repository's `CLAUDE.md`, kept so SOSPHD can
+> reason about its data sources offline. It drifts the moment that repo changes,
+> and it has: audited 2026-08-04 and found describing a homepage and product
+> names that were retired months earlier. Treat it as orientation only — for
+> anything load-bearing (table names, ownership, schema), read the live
+> `CLAUDE.md` in **SOSPRO** itself.
+>
+> Snapshot last reconciled: never. Audited: 2026-08-04.
+
 ## What This Is
 
 The professional operations portal ("Patient Central") for **Tourist SOS** (tourist-sos.com). Serves clinics, transport providers, and command centers. Manages patients, cases, transfers, fleet/vehicle tracking, and crew assignments.
