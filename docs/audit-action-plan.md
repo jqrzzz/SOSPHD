@@ -34,17 +34,14 @@
 **Audit date**: 2026-05-19
 **Audit coverage**: 7 of 17 sections deep-reviewed before stopping. We have enough to act on; the remaining sections (UI pages, components, hooks, tests, docs) would mostly surface issues that cascade from the data-layer problems below.
 
-> **Dead link on `main` — but the file exists.** This document opens by citing
-> `docs/agent-strategy.md` as its companion (the long arc: Paper 2 →
-> credentialed agent → revenue). It is not on `main`, which is why the link
-> 404s. It was never lost: it lives on the unmerged branch
-> **`claude/agent-strategy-plan`** (`29f779e`, 2026-05-18, 181 lines) and is a
-> real document — 12-month and 24–36-month outcomes, an MCP-registered
-> callable agent, provenance receipts, x402 per-call billing.
+> **Companion doc — resolved.** This document opens by citing
+> [`docs/agent-strategy.md`](./agent-strategy.md) (the long arc: Paper 2 →
+> credentialed agent → revenue). That link was dead for two and a half months:
+> the file had been written on 2026-05-18 and left on an unmerged branch, so
+> `main` never had it while this plan kept deferring to it — including Phase 7
+> below, which sequences directly off it.
 >
-> So the strategy this plan defers to was written, reviewed by nobody, and left
-> on a branch. **Merge that branch or the link stays broken** — and Phase 7
-> below, which sequences directly off it, has no readable source on `main`.
+> It landed with this change. The link works again.
 
 ---
 
@@ -216,12 +213,7 @@ Low-risk cleanup so the codebase doesn't accumulate fossils:
 
 ### Phase 7 — Agent-economy foundation (4–8 weeks · the long arc)
 
-This is what `docs/agent-strategy.md` lays out as **Phase 1 of that doc**: service tokens, provenance receipts, PHI redaction, MCP wrap, agent-card. **Do not start until Phases 1–4 of THIS plan are done.** External agents calling a broken data layer is worse than no external agents.
-
-> The link here was live markdown pointing at a path that does not resolve on
-> `main`. Reduced to plain text so it stops reading as a file you can open. The
-> document itself is on the unmerged `claude/agent-strategy-plan` branch (see
-> the note at the top) — re-link it the moment that branch lands.
+This is what [`docs/agent-strategy.md`](./agent-strategy.md) lays out as **Phase 1 of that doc**: service tokens, provenance receipts, PHI redaction, MCP wrap, agent-card. **Do not start until Phases 1–4 of THIS plan are done.** External agents calling a broken data layer is worse than no external agents.
 
 The strategy doc is the canonical reference. This audit doesn't change its content — it just adds the prerequisite that the data layer be sound first.
 
