@@ -3,6 +3,7 @@ import { z } from "zod";
 import { buildPaperContext } from "@/lib/data/analytics";
 import { modelFor } from "@/lib/ai/config";
 import { gateAIRequest } from "@/lib/ai/gate";
+import { neutralizeTag } from "@/lib/ai/sanitize";
 
 export const maxDuration = 60;
 
@@ -164,10 +165,12 @@ ${paperCtx.rows
   // block. They are SUGGESTIONS — the section prompt's section
   // structure and the data context's numbers are authoritative. This
   // is documented in the system prompt prefix appended below.
+  // Uses the shared neutralizeTag rather than a local regex pair: envelope
+  // neutralization is the codebase's single line of defence against context
+  // breakout, and it should have exactly one implementation to audit and to
+  // fix. The behaviour is identical.
   const safeCustomInstructions = custom_instructions
-    ? custom_instructions
-        .replace(/<\/user_suggestions>/gi, "</_user_suggestions>")
-        .replace(/<user_suggestions>/gi, "<_user_suggestions>")
+    ? neutralizeTag(custom_instructions, "user_suggestions")
     : "";
 
   const systemPrompt = `${SECTION_PROMPTS[section]}
