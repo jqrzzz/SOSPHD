@@ -14,6 +14,8 @@ import {
   MissingAIKeyError,
   requireAuthenticatedUser,
   UnauthenticatedError,
+  UnknownProviderError,
+  ProviderNotInstalledError,
 } from "./config";
 import { requireWithinAILimit, AIRateLimitError } from "./rate-limit";
 
@@ -39,10 +41,18 @@ export async function gateAIRequest(surface: AISurface): Promise<GateResult> {
     requireWithinAILimit(user.id, surface);
     return { ok: true, userId: user.id };
   } catch (err) {
+    // The provider errors are MISCONFIGURATION, not client error — a 500
+    // with the message intact, because the message names the exact env
+    // value at fault and the exact command to fix it. Swallowing them into
+    // a generic 500 would throw that away. They surface here because
+    // requireAIKey now resolves the provider in order to know which key to
+    // check.
     if (
       err instanceof UnauthenticatedError ||
       err instanceof MissingAIKeyError ||
-      err instanceof AIRateLimitError
+      err instanceof AIRateLimitError ||
+      err instanceof UnknownProviderError ||
+      err instanceof ProviderNotInstalledError
     ) {
       const body: Record<string, unknown> = { error: err.message };
       const headers: Record<string, string> = {};
