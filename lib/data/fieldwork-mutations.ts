@@ -215,11 +215,14 @@ export async function createProtocolFromTemplate(
     linked_contact_ids?: string[];
   },
 ): Promise<FieldProtocol> {
-  const template = await getProtocolById(templateId);
+  // Auth first so the template lookup runs on the server client with the
+  // caller's session — the store's default browser client has no session
+  // in this server-only module (Phase 2 fix).
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const template = await getProtocolById(templateId, sb);
   if (!template) {
     throw new Error("Template not found");
   }
-  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("protocols")

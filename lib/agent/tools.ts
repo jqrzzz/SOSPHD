@@ -8,7 +8,11 @@
 
 import { RESEARCH_DOMAIN } from "./domain";
 import { categorizeText as pureCategorize } from "./categorize";
+// Fieldwork reads are client-safe and default to the BROWSER client,
+// which carries no session in this server-only module — every call here
+// must pass the server client or RLS returns nothing (Phase 2 fix).
 import { getJournalEntries, getContacts, getProtocols, getProtocolProgress } from "@/lib/data/fieldwork-store";
+import { getServerSupabase } from "@/lib/supabase/server-auth";
 import { getNotes, getTasks } from "@/lib/data/advisor-store";
 import { createTask, createNote } from "@/lib/data/advisor-mutations";
 import { getDocs } from "@/lib/data/docs-store";
@@ -27,10 +31,11 @@ export interface ToolDefinition {
 // ── Tool: Research Status ───────────────────────────────────────────
 
 async function getResearchStatus() {
+  const sb = await getServerSupabase();
   const [journal, contacts, protocols, notes, tasks, docs, cases] = await Promise.all([
-    getJournalEntries(),
-    getContacts(),
-    getProtocols(),
+    getJournalEntries(undefined, sb),
+    getContacts(undefined, sb),
+    getProtocols(undefined, sb),
     getNotes(100),
     getTasks(),
     getDocs(),
@@ -81,10 +86,11 @@ async function getResearchStatus() {
 // ── Tool: Identify Research Gaps ────────────────────────────────────
 
 async function identifyResearchGaps() {
+  const sb = await getServerSupabase();
   const [journal, contacts, protocols, tasks, docs] = await Promise.all([
-    getJournalEntries(),
-    getContacts(),
-    getProtocols(),
+    getJournalEntries(undefined, sb),
+    getContacts(undefined, sb),
+    getProtocols(undefined, sb),
     getTasks(),
     getDocs(),
   ]);
@@ -309,8 +315,11 @@ async function createNoteFromInsight(params: {
 // ── Tool: Corridor Analysis ─────────────────────────────────────────
 
 async function analyzeCorridorCoverage() {
-  const journal = await getJournalEntries();
-  const contacts = await getContacts();
+  const sb = await getServerSupabase();
+  const [journal, contacts] = await Promise.all([
+    getJournalEntries(undefined, sb),
+    getContacts(undefined, sb),
+  ]);
 
   return RESEARCH_DOMAIN.corridors.map((corridor) => {
     const entries = journal.filter((e) => e.corridor === corridor.name);
@@ -338,8 +347,9 @@ async function generateWeeklyDigest() {
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const cutoff = oneWeekAgo.toISOString();
 
+  const sb = await getServerSupabase();
   const [journal, notes, tasks] = await Promise.all([
-    getJournalEntries(),
+    getJournalEntries(undefined, sb),
     getNotes(100),
     getTasks(),
   ]);

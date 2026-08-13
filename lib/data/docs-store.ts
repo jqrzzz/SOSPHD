@@ -1,17 +1,26 @@
-/* ─── Docs Store — READ paths ──────────────────────────────────────────
+/* ─── Docs Store — READ paths (SERVER ONLY) ────────────────────────────
  *  Queries research.docs, research.doc_versions.
- *  Falls back to seed data when Supabase is unavailable (with a
- *  [SOSPHD:DEGRADED] warning so it's not silent).
  *
- *  Writes live in docs-mutations.ts (server-only) so this file
- *  stays safe to import from any context.
+ *  SERVER ONLY as of the Phase 2 client unification: every consumer is a
+ *  server context (docs pages, /api/docs/ai, lib/docs-actions.ts,
+ *  lib/agent/tools.ts), and the previous browser client carried no
+ *  session cookies on the server — queries ran as `anon`, RLS returned
+ *  nothing, and the seed fallback silently served a fabricated Paper 1
+ *  draft. The `server-only` import makes any future client import a
+ *  build error instead of a repeat of that bug.
+ *
+ *  Fallback policy (lib/data/degraded.ts): seed data in dev, EMPTY in
+ *  production, always with a [SOSPHD:DEGRADED] warning.
  *
  *  research.docs has no `site_id` column; the TS `Doc.site_id` field
  *  is coerced to null in mapDbDoc. (Pending Phase 6 hygiene — remove
  *  site_id from the Doc type entirely.)
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
+import "server-only";
+
+import { getServerSupabase } from "@/lib/supabase/server-auth";
+import { warnDegradedMode, seedOrEmpty } from "@/lib/data/degraded";
 import type { Doc, DocVersion, DocStatus } from "./docs-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────
@@ -245,7 +254,7 @@ export async function getDocs(filters?: {
   search?: string;
   tag?: string;
 }): Promise<Doc[]> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       let query = sb
@@ -287,11 +296,16 @@ export async function getDocs(filters?: {
         d.tags.some((t: string) => t.toLowerCase().includes(q)),
     );
   }
-  return result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  return seedOrEmpty(
+    result.sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    ),
+    [],
+  );
 }
 
 export async function getDocById(id: string): Promise<Doc | null> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -301,15 +315,23 @@ export async function getDocById(id: string): Promise<Doc | null> {
         .eq("id", id)
         .single();
       if (!error && data) return mapDbDoc(data as Record<string, unknown>);
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getDocById", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getDocById",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getDocById", "supabase unavailable");
   }
-  return seedDocs.find((d) => d.id === id) ?? null;
+  return seedOrEmpty(seedDocs.find((d) => d.id === id) ?? null, null);
 }
 
 // ── Versions (reads only — writes in docs-mutations.ts) ─────────────
 
 export async function getVersionsByDocId(docId: string): Promise<DocVersion[]> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -319,15 +341,28 @@ export async function getVersionsByDocId(docId: string): Promise<DocVersion[]> {
         .eq("doc_id", docId)
         .order("created_at", { ascending: false });
       if (!error && data) return data.map((r) => mapDbVersion(r as Record<string, unknown>));
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getVersionsByDocId", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getVersionsByDocId",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getVersionsByDocId", "supabase unavailable");
   }
-  return seedVersions
-    .filter((v) => v.doc_id === docId)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return seedOrEmpty(
+    seedVersions
+      .filter((v) => v.doc_id === docId)
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      ),
+    [],
+  );
 }
 
 export async function getVersionById(id: string): Promise<DocVersion | null> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -337,9 +372,17 @@ export async function getVersionById(id: string): Promise<DocVersion | null> {
         .eq("id", id)
         .single();
       if (!error && data) return mapDbVersion(data as Record<string, unknown>);
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getVersionById", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getVersionById",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getVersionById", "supabase unavailable");
   }
-  return seedVersions.find((v) => v.id === id) ?? null;
+  return seedOrEmpty(seedVersions.find((v) => v.id === id) ?? null, null);
 }
 
 // ── Unique tags ─────────────────────────────────────────────────────

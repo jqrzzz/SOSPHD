@@ -635,7 +635,7 @@ Four Supabase entry points, and which one you use matters:
 | `lib/supabase/client.ts` | `createBrowserClient` | Browser cookies | Client components |
 | `lib/supabase/server.ts` | `createServerClient` | `next/headers` cookies | Server components, actions, routes |
 | `lib/supabase/proxy.ts` | `createServerClient` | Request cookies | `middleware.ts` only |
-| `lib/supabase/db.ts` | Wraps `client.ts` | Browser cookies | Client components |
+| `lib/supabase/db.ts` | Wraps `client.ts` | Browser cookies | Client components (`warnDegradedMode` moved to `lib/data/degraded.ts`) |
 
 `lib/supabase/server-auth.ts` is the server-side gatekeeper. `requireAuthOrThrow()`
 returns `{ supabase, userId }` or throws `AuthRequiredError` (status 401). Its file
@@ -707,7 +707,16 @@ an assumption, not an enforcement — nothing fails the build or the boot if
 be an open, unauthenticated app with unbounded LLM spend, and the rate limiter
 would key everything to the single bucket `dev_user`.
 
-### 8.2 Four read stores use the browser Supabase client, including on the server
+### 8.2 Four read stores use the browser Supabase client, including on the server — FIXED 2026-08-13
+
+**Status: fixed.** `docs-store`, `advisor-store`, and `workspace-store` now use
+the cookie-aware server client (`getServerSupabase`) and carry
+`import "server-only"`, so any future client import is a build error.
+`fieldwork-store` stays client-safe (it is imported by the `/fieldwork` and
+`/contacts` client pages) and every read function accepts an optional trailing
+`client` param; its server callers (`lib/agent/tools.ts`,
+`lib/data/fieldwork-mutations.ts:createProtocolFromTemplate`) pass a server
+client explicitly. Original issue for the record:
 
 `lib/supabase/db.ts:getSupabase()` returns `createBrowserClient(...)`, which reads
 its session from browser cookies. Four stores use it:
@@ -733,7 +742,14 @@ from template" cannot find its template. **The import split is unambiguous in th
 source; the exact runtime behaviour was not executed and needs checking before
 acting on it.**
 
-### 8.3 Seed data can be served as if it were real research data
+### 8.3 Seed data can be served as if it were real research data — FIXED 2026-08-13
+
+**Status: fixed.** `lib/data/degraded.ts:seedOrEmpty` now returns EMPTY in
+production and seed only in development, applied to every fallback return in
+all four stores — including the by-id functions, whose silent
+`catch { /* fall through */ }` blocks now emit `[SOSPHD:DEGRADED]` warnings.
+Fabricated seed content can no longer render in a deployed environment.
+Original issue for the record:
 
 Every store carries a hardcoded seed array (`seedNotes`, `seedTasks`, `seedDocs`,
 `seedJournal`, `seedContacts`, `seedProtocols`, `seedUploads`, `seedMindMaps`) —
@@ -846,7 +862,8 @@ its own, even after a successful backfill.
 - Two toast systems ship: `hooks/use-toast.ts` + `components/ui/toast.tsx` +
   `components/ui/toaster.tsx`, and `sonner`. Only sonner is mounted, in
   `app/layout.tsx`.
-- `next-themes` and `server-only` are dependencies that are never imported. Dark
+- `next-themes` is a dependency that is never imported (`server-only` is now
+  used by the three server-only stores as of the Phase 2 fix). Dark
   mode is hardcoded as `<html className="dark">` in `app/layout.tsx`; there is no
   light theme and no toggle.
 - `scripts/generate-types.sh` writes to `lib/types/`, which does not exist in the
