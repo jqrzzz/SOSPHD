@@ -523,8 +523,7 @@ SOSPHD owns the `research` schema. It reads `public.*` but never writes it.
 
 ### 6.1 The provenance spine — `research.case_events`
 
-The most important table in the system. Columns: `id`, `case_id` (uuid, **no
-foreign key**), `occurred_at`, `event_type` (enum), `actor_id` (text),
+The most important table in the system. Columns: `id`, `case_id` (uuid — FK to `public.cases` existed undocumented from the original April migration until migration 015 dropped it on 2026-08-13; now deliberately **no foreign key**), `occurred_at`, `event_type` (enum), `actor_id` (text),
 `payload` (text), plus `inserted_at` and `ingest_batch_id` added by migration 008.
 
 `event_type` is an eight-value enum: `FIRST_CONTACT`, `TRIAGE_COMPLETE`,
@@ -797,6 +796,14 @@ behind the same API. For an owner-operated single-user deployment this is
 acceptable; it is not a control you can rely on.
 
 ### 8.7 `research.case_events.case_id` and `recommendations.case_id` have no foreign key
+
+**Correction 2026-08-13:** `case_events.case_id` actually DID have an
+undocumented FK to `public.cases` (with ON DELETE CASCADE) from the original
+April migration — the repo snapshot omitted it and this document repeated the
+omission. It surfaced during the first real backfill and was dropped by
+migration `20260813_015` (it foreclosed research-native events and would have
+cascaded operational deletions into research provenance). The no-FK design
+below is now true by decision rather than by accident.
 
 Deliberate — it allows research-native case ids that do not exist in
 `public.cases`. The cost is silent data loss in analytics:

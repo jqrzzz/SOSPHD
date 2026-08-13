@@ -2,7 +2,31 @@
 
 > Scoping for Phase 1 / Step 5a (`phd-spine.ts`): ingest the historical operational spreadsheet so Paper 1 has descriptive stats to compute over. This doc is the architecture decision + task plan. It does NOT change schema yet — it surfaces the decision that must be made first.
 
-**Status**: FOUNDATIONS BUILT (2026-05-28). Architecture decision = **Option C** (§4). SD-001 = **resolved, Option B** (allowlist). Migration `20260528_008` applied live + verified. Read-layer union, normalization, pure transform, and idempotent writer are implemented and tested. **Remaining: the spreadsheet parser** (HistoricalCaseInput[] from the real 843-case sheet) + running the ingest — both blocked on access to the sheet headers/data.
+**Status**: FIRST BATCH INGESTED (2026-08-13). Batch
+`c201c6c2-3f5d-41db-8f06-40bfdef82b82`: **665 cases + 674 events**
+(665 FIRST_CONTACT, 9 TRANSPORT_ACTIVATED) from the canonical source
+`TouristSOS_Master_Claims_Ledger` → "Patient Central Database" sheet in
+Google Drive (same registry as `TouristSOS_Master_Spreadsheet_FIVERR_2023`).
+Year distribution: 2018=62, 2019=328, 2020=275. De-identification: patient_ref
+= File Number (pseudonym); names/DOB never left the local ETL. Normalization:
+387 raw insurer strings → 268 entities (MOP=Self-pay takes precedence over a
+named insurer, 197 cases); diagnosis keyword buckets incl. new animal_bite /
+marine / derm / ent; corridor derived from Province/Branch keywords (Krabi 513,
+Chiang Mai 10, none/Indonesia 142). 16 duplicate file numbers disambiguated
+with `#N` suffixes; 1 junk row ("FIND WHAT IS MISSING") excluded. Timestamps
+stored as date at 00:00 Asia/Bangkok (+07:00) — date-only source precision,
+document in Paper 1 methods. Discovered + fixed during ingest: migration 015
+dropped a previously undocumented FK research.case_events → public.cases
+(ON DELETE CASCADE) that the original April migration created, the repo
+snapshot omitted, and §3 below wrongly denied — it foreclosed research-native
+events AND would have cascaded operational deletions into research provenance.
+NOT yet ingested: the 54-row transport ledger's unmatched rows (40), the
+earlier MasterDatabase_a/b/c + Patient_Database + FirstLanta versions (per the
+folder README, versions to reconcile), and the claimed 843-case total — the
+canonical consolidated registry holds 666 rows; reconcile the remaining ~177
+against the older versions when convenient.
+
+Previous status (2026-05-28): FOUNDATIONS BUILT. Architecture decision = **Option C** (§4). SD-001 = **resolved, Option B** (allowlist). Migration `20260528_008` applied live + verified. Read-layer union, normalization, pure transform, and idempotent writer are implemented and tested. **Remaining: the spreadsheet parser** (HistoricalCaseInput[] from the real 843-case sheet) + running the ingest — both blocked on access to the sheet headers/data.
 
 ### What's built (Phase 9)
 - `research.cases` dimension + `research.allowed_users` allowlist + `is_allowed_user()` + ingestion-provenance columns on `case_events` (migration `20260528_008`, applied + verified).
@@ -54,7 +78,7 @@ Two independent reasons this blocks "just backfill into `public.cases`":
 
 ## 3. The gap that dictates everything: analytics is coupled to `public.cases`
 
-`research.case_events.case_id` is `uuid NOT NULL` but has **no foreign key** — so we *can* mint synthetic case_ids and insert events directly. But that alone doesn't work, because of how the read layer is wired:
+`research.case_events.case_id` is `uuid NOT NULL` and ~~has no foreign key~~ (WRONG — the original April migration created an FK to public.cases that migration 015 dropped on 2026-08-13) — so we *can* mint synthetic case_ids and insert events directly. But that alone doesn't work, because of how the read layer is wired:
 
 Every aggregate starts from `getCases()` (which reads **`public.cases`**), then looks up events by `case_id`:
 
