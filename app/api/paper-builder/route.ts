@@ -155,8 +155,11 @@ ${paperCtx.formatted.severity_distribution}
 ## Raw Metric Table
 ${paperCtx.rows
   .map(
+    // Only COMPLETED intervals reach the model. Running metrics are
+    // elapsed-so-far clocks — feeding them to the paper builder would
+    // bake wall-clock noise into drafted numbers. Incomplete = N/A.
     (r) =>
-      `- ${r.patient_ref} | sev=${r.severity} | status=${r.status} | TTTA=${r.ttta_ms !== null ? Math.round(r.ttta_ms / 60000) + "min" : "N/A"} | TTGP=${r.ttgp_ms !== null ? Math.round(r.ttgp_ms / 60000) + "min" : "N/A"} | TTDC=${r.ttdc_ms !== null ? Math.round(r.ttdc_ms / 60000) + "min" : "N/A"} | payment_delayed=${r.payment_delayed} | recs=${r.recommendation_count} accepted=${r.accepted_count} overridden=${r.override_count}`,
+      `- ${r.patient_ref} | sev=${r.severity} | status=${r.status} | TTTA=${r.ttta_complete && r.ttta_ms !== null ? Math.round(r.ttta_ms / 60000) + "min" : "N/A"} | TTGP=${r.ttgp_complete && r.ttgp_ms !== null ? Math.round(r.ttgp_ms / 60000) + "min" : "N/A"} | TTDC=${r.ttdc_complete && r.ttdc_ms !== null ? Math.round(r.ttdc_ms / 60000) + "min" : "N/A"} | payment_delayed=${r.payment_delayed} | recs=${r.recommendation_count} accepted=${r.accepted_count} overridden=${r.override_count}`,
   )
   .join("\n")}
 `;

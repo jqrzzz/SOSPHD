@@ -41,15 +41,20 @@ export function DashboardExport({ rows }: { rows: ExportRow[] }) {
       "overridden",
     ];
 
+    // Only COMPLETED intervals are exported. A running metric's value_ms
+    // is "elapsed so far" (Date.now() - start), so exporting it would make
+    // the same dataset differ between two exports taken an hour apart —
+    // papers cite frozen numbers, not clocks. The *_complete flags are
+    // the filter; incomplete cells export empty.
     const csvRows = rows.map((r) => [
       r.case_id,
       r.patient_ref,
       r.severity,
       r.status,
       r.created_at,
-      r.ttta_ms !== null ? Math.round(r.ttta_ms / 60000) : "",
-      r.ttgp_ms !== null ? Math.round(r.ttgp_ms / 60000) : "",
-      r.ttdc_ms !== null ? Math.round(r.ttdc_ms / 60000) : "",
+      r.ttta_complete && r.ttta_ms !== null ? Math.round(r.ttta_ms / 60000) : "",
+      r.ttgp_complete && r.ttgp_ms !== null ? Math.round(r.ttgp_ms / 60000) : "",
+      r.ttdc_complete && r.ttdc_ms !== null ? Math.round(r.ttdc_ms / 60000) : "",
       r.ttta_complete,
       r.ttgp_complete,
       r.ttdc_complete,
