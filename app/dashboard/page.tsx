@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDashboardSummary, getCaseMetricRows, getMissingnessReport } from "@/lib/data/analytics";
+import { getDashboardSummary, getCaseMetricRows, getMissingnessReport, getCaseBreakdowns } from "@/lib/data/analytics";
 import { getSnapshots } from "@/lib/data/snapshots";
 import { SnapshotControls } from "@/components/snapshot-controls";
 import { DashboardSummaryCards } from "@/components/dashboard-summary";
@@ -52,7 +52,7 @@ const SEVERITY_DOT: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [summary, rows, pulse, nextActions, gaps, snapshots, missingness] =
+  const [summary, rows, pulse, nextActions, gaps, snapshots, missingness, breakdowns] =
     await Promise.all([
       getDashboardSummary(),
       getCaseMetricRows(),
@@ -61,6 +61,7 @@ export default async function DashboardPage() {
       detectGaps(),
       getSnapshots(),
       getMissingnessReport(),
+      getCaseBreakdowns(),
     ]);
 
   const palette = HEALTH_COLORS[pulse.health] ?? HEALTH_COLORS.good;
@@ -364,12 +365,79 @@ export default async function DashboardPage() {
           </Card>
         </FadeIn>
 
+        {/* Dimension breakdowns — Paper 1 distribution figures */}
+        <FadeIn>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <BreakdownCard
+              title="Cases by corridor"
+              items={breakdowns.by_corridor.slice(0, 7)}
+              total={breakdowns.total_cases}
+            />
+            <BreakdownCard
+              title={`Top payers · ${breakdowns.by_payer.length} entities`}
+              items={breakdowns.by_payer.slice(0, 7)}
+              total={breakdowns.total_cases}
+            />
+            <BreakdownCard
+              title="Diagnosis mix"
+              items={breakdowns.by_diagnosis.slice(0, 7)}
+              total={breakdowns.total_cases}
+            />
+          </div>
+        </FadeIn>
+
         {/* Frozen snapshots — the citable datasets papers reference */}
         <FadeIn>
           <SnapshotControls snapshots={snapshots} />
         </FadeIn>
       </div>
     </div>
+  );
+}
+
+function BreakdownCard({
+  title,
+  items,
+  total,
+}: {
+  title: string;
+  items: { label: string; count: number }[];
+  total: number;
+}) {
+  const max = items[0]?.count ?? 1;
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-2.5 p-5">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          {title}
+        </h2>
+        {items.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No data yet.</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {items.map((item) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <span className="w-32 shrink-0 truncate text-xs text-foreground/85" title={item.label}>
+                  {item.label.replaceAll("_", " ")}
+                </span>
+                <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-muted/50">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary/80 to-primary/50"
+                    style={{ width: `${Math.max(2, Math.round((item.count / max) * 100))}%` }}
+                  />
+                </div>
+                <span className="w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {item.count}
+                  <span className="text-muted-foreground/50">
+                    {" "}· {total > 0 ? Math.round((item.count / total) * 100) : 0}%
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
