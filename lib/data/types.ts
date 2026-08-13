@@ -88,6 +88,13 @@ export interface Case {
   patient_ref: string;
   notes: string;
   source?: CaseSource;
+  /** Research dimensions — populated for research.cases rows (backfill);
+   *  null/undefined for operational rows until a deriver exists. */
+  corridor?: string | null;
+  diagnosis_bucket?: string | null;
+  payer_entity?: string | null;
+  nationality?: string | null;
+  evacuated?: boolean | null;
 }
 
 // ── Event (the provenance spine) ──────────────────────────────────────

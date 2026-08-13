@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDashboardSummary, getCaseMetricRows } from "@/lib/data/analytics";
+import { getDashboardSummary, getCaseMetricRows, getMissingnessReport } from "@/lib/data/analytics";
 import { getSnapshots } from "@/lib/data/snapshots";
 import { SnapshotControls } from "@/components/snapshot-controls";
 import { DashboardSummaryCards } from "@/components/dashboard-summary";
@@ -52,14 +52,16 @@ const SEVERITY_DOT: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [summary, rows, pulse, nextActions, gaps, snapshots] = await Promise.all([
-    getDashboardSummary(),
-    getCaseMetricRows(),
-    getResearchPulse(),
-    suggestNextActions(5),
-    detectGaps(),
-    getSnapshots(),
-  ]);
+  const [summary, rows, pulse, nextActions, gaps, snapshots, missingness] =
+    await Promise.all([
+      getDashboardSummary(),
+      getCaseMetricRows(),
+      getResearchPulse(),
+      suggestNextActions(5),
+      detectGaps(),
+      getSnapshots(),
+      getMissingnessReport(),
+    ]);
 
   const palette = HEALTH_COLORS[pulse.health] ?? HEALTH_COLORS.good;
   const [coverNum, coverDenom] = pulse.corridorCoverage.split("/").map(Number);
@@ -312,6 +314,55 @@ export default async function DashboardPage() {
             <DashboardCaseTable rows={rows} />
           </>
         )}
+
+        {/* Milestone missingness — Paper 1's denominators. Explains WHY a
+            metric shows N/A: a TTTA/TTGP/TTDC value only exists when both
+            endpoint milestones were recorded. Historical backfill rows carry
+            FIRST_CONTACT (and occasionally TRANSPORT_ACTIVATED) only. */}
+        <FadeIn>
+          <Card>
+            <CardContent className="flex flex-col gap-3 p-5">
+              <div className="flex items-baseline justify-between">
+                <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Milestone coverage · Paper 1 denominators
+                </h2>
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {missingness.complete_cases}/{missingness.total_cases} cases with full provenance
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                {missingness.by_milestone.map((m) => {
+                  const presentRate =
+                    missingness.total_cases > 0
+                      ? Math.round((m.present / missingness.total_cases) * 100)
+                      : 0;
+                  return (
+                    <div
+                      key={m.event_type}
+                      className="flex flex-col gap-1 rounded-lg border border-border/50 bg-background/40 p-2.5"
+                    >
+                      <span className="truncate font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                        {m.event_type.replaceAll("_", " ")}
+                      </span>
+                      <span className="font-mono text-lg font-semibold tabular-nums text-foreground">
+                        {presentRate}%
+                      </span>
+                      <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
+                        {m.present} of {missingness.total_cases}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                A metric is computable only when both of its endpoint milestones
+                were recorded. Low coverage here is itself a Paper 1 finding —
+                historical records rarely captured coordination timestamps,
+                which is what prospective logging fixes.
+              </p>
+            </CardContent>
+          </Card>
+        </FadeIn>
 
         {/* Frozen snapshots — the citable datasets papers reference */}
         <FadeIn>

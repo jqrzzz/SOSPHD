@@ -151,6 +151,11 @@ export function toResearchCase(row: Record<string, unknown>): Case {
     patient_ref: (row.patient_ref as string) ?? "Unknown",
     notes: "",
     source: "historical",
+    corridor: (row.corridor as string | null) ?? null,
+    diagnosis_bucket: (row.diagnosis_bucket as string | null) ?? null,
+    payer_entity: (row.payer_entity as string | null) ?? null,
+    nationality: (row.nationality as string | null) ?? null,
+    evacuated: (row.evacuated as boolean | null) ?? null,
   };
 }
 
@@ -229,7 +234,7 @@ export async function getResearchCases(
       .schema("research")
       .from("cases")
       .select(
-        "id, status, severity, country, incident_summary, patient_ref, created_at",
+        "id, status, severity, country, incident_summary, patient_ref, created_at, corridor, diagnosis_bucket, payer_entity, nationality, evacuated",
       )
       .order("created_at", { ascending: false });
     if (statusFilter) {
@@ -304,7 +309,7 @@ export async function getCaseById(id: string): Promise<Case | undefined> {
         .schema("research")
         .from("cases")
         .select(
-          "id, status, severity, country, incident_summary, patient_ref, created_at",
+          "id, status, severity, country, incident_summary, patient_ref, created_at, corridor, diagnosis_bucket, payer_entity, nationality, evacuated",
         )
         .eq("id", id)
         .maybeSingle(),
