@@ -684,10 +684,15 @@ policy above.
 Read this section before changing anything. Nothing here is fixed in this
 document — it is a description of what exists.
 
-### 8.1 A missing env var silently disables all authentication
+### 8.1 A missing env var silently disables all authentication — FIXED 2026-08-13
 
-This is the sharpest issue. Three separate places treat "Supabase env vars are
-absent" as "development mode, allow everything":
+**Status: fixed.** `lib/env.ts:assertProductionEnv()` now throws in production
+when `NEXT_PUBLIC_SUPABASE_*` is missing, called from
+`lib/supabase/proxy.ts:updateSession` (every routed request) and
+`lib/ai/config.ts:requireAuthenticatedUser` (every AI surface and `/api/agent`).
+Dev/test keep the documented degraded mode. Original issue for the record:
+three separate places treated "Supabase env vars are absent" as "development
+mode, allow everything":
 
 - `lib/supabase/proxy.ts:updateSession` returns before checking auth, so
   middleware stops redirecting.
@@ -756,15 +761,16 @@ inject additional predicates. RLS still bounds the result to the caller's own
 rows, so the blast radius is limited to that user's data, but the filter is
 attacker-controlled.
 
-### 8.5 The two paths into the recommendation engine are gated differently
+### 8.5 The two paths into the recommendation engine are gated differently — FIXED 2026-08-13
 
-`POST /api/recommendations/generate` calls `gateAIRequest("recommendations")` —
-auth, key, and a 15/min rate limit. The server action
-`lib/actions.ts:generateRecommendationsAction`, which the UI button uses, calls
-`generateRecommendationsForCase` directly. That function checks only
-`requireAIKey`. So the button path has **no explicit auth check and no rate
-limit**; it relies entirely on middleware. A signed-in user (or a loop bug) can
-drive unbounded OpenAI calls through it.
+**Status: fixed.** `generateRecommendationsAction` now applies the same
+auth + rate-limit gate as the HTTP route (`requireAuthenticatedUser` +
+`requireWithinAILimit("recommendations")`), and `addEventAction` resolves the
+operator explicitly (no more `actor_id = "system"` mislabeling for
+unauthenticated callers) and returns `{ error }` envelopes instead of throwing
+unhandled. Original issue for the record: the UI-button path reached the paid
+LLM with no explicit auth check and no rate limit, relying entirely on
+middleware.
 
 ### 8.6 The rate limiter does not work on serverless
 
@@ -874,10 +880,16 @@ and every row's value is `"#"`. No storage bucket is configured anywhere.
 - **`package.json` is still named `"my-project"`.**
 - **Migration 008 commits a real user UUID** (`bb8a6e83-…`) into git as the seeded
   allowlist entry. Not a credential, but it is an identifier in version control.
-- **`anon` holds `GRANT SELECT` on every `research` table** (migration 004),
-  including `ALTER DEFAULT PRIVILEGES` for future tables. RLS is the only thing
-  stopping anonymous reads, so any new `research` table added without
-  `ENABLE ROW LEVEL SECURITY` is readable by anyone holding the public anon key.
+- **`anon` grants on `research` — FIXED 2026-08-13** by migration
+  `20260813_009_research_grants_normalization.sql`: `anon` now holds nothing in
+  `research`, `authenticated` holds exactly SELECT/INSERT/UPDATE/DELETE (the
+  original `GRANT ALL` had included TRUNCATE, which RLS does not govern — a
+  table-wipe primitive for any authenticated user in the shared project). The
+  same migration fixed a live bug: migrations 007/008 had never granted
+  `journal_entries`, `contacts`, `protocols`, or `cases` to `authenticated` at
+  all, so every fieldwork query failed at the grant layer and fell back to seed
+  data. Migration `20260813_010` additionally makes decided recommendations
+  immutable at the DB layer via a `BEFORE UPDATE` trigger.
 
 ### 8.15 Test coverage
 

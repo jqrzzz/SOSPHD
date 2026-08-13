@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { assertProductionEnv } from "@/lib/env";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -9,6 +10,10 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
  * Everything else requires authentication.
  */
 export async function updateSession(request: NextRequest) {
+  // In production a missing Supabase config must fail every request
+  // loudly — the dev skip below would otherwise disable auth silently.
+  assertProductionEnv();
+
   let supabaseResponse = NextResponse.next({ request });
 
   // Skip auth in local dev if Supabase is not configured

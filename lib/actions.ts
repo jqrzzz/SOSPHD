@@ -12,6 +12,11 @@ import {
   generateRecommendationsForCase,
   RecommendationError,
 } from "@/lib/recommendations";
+import {
+  requireAuthenticatedUser,
+  UnauthenticatedError,
+} from "@/lib/ai/config";
+import { requireWithinAILimit, AIRateLimitError } from "@/lib/ai/rate-limit";
 import { EVENT_TYPES } from "@/lib/data/types";
 
 // ── Schemas ──────────────────────────────────────────────────────────
@@ -48,7 +53,30 @@ export async function addEventAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  await addEvent(parsed.data);
+  // Resolve the operator explicitly. Without this, addEvent's internal
+  // fallback would stamp actor_id = "system" for an unauthenticated
+  // caller — mislabeling provenance as trigger-synced. Operator-typed
+  // events must carry a real operator id (same rule as decideRecommendationAction).
+  let actorId: string;
+  try {
+    const user = await requireAuthenticatedUser();
+    actorId = user.id;
+  } catch (err) {
+    if (err instanceof UnauthenticatedError) {
+      return { error: err.message };
+    }
+    throw err;
+  }
+
+  // addEvent throws on DB failure; return the { error } envelope this
+  // form renders instead of letting the action explode unhandled.
+  try {
+    await addEvent({ ...parsed.data, actor_id: actorId });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to add event",
+    };
+  }
 
   revalidatePath(`/cases/${parsed.data.case_id}`);
   return { success: true };
@@ -155,6 +183,23 @@ export async function generateRecommendationsAction(
   caseId: string,
   count: number = 3,
 ): Promise<{ error?: string; success?: boolean; count?: number }> {
+  // Same auth + rate-limit gate the HTTP route applies via gateAIRequest.
+  // Without it, the UI-button path reached the paid LLM with no explicit
+  // auth check and no rate limit — middleware alone stood between a retry
+  // loop and unbounded OpenAI spend.
+  try {
+    const user = await requireAuthenticatedUser();
+    requireWithinAILimit(user.id, "recommendations");
+  } catch (err) {
+    if (
+      err instanceof UnauthenticatedError ||
+      err instanceof AIRateLimitError
+    ) {
+      return { error: err.message };
+    }
+    throw err;
+  }
+
   try {
     const recommendations = await generateRecommendationsForCase({
       caseId,

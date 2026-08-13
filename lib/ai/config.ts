@@ -7,6 +7,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { openai } from "@ai-sdk/openai";
+import { assertProductionEnv } from "@/lib/env";
 
 export type AISurface =
   | "recommendations"
@@ -200,9 +201,12 @@ export class UnauthenticatedError extends Error {
  * when Supabase env vars are not configured, treat as dev mode and
  * return a fake user. This keeps `npm run dev` usable in clean
  * checkouts where no Supabase project is wired up yet. In production
- * the env vars MUST be set, so this path is never reached.
+ * assertProductionEnv throws before the dev_user path can be reached,
+ * so a misconfigured deployment fails loudly instead of serving an
+ * unauthenticated app with unmetered LLM spend.
  */
 export async function requireAuthenticatedUser(): Promise<{ id: string }> {
+  assertProductionEnv();
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY

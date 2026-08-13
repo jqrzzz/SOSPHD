@@ -159,8 +159,11 @@ export function toResearchCase(row: Record<string, unknown>): Case {
 // `public.cases` has ~40 columns; selecting "*" pulls every one across
 // the wire (including PHI-adjacent fields SOSPHD has no business
 // touching). Keep this list minimal and document additions.
+// patients() projects medical_id ONLY. full_name was previously included
+// here — pulled over the wire on every case read and then discarded by
+// toCase(). Real-name PHI has no business transiting SOSPHD at all.
 const CASE_COLUMNS =
-  "id, case_number, patient_id, status, priority, country, incident_description, notes, created_at, patients(full_name, medical_id)";
+  "id, case_number, patient_id, status, priority, country, incident_description, notes, created_at, patients(medical_id)";
 
 // Inverse of mapStatus — given a research bucket, the set of
 // operational statuses that project into it. Used to push the status
