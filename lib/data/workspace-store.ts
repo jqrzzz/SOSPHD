@@ -25,7 +25,7 @@ import type { Upload, UploadCategory, MindMap } from "./workspace-types";
 
 const DEMO_USER_ID = "user_demo";
 
-const seedUploads: Upload[] = [
+const seedUploadsRaw: Omit<Upload, "consent_status" | "consent_method" | "consent_jurisdiction" | "consent_captured_at">[] = [
   {
     id: "upload_001",
     created_at: "2026-02-06T09:00:00Z",
@@ -69,6 +69,15 @@ const seedUploads: Upload[] = [
     linked_doc_id: "doc_004",
   },
 ];
+
+// Seed uploads predate the consent columns (migration 011).
+const seedUploads: Upload[] = seedUploadsRaw.map((u) => ({
+  ...u,
+  consent_status: "not_required" as const,
+  consent_method: null,
+  consent_jurisdiction: null,
+  consent_captured_at: null,
+}));
 
 const seedMindMaps: MindMap[] = [
   {

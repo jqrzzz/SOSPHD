@@ -34,7 +34,7 @@ import type {
 
 const DEMO_USER_ID = "user_demo";
 
-const seedJournal: JournalEntry[] = [
+const seedJournalRaw: Omit<JournalEntry, "consent_status" | "consent_method" | "consent_jurisdiction" | "consent_captured_at">[] = [
   {
     id: "je_001",
     created_at: "2026-03-15T09:30:00Z",
@@ -128,6 +128,16 @@ const seedJournal: JournalEntry[] = [
 // never display anything resembling a real research contact. Real
 // contacts live in research.contacts (Supabase) and are scoped per
 // user_id via RLS.
+// Seed entries predate the consent columns (migration 011); mark them
+// explicitly not_required rather than editing every literal.
+const seedJournal: JournalEntry[] = seedJournalRaw.map((e) => ({
+  ...e,
+  consent_status: "not_required" as const,
+  consent_method: null,
+  consent_jurisdiction: null,
+  consent_captured_at: null,
+}));
+
 const seedContacts: Contact[] = [
   {
     id: "ct_001",

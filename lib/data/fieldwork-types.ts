@@ -1,3 +1,5 @@
+import type { ConsentStatus } from "./types";
+
 /* ─── Fieldwork Module Types ──────────────────────────────────────────
  *  Field Journal entries, Contacts (research network), and
  *  Field Protocols (site-visit checklists).
@@ -39,6 +41,11 @@ export interface JournalEntry {
   linked_case_id: string | null;
   attachments: JournalAttachment[];
   is_pinned: boolean;
+  // Consent gate (migration 011) — see ConsentStatus in ../types
+  consent_status: ConsentStatus;
+  consent_method: string | null;       // "verbal" | "written" | "recorded_verbal" | free text
+  consent_jurisdiction: string | null; // ISO country code in force at capture
+  consent_captured_at: string | null;
 }
 
 // ── Contacts (Research Network) ─────────────────────────────────────

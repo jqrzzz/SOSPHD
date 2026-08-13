@@ -15,6 +15,7 @@
 
 import { requireAuthOrThrow } from "@/lib/supabase/server-auth";
 import { getProtocolById } from "./fieldwork-store";
+import type { ConsentStatus } from "./types";
 import type {
   JournalEntry,
   JournalEntryType,
@@ -36,6 +37,10 @@ export async function createJournalEntry(data: {
   contact_ids?: string[];
   linked_case_id?: string | null;
   attachments?: JournalAttachment[];
+  consent_status?: ConsentStatus;
+  consent_method?: string | null;
+  consent_jurisdiction?: string | null;
+  consent_captured_at?: string | null;
 }): Promise<JournalEntry> {
   const { supabase: sb, userId } = await requireAuthOrThrow();
 
@@ -54,6 +59,10 @@ export async function createJournalEntry(data: {
       linked_case_id: data.linked_case_id ?? null,
       attachments: data.attachments ?? [],
       is_pinned: false,
+      consent_status: data.consent_status ?? "not_required",
+      consent_method: data.consent_method ?? null,
+      consent_jurisdiction: data.consent_jurisdiction ?? null,
+      consent_captured_at: data.consent_captured_at ?? null,
     })
     .select()
     .single();
