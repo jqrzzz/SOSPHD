@@ -1,6 +1,7 @@
 /* ─── Supabase-Backed Data Store ─────────────────────────────────────
- *  Reads cases from public schema (operational).
- *  Reads/writes events & recommendations from research schema.
+ *  Reads cases from public.cases (operational) UNIONED with
+ *  research.cases (historical/research-native) — see getCases.
+ *  Reads/writes events & recommendations from the research schema.
  *  All functions are async — consumers must await.
  *
  *  When Supabase env vars are not configured (e.g. local dev without

@@ -3,7 +3,8 @@ import type { ConsentStatus } from "./types";
 /* ─── Fieldwork Module Types ──────────────────────────────────────────
  *  Field Journal entries, Contacts (research network), and
  *  Field Protocols (site-visit checklists).
- *  Mirror the target Postgres schema — swap for Supabase later.
+ *  Mirror the live research.{journal_entries,contacts,protocols} rows
+ *  (migrations 007 + 011).
  * ────────────────────────────────────────────────────────────────────── */
 
 // ── Field Journal ───────────────────────────────────────────────────

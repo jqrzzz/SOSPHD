@@ -1,6 +1,7 @@
 /* ─── Advisor Module Types ─────────────────────────────────────────────
- *  Mirror the target Postgres schema for research_notes, tasks,
- *  advisor_sessions, and advisor_messages.
+ *  Mirror the live research.{notes,tasks,advisor_sessions,
+ *  advisor_messages} rows — except site_id on ResearchNote/ResearchTask,
+ *  which has no DB column (legacy field, always null from the DB).
  * ────────────────────────────────────────────────────────────────────── */
 
 // ── Research Notes ───────────────────────────────────────────────────

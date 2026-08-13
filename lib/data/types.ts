@@ -1,6 +1,7 @@
-/* ─── ResearchOS Domain Types ────────────────────────────────────────────
- *  Mirror the target Postgres schema exactly.
- *  When Supabase is connected, these become the Row types.
+/* ─── SOSPHD Domain Types ────────────────────────────────────────────────
+ *  Mirror the live research.* Row types (with one legacy exception:
+ *  Case.site_id has no DB column — the read layer fills it from
+ *  public.cases.country / research.cases.country).
  * ────────────────────────────────────────────────────────────────────── */
 
 // ── Event taxonomy (provenance-critical) ──────────────────────────────

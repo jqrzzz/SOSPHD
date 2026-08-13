@@ -199,7 +199,7 @@ export class UnauthenticatedError extends Error {
  *
  * Mirrors the middleware's local-dev pattern (lib/supabase/proxy.ts):
  * when Supabase env vars are not configured, treat as dev mode and
- * return a fake user. This keeps `npm run dev` usable in clean
+ * return a fake user. This keeps `pnpm dev` usable in clean
  * checkouts where no Supabase project is wired up yet. In production
  * assertProductionEnv throws before the dev_user path can be reached,
  * so a misconfigured deployment fails loudly instead of serving an

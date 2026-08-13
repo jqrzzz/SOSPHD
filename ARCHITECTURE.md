@@ -84,13 +84,13 @@ target is unclear — needs checking outside the repo.
 | `components/` | Feature components (case timeline, recommendation card, advisor chat, mind map canvas, dashboard widgets). |
 | `components/ui/` | 49 shadcn/ui primitive files. Mostly generated; many are unused. |
 | `components/motion/` | Four framer-motion wrappers: `count-up`, `fade-in`, `progress-ring`, `stagger`. |
-| `hooks/` | `use-mobile.tsx` and `use-toast.ts`. `use-mobile.tsx` is byte-identical to `components/ui/use-mobile.tsx`. |
+| `hooks/` | `use-mobile.tsx` (used by `components/ui/sidebar.tsx`). |
 | `lib/` | Everything non-visual: config, server actions, data layer, AI layer, agent layer, Supabase clients. |
 | `lib/data/` | Read stores (`*-store.ts`), write paths (`*-mutations.ts`), types, metric math, analytics, backfill pipeline. |
 | `lib/ai/` | Model routing, the auth/key/rate-limit gate, prompt sanitizers, advisor prompt assembly. |
 | `lib/agent/` | The "PhD agent" — deterministic, non-LLM: typed domain knowledge, tools, an action dispatcher, workflows. |
 | `lib/supabase/` | Four Supabase entry points: browser client, server client, middleware proxy, server-side auth helper. |
-| `supabase/migrations/` | Seven SQL files, all for the `research` schema plus triggers on `public.*`. |
+| `supabase/migrations/` | Thirteen SQL files: the `research` schema, triggers on `public.*`, grants, consent, snapshots, and the storage bucket. |
 | `docs/` | Planning and audit markdown, plus `docs/ecosystem/` — copies of the five sibling repos' `CLAUDE.md`. |
 | `scripts/` | `generate-types.sh` (Supabase type generation; its output directory `lib/types/` is not committed). |
 | `public/` | PWA icons and `manifest.json`. |
@@ -838,7 +838,17 @@ constant rather than a database read, `identifyResearchGaps` emits a permanent
 "843 historical cases not yet imported" high-severity gap that will never clear on
 its own, even after a successful backfill.
 
-### 8.11 Documentation and UI that describe a system that no longer exists
+### 8.11 Documentation and UI that describe a system that no longer exists — FIXED 2026-08-13
+
+**Status: fixed.** `/guide` rewritten to match the real app (read-only cases,
+consent-gated fieldwork, snapshots; renamed from "ResearchOS" to "SOS PHD");
+`docs/agent-strategy.md`'s dead `lib/data/sync.ts` claim replaced with the
+trigger migrations; the "when Supabase is connected" / "swap for Supabase
+later" header comments corrected across `lib/data/*-types.ts`; the
+`metrics.ts` dedup comment now states the real `(case_id, event_type,
+occurred_at, actor_id)` constraint; README converted to pnpm and its
+migration list completed; CLAUDE.md's wrong `lib/data/server-auth.ts` path
+fixed. Original issue for the record:
 
 - `app/guide/page.tsx` walks the user through "Click 'New Case' and fill in the
   details." `createCase` and the `/cases/new` route were deliberately deleted
@@ -858,12 +868,14 @@ its own, even after a successful backfill.
 - `lib/agent/workflows.ts:handleAgentContract` — which validates that the calling
   system is one of the six SOS apps — is exported and never used. `/api/agent`
   does not apply that validation; the `caller` field is accepted and ignored.
-- `hooks/use-mobile.tsx` and `components/ui/use-mobile.tsx` are byte-identical.
-- Two toast systems ship: `hooks/use-toast.ts` + `components/ui/toast.tsx` +
-  `components/ui/toaster.tsx`, and `sonner`. Only sonner is mounted, in
-  `app/layout.tsx`.
-- `next-themes` is a dependency that is never imported (`server-only` is now
-  used by the three server-only stores as of the Phase 2 fix). Dark
+- ~~`hooks/use-mobile.tsx` and `components/ui/use-mobile.tsx` are byte-identical.~~
+  Fixed 2026-08-13: the unused `components/ui/use-mobile.tsx` copy is deleted.
+- ~~Two toast systems ship.~~ Fixed 2026-08-13: the unused
+  `hooks/use-toast.ts` + `components/ui/toast.tsx` + `components/ui/toaster.tsx`
+  trio is deleted; sonner (mounted in `app/layout.tsx`) is the only one.
+- ~~`next-themes` is a dependency that is never imported.~~ Fixed 2026-08-13:
+  `next-themes` and the equally unused `@tailwindcss/postcss` are removed from
+  package.json (`server-only` is now used by the three server-only stores). Dark
   mode is hardcoded as `<html className="dark">` in `app/layout.tsx`; there is no
   light theme and no toggle.
 - `scripts/generate-types.sh` writes to `lib/types/`, which does not exist in the
@@ -873,7 +885,13 @@ its own, even after a successful backfill.
 - `Doc`, `ResearchNote`, and `ResearchTask` all carry a `site_id` field that no
   `research` table has. `lib/data/docs-store.ts:mapDbDoc` coerces it to `null`.
 
-### 8.13 File uploads do not upload files
+### 8.13 File uploads do not upload files — FIXED 2026-08-13
+
+**Status: fixed.** Migration `20260813_013` created the private
+`research-uploads` bucket with owner-folder RLS; `components/workspace-uploads.tsx`
+now uploads the file first and only then persists metadata with the storage
+path as `url` (legacy `"#"` rows are flagged as metadata-only), with downloads
+via short-lived signed URLs. Original issue for the record:
 
 `components/workspace-uploads.tsx` reads a `File` from the input, extracts its
 name, mime type and size into hidden fields, and posts a hardcoded
@@ -891,10 +909,9 @@ and every row's value is `"#"`. No storage bucket is configured anywhere.
   applying any migration — the other connector points at a different SOS project.
 - **Migration `20260402_002` is a stub.** Its body describes the tables in
   comments. `20260516_004` is the real snapshot. A fresh bootstrap depends on that.
-- **`/protocol` and `/guide` have no `layout.tsx`**, so they render without the
-  `AppShell` sidebar. Every other authenticated route has a one-line layout that
-  wraps children in `AppShell`.
-- **`package.json` is still named `"my-project"`.**
+- ~~`/protocol` and `/guide` have no `layout.tsx`.~~ Fixed 2026-08-13: both now
+  wrap children in `AppShell` like every other authenticated route.
+- ~~`package.json` is still named `"my-project"`.~~ Fixed 2026-08-13: renamed to `"sosphd"`.
 - **Migration 008 commits a real user UUID** (`bb8a6e83-…`) into git as the seeded
   allowlist entry. Not a credential, but it is an identifier in version control.
 - **`anon` grants on `research` — FIXED 2026-08-13** by migration
