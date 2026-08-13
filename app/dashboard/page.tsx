@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getDashboardSummary, getCaseMetricRows } from "@/lib/data/analytics";
+import { getSnapshots } from "@/lib/data/snapshots";
+import { SnapshotControls } from "@/components/snapshot-controls";
 import { DashboardSummaryCards } from "@/components/dashboard-summary";
 import { DashboardMetricChart } from "@/components/dashboard-metric-chart";
 import { DashboardCaseTable } from "@/components/dashboard-case-table";
@@ -50,12 +52,13 @@ const SEVERITY_DOT: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [summary, rows, pulse, nextActions, gaps] = await Promise.all([
+  const [summary, rows, pulse, nextActions, gaps, snapshots] = await Promise.all([
     getDashboardSummary(),
     getCaseMetricRows(),
     getResearchPulse(),
     suggestNextActions(5),
     detectGaps(),
+    getSnapshots(),
   ]);
 
   const palette = HEALTH_COLORS[pulse.health] ?? HEALTH_COLORS.good;
@@ -309,6 +312,11 @@ export default async function DashboardPage() {
             <DashboardCaseTable rows={rows} />
           </>
         )}
+
+        {/* Frozen snapshots — the citable datasets papers reference */}
+        <FadeIn>
+          <SnapshotControls snapshots={snapshots} />
+        </FadeIn>
       </div>
     </div>
   );
