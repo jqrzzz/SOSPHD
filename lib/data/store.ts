@@ -116,9 +116,8 @@ export function mapPriority(priority: string): Severity {
   }
 }
 
-/** Transform an operational case row + patient into SOSPHD's Case type */
+/** Transform an operational case row into SOSPHD's Case type */
 function toCase(row: Record<string, unknown>): Case {
-  const patient = row.patients as Record<string, unknown> | null;
   return {
     id: row.id as string,
     site_id: (row.country as string) ?? "unknown",
@@ -126,7 +125,7 @@ function toCase(row: Record<string, unknown>): Case {
     status: mapStatus(row.status as string),
     severity: mapPriority(row.priority as string),
     chief_complaint: (row.incident_description as string) ?? "",
-    patient_ref: (patient?.medical_id as string) ?? (row.case_number as string) ?? "Unknown",
+    patient_ref: (row.case_number as string) ?? "Unknown",
     notes: (row.notes as string) ?? "",
     source: "operational",
   };
@@ -165,11 +164,18 @@ export function toResearchCase(row: Record<string, unknown>): Case {
 // `public.cases` has ~40 columns; selecting "*" pulls every one across
 // the wire (including PHI-adjacent fields SOSPHD has no business
 // touching). Keep this list minimal and document additions.
-// patients() projects medical_id ONLY. full_name was previously included
-// here — pulled over the wire on every case read and then discarded by
-// toCase(). Real-name PHI has no business transiting SOSPHD at all.
+// NO patients() embed. It used to project medical_id, but embedding
+// public.patients makes every operational case read 500: that table has
+// a self-referential RLS policy and Postgres reports "infinite recursion
+// detected in policy for relation patients" (observed 2026-08-14). The
+// policy lives in the public schema, which SOSWEBSITE/SOSCOMMAND own and
+// SOSPHD must not modify, so the fix belongs on our side of the line.
+//
+// Nothing is lost: patient_ref already falls back to case_number, and
+// dropping the embed removes a patient identifier from the wire
+// entirely, which is the direction this projection was already moving.
 const CASE_COLUMNS =
-  "id, case_number, patient_id, status, priority, country, incident_description, notes, created_at, patients(medical_id)";
+  "id, case_number, patient_id, status, priority, country, incident_description, notes, created_at";
 
 // Inverse of mapStatus — given a research bucket, the set of
 // operational statuses that project into it. Used to push the status
