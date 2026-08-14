@@ -8,6 +8,7 @@ import { APP_CONFIG } from "@/lib/config";
 import { useEffect, useState } from "react";
 import { CommandPalette } from "@/components/command-palette";
 import { QuickCaptureNote, QuickCaptureTask } from "@/components/advisor-quick-capture";
+import { ResearchApiBanner } from "@/components/research-api-banner";
 
 // Grouped by job-to-be-done so the sidebar reads as a map of the
 // research program, not a flat feature list.
@@ -30,6 +31,7 @@ const NAV_SECTIONS = [
   {
     heading: "Writing",
     items: [
+      { href: "/papers", label: "Papers", icon: BookIcon },
       { href: "/docs", label: "Docs", icon: FileTextIcon },
       { href: "/workspace", label: "Workspace", icon: FolderIcon },
       { href: "/advisor", label: "Advisor", icon: BrainIcon },
@@ -208,6 +210,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="flex flex-1 flex-col overflow-hidden">
+        {/* Silent unless the research data path is actually broken. */}
+        <ResearchApiBanner />
+
         {/* Top bar — mobile nav toggle + quick actions */}
         <div className="flex items-center gap-2 border-b border-border/60 bg-background/60 px-3 py-2 backdrop-blur-md">
           <button
@@ -270,6 +275,15 @@ function SpineIcon({ className }: { className?: string }) {
       <path d="M7 10h10" />
       <path d="M8 14h8" />
       <path d="M9 18h6" />
+    </svg>
+  );
+}
+
+function BookIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
     </svg>
   );
 }

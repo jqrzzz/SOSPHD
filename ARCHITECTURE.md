@@ -946,6 +946,18 @@ RLS for empty reads is wasted effort until this switch is checked. The setting i
 platform config (not in the database), so no migration can fix it — it is a
 one-time Dashboard action per project.
 
+**Do not try to fix this from SQL.** PostgREST's in-database configuration
+(`ALTER ROLE authenticator SET pgrst.db_schemas = …` + `NOTIFY pgrst, 'reload
+config'`) was attempted on 2026-08-14 and had **no effect** — Supabase serves
+the exposed-schema list from platform config, and the override was reverted
+rather than left as dangling state. The Dashboard toggle is the only path.
+
+The app now detects this itself: `lib/data/health.ts` probes the research
+schema, `/api/research-health` exposes the verdict, and
+`components/research-api-banner.tsx` renders it at the top of every page.
+PGRST106 gets the exact fix text. Zeros everywhere with no banner means a
+genuinely empty database; zeros *with* the banner means this setting.
+
 ### 8.16 Test coverage
 
 Ten Vitest files, all unit tests, all pure-function or mocked:
