@@ -71,6 +71,16 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
 - Brand color: teal `hsl(170 50% 38%)`
 - Dark mode: blue-tinted backgrounds `hsl(220 20% 6%)`
 
+## Agent Access
+
+- **`AGENTS.md`** (repo root) is the contract for ANY AI agent writing to the
+  database — research-schema-only, PHI rules, consent semantics, `'agent'`
+  tagging. Follow it when writing rows on the owner's behalf.
+- **`mcp/`** is the personal SOSPHD MCP server (single-user, stdio, RLS-scoped
+  via owner sign-in) used by Claude Code / Cowork / OpenClaw. Registered for
+  Claude Code via the root `.mcp.json`. Setup: `mcp/README.md`; plan history:
+  `docs/agent-integration-plan.md`.
+
 ## Key Architecture
 
 - **Read paths** (`lib/data/*-store.ts`) — typed wrappers over Supabase queries. Seed-data fallback in dev with `[SOSPHD:DEGRADED]` warnings.

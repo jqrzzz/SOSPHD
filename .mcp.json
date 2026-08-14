@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sosphd": {
+      "command": "pnpm",
+      "args": ["--dir", "mcp", "run", "start"]
+    }
+  }
+}
