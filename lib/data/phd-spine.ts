@@ -101,9 +101,9 @@ export const PHD_PHASES: Phase[] = [
         id: "step-5a",
         label: "Backfill (2018–2023 data)",
         description:
-          "843 historical cases from operational spreadsheet. Needs insurer normalization (448 strings → ~30 entities) and diagnosis bucketing (free text → coarse categories). Awaiting backfill — research.case_events is currently empty in the live DB.",
-        status: "next",
-        deliverable: "Baseline Case Registry CSV",
+          "DONE 2026-08-13: 836 of the claimed 843 cases (99.2%) ingested into research.cases across two audited batches — insurer normalization (387 strings → 311 entities), diagnosis bucketing, corridor derivation, full de-identification. Key finding: zero milestone timestamps beyond FIRST_CONTACT exist in historical records (docs/paper1-baseline-findings.md §6).",
+        status: "done",
+        deliverable: "Baseline registry in research.cases + docs/paper1-baseline-findings.md",
       },
       {
         id: "step-5b",

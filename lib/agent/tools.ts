@@ -180,13 +180,14 @@ async function identifyResearchGaps() {
     }
   }
 
-  // Historical data import
-  if (RESEARCH_DOMAIN.historicalData.status === "pending_import") {
+  // Historical data import — resolved 2026-08-13 (836 cases ingested).
+  // The check stays so a future status regression resurfaces the gap.
+  if ((RESEARCH_DOMAIN.historicalData.status as string) === "pending_import") {
     gaps.push({
       area: "data",
       gap: `${RESEARCH_DOMAIN.historicalData.caseCount} historical cases not yet imported`,
       severity: "high",
-      suggestion: `Import the ${RESEARCH_DOMAIN.historicalData.dateRange} case data from Google Sheets into Supabase for baseline analysis.`,
+      suggestion: `Import the ${RESEARCH_DOMAIN.historicalData.dateRange} case data into research.cases for baseline analysis.`,
     });
   }
 

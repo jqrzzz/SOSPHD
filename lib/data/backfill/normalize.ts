@@ -18,15 +18,54 @@ function canon(raw: string): string {
 // collapse is built by extending this from the distinct payer strings in
 // the source sheet. Seeded with a couple of illustrative multi-string
 // entities so the shape is clear.
+// Widened 2026-08-13 from the real registry ingest (batches c201c6c2 +
+// b3264682) — these are the aliases the 836 backfilled rows were
+// normalized with. Keep in lockstep with docs/backfill-plan.md.
 const PAYER_ALIASES: Record<string, string> = {
   "ALLIANZ": "Allianz",
   "ALLIANZ PARTNERS": "Allianz",
   "ALLIANZ GLOBAL ASSISTANCE": "Allianz",
+  "ALLIANZ TRAVEL": "Allianz",
+  "MONDIAL": "Allianz",
   "AXA": "AXA",
-  "AXA PARTNERS": "AXA",
+  "AXA UK/INTER PARTNER": "AXA",
+  "AXA ASSISTANCE": "AXA",
+  "INTER PARTNER": "AXA",
+  "INTER PARTNER ASSISTANCE": "AXA",
+  "AIG": "AIG",
+  "AIG TRAVEL GUARD": "AIG",
+  "TRAVEL GUARD": "AIG",
+  "WORLD NOMADS": "World Nomads",
+  "WORLDNOMADS": "World Nomads",
+  "ASSIST CARD": "Assist Card",
+  "ASSISTCARD": "Assist Card",
+  "BLUE CROSS BLUE SHIELD": "Blue Cross Blue Shield",
+  "BCBS": "Blue Cross Blue Shield",
+  "ADAC": "ADAC",
+  "PZU": "PZU",
+  "GJENSIDIGE": "Gjensidige",
+  "RESEBEVIS": "Resebevis",
+  "VIRGIN MONEY": "Virgin Money",
+  "EUROP ASSISTANCE": "Europ Assistance",
+  "EUROPE ASSISTANCE": "Europ Assistance",
+  "SOS INTERNATIONAL": "SOS International",
+  "INTERNATIONAL SOS": "International SOS",
+  "ERV": "ERV",
+  "ERGO": "ERGO",
+  "HANSE MERKUR": "HanseMerkur",
+  "HANSEMERKUR": "HanseMerkur",
+  "TRUE TRAVELLER": "True Traveller",
+  "STAYSURE": "Staysure",
+  "INSUREANDGO": "InsureAndGo",
+  "INSURE AND GO": "InsureAndGo",
   "SELF PAY": "Self-pay",
   "SELF-PAY": "Self-pay",
+  "SELFPAY": "Self-pay",
   "CASH": "Self-pay",
+  "SELF": "Self-pay",
+  "NONE": "Self-pay",
+  "NO INSURANCE": "Self-pay",
+  "N/A": "Self-pay",
 };
 
 /**
@@ -47,15 +86,39 @@ export function normalizePayer(raw?: string | null): string | null {
 
 // Coarse diagnosis buckets via keyword match. v1 keyword lists; widen
 // from the real free-text diagnoses. Order matters — first match wins.
+// Widened 2026-08-13 from the real registry's 487 distinct diagnosis
+// strings. ORDER MATTERS — first match wins; the 836 backfilled rows
+// were bucketed with exactly these rules.
 const DIAGNOSIS_BUCKETS: { bucket: string; keywords: string[] }[] = [
-  { bucket: "cardiac", keywords: ["cardiac", "heart", "mi ", "infarct", "angina", "arrhythm"] },
-  { bucket: "trauma", keywords: ["trauma", "fracture", "fall", "accident", "rta", "injury", "laceration"] },
-  { bucket: "neuro", keywords: ["stroke", "cva", "seizure", "neuro", "head injury", "tbi"] },
-  { bucket: "respiratory", keywords: ["respiratory", "pneumonia", "asthma", "copd", "breath"] },
-  { bucket: "infectious", keywords: ["infection", "sepsis", "dengue", "malaria", "fever", "covid"] },
-  { bucket: "diving", keywords: ["diving", "dcs", "decompression", "scuba", "bends"] },
-  { bucket: "gastro", keywords: ["gastro", "appendic", "abdominal", "diarrh", "vomit"] },
+  { bucket: "gastro", keywords: ["age", "gastro", "diarr", "vomit", "abdominal", "appendic", "food pois", "stomach", "dehydrat", "nausea"] },
+  { bucket: "trauma", keywords: ["trauma", "fracture", "fall", "accident", "rta", "injury", "lacerat", "abrasion", "wound", "sprain", "dislocat", "motorbike", "motorcycle", "bike", "burn", "cut", "contusion", "ankle", "knee", "shoulder"] },
+  { bucket: "marine", keywords: ["sea urchin", "jellyfish", "coral", "marine", "sting ray", "stingray", "fish", "lionfish", "stonefish"] },
+  { bucket: "animal_bite", keywords: ["monkey", "dog bite", "cat bite", "bite", "rabies", "snake", "scorpion"] },
+  { bucket: "infectious", keywords: ["infect", "sepsis", "dengue", "malaria", "fever", "covid", "flu", "virus", "tonsil", "uti", "urinary"] },
+  { bucket: "respiratory", keywords: ["respirat", "pneumonia", "asthma", "copd", "breath", "bronch", "cough"] },
+  { bucket: "neuro", keywords: ["stroke", "cva", "seizure", "neuro", "head injury", "tbi", "concussion", "headache", "migraine"] },
+  { bucket: "cardiac", keywords: ["cardiac", "heart", "infarct", "angina", "arrhythm", "chest pain", "hypertens"] },
+  { bucket: "diving", keywords: ["diving", "dcs", "decompression", "scuba", "bends", "barotrauma"] },
+  { bucket: "derm", keywords: ["rash", "allerg", "skin", "derm", "sunburn", "insect"] },
+  { bucket: "ent", keywords: ["ear", "otitis", "eye", "conjunctiv", "sinus", "throat"] },
 ];
+
+// Short tokens that are substrings of unrelated words ("cut" ⊂ "acute",
+// "age" ⊂ "haemorrhage", "mi" ⊂ "vomit") must match as WHOLE WORDS.
+// Longer keywords stay substring matches so prefixes keep working
+// ("diarr" → diarrhea/diarrhoea, "vomit" → vomiting).
+const WHOLE_WORD_KEYWORDS = new Set(["cut", "age", "mi", "rta", "fall", "bite", "flu"]);
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function keywordMatches(hay: string, keyword: string): boolean {
+  if (WHOLE_WORD_KEYWORDS.has(keyword)) {
+    return new RegExp(`\\b${escapeRegExp(keyword)}\\b`).test(hay);
+  }
+  return hay.includes(keyword);
+}
 
 /**
  * Bucket a free-text diagnosis into a coarse category. Returns "other"
@@ -65,7 +128,7 @@ export function bucketDiagnosis(raw?: string | null): string | null {
   if (!raw || !raw.trim()) return null;
   const hay = raw.toLowerCase();
   for (const { bucket, keywords } of DIAGNOSIS_BUCKETS) {
-    if (keywords.some((k) => hay.includes(k))) return bucket;
+    if (keywords.some((k) => keywordMatches(hay, k))) return bucket;
   }
   return "other";
 }
