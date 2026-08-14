@@ -112,6 +112,9 @@ export interface Outreach {
   updated_at: string;
   user_id: string;
   institution_id: string | null;
+  /** Set when the approach is to a funder rather than a supervisor
+   *  (migration 018 — the same drafting machinery serves both). */
+  opportunity_id: string | null;
   contact_id: string | null;
   person_name: string;
   person_role: string | null;

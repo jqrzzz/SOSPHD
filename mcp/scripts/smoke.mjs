@@ -70,15 +70,16 @@ try {
 
   const list = await request("tools/list", {});
   const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-  check(`tools/list returns 23 tools (got ${names.length})`, names.length === 23);
+  check(`tools/list returns 27 tools (got ${names.length})`, names.length === 27);
   const expected = [
-    "add_contact", "add_institution", "add_journal_entry", "add_mind_map_node",
-    "add_requirement", "add_task", "append_to_doc", "complete_task",
-    "create_note", "draft_outreach", "get_baseline_stats", "get_institution",
-    "link_mind_map_nodes", "list_doc_annotations", "list_institutions",
-    "list_mind_maps", "list_open_tasks", "list_outreach", "list_recent_journal",
-    "search_contacts", "search_docs", "search_notes",
-    "update_institution_stage",
+    "add_contact", "add_funding_opportunity", "add_institution",
+    "add_journal_entry", "add_mind_map_node", "add_requirement", "add_task",
+    "append_to_doc", "complete_task", "create_note", "draft_funder_outreach",
+    "draft_outreach", "get_baseline_stats", "get_institution",
+    "link_mind_map_nodes", "list_doc_annotations", "list_funding",
+    "list_institutions", "list_mind_maps", "list_open_tasks", "list_outreach",
+    "list_recent_journal", "search_contacts", "search_docs", "search_notes",
+    "update_funding_stage", "update_institution_stage",
   ];
   check("tool names match", JSON.stringify(names) === JSON.stringify(expected));
 

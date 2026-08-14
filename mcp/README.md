@@ -19,6 +19,12 @@ and no service-role key exists anywhere.
 set after reading the official page for the current cycle. Outreach is saved
 as a draft — the server has no send capability by design.
 
+*Funding* — `list_funding`, `add_funding_opportunity`, `update_funding_stage`,
+`draft_funder_outreach`. Every opportunity is classified by eligibility
+(`a_open_now` / `c_company_eligible` / `b_needs_affiliation`) because most
+research funding requires an academic host institution the owner does not yet
+have. Funder approaches are drafts too.
+
 Everything an agent writes is tagged (`tags: ['agent']`, mind-map nodes get
 `origin: "agent"`) so you can always tell your writing from an agent's. The
 rules all agents follow are in the repo root `AGENTS.md`.

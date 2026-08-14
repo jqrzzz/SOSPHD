@@ -15,6 +15,10 @@ import {
   type Institution,
   type InstitutionRequirement,
 } from "@/lib/data/admissions-types";
+import {
+  DeadlineTimeline,
+  SchoolComparison,
+} from "@/components/school-comparison";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -125,6 +129,31 @@ export default async function ApplyPage() {
             </CardContent>
           </Card>
         </section>
+
+        {/* Deadline strip — see the pile-up, don't infer it from a list */}
+        {dated.length > 0 && (
+          <Card>
+            <CardContent className="p-5">
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Deadline runway
+              </p>
+              <DeadlineTimeline institutions={active} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Side-by-side comparison */}
+        <Card>
+          <CardContent className="p-5">
+            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Compare
+            </p>
+            <SchoolComparison
+              institutions={active}
+              reqsByInstitution={reqsByInstitution}
+            />
+          </CardContent>
+        </Card>
 
         {/* Live pipeline, deadline order */}
         <section className="flex flex-col gap-3">
