@@ -427,3 +427,66 @@ export async function getAnnotationsByDocId(
   // No seed annotations — an empty margin is the correct empty state.
   return [];
 }
+
+// ── Paper overviews (the /papers surface) ───────────────────────────
+
+export interface PaperOverview {
+  doc: Doc;
+  version_count: number;
+  open_annotations: number;
+}
+
+/**
+ * Docs in the Papers folder with their version and open-annotation
+ * counts. Three queries total (docs, versions, annotations) grouped in
+ * memory rather than one query per paper — the paper set is small and
+ * this keeps the page a fixed cost.
+ */
+export async function getPaperOverviews(): Promise<PaperOverview[]> {
+  const docs = await getDocs({ folder: "Papers" });
+  if (docs.length === 0) return [];
+
+  const ids = docs.map((d) => d.id);
+  const counts = new Map<string, number>();
+  const openNotes = new Map<string, number>();
+
+  const sb = await getServerSupabase();
+  if (sb) {
+    try {
+      const [versions, annotations] = await Promise.all([
+        sb
+          .schema("research")
+          .from("doc_versions")
+          .select("doc_id")
+          .in("doc_id", ids),
+        sb
+          .schema("research")
+          .from("doc_annotations")
+          .select("doc_id")
+          .eq("resolved", false)
+          .in("doc_id", ids),
+      ]);
+      for (const row of (versions.data ?? []) as { doc_id: string }[]) {
+        counts.set(row.doc_id, (counts.get(row.doc_id) ?? 0) + 1);
+      }
+      for (const row of (annotations.data ?? []) as { doc_id: string }[]) {
+        openNotes.set(row.doc_id, (openNotes.get(row.doc_id) ?? 0) + 1);
+      }
+      if (versions.error) warnDegradedMode("getPaperOverviews.versions", versions.error.message);
+      if (annotations.error) {
+        warnDegradedMode("getPaperOverviews.annotations", annotations.error.message);
+      }
+    } catch (e) {
+      warnDegradedMode(
+        "getPaperOverviews",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  }
+
+  return docs.map((doc) => ({
+    doc,
+    version_count: counts.get(doc.id) ?? 0,
+    open_annotations: openNotes.get(doc.id) ?? 0,
+  }));
+}
