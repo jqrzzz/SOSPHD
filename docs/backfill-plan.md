@@ -2,7 +2,24 @@
 
 > Scoping for Phase 1 / Step 5a (`phd-spine.ts`): ingest the historical operational spreadsheet so Paper 1 has descriptive stats to compute over. This doc is the architecture decision + task plan. It does NOT change schema yet — it surfaces the decision that must be made first.
 
-**Status**: FIRST BATCH INGESTED (2026-08-13). Batch
+**Status**: RECONCILED — TWO BATCHES INGESTED (2026-08-13). Total
+**836 backfilled cases** (99.2% of the claimed 843), 844 events, 311
+distinct payer entities. Batch 2 `b3264682-d691-4cec-9d0f-ece4fb62a3cd`
+added 171 cases: 164 rows in the canonical registry that carry a patient
++date but NO file number (the Square Inter Clinic 2019 stream, refs
+`NR-r<row>`), plus 7 cases found only in the older
+MasterDatabase_PatientProviderInsurance files (refs `MC-r<row>`).
+Reconciliation findings: MasterDatabase _a/_b/_c are byte-identical
+copies (SHA-256 of the DATA sheet matches) — the folder README's
+"reconcile which is canonical" is answered: any one of them, and the
+other two can be archived; their 129 case rows overlap the canonical
+registry in 120/129 by exact name+date. The residual ~7 vs the 843
+claim: 2 probable repeat-visit rows (same name, different date — skipped
+deliberately) and counting noise in the original estimate. Name/date
+matching was done entirely in the local ETL; no names touched the
+database.
+
+Previous status: FIRST BATCH INGESTED (2026-08-13). Batch
 `c201c6c2-3f5d-41db-8f06-40bfdef82b82`: **665 cases + 674 events**
 (665 FIRST_CONTACT, 9 TRANSPORT_ACTIVATED) from the canonical source
 `TouristSOS_Master_Claims_Ledger` → "Patient Central Database" sheet in
