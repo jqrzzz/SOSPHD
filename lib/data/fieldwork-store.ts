@@ -1,15 +1,26 @@
-/* ─── Fieldwork Store — READ paths ─────────────────────────────────────
+/* ─── Fieldwork Store — READ paths (client-safe, injectable client) ────
  *  Queries research.journal_entries, research.contacts, research.protocols.
- *  Falls back to seed data when Supabase is unavailable (with a
- *  [SOSPHD:DEGRADED] warning so it's not silent).
  *
  *  IMPORTANT: this file is imported by client components
- *  (/app/fieldwork/page.tsx, /app/contacts/page.tsx). All write paths
- *  live in fieldwork-mutations.ts (server-only) so importing the
- *  server Supabase client doesn't pollute the client bundle.
+ *  (/app/fieldwork/page.tsx, /app/contacts/page.tsx), so it must never
+ *  import the server Supabase client. It therefore defaults to the
+ *  BROWSER client — which carries no session on the server. Every read
+ *  function accepts an optional trailing `client` param for that reason:
+ *
+ *    - Client components: omit it (browser client, session cookies).
+ *    - Server callers (lib/agent/tools.ts, fieldwork-mutations.ts):
+ *      MUST pass a server client, or the query runs as `anon`, RLS
+ *      returns nothing, and the fallback path fires.
+ *
+ *  Fallback policy (lib/data/degraded.ts): seed data in dev, EMPTY in
+ *  production, always with a [SOSPHD:DEGRADED] warning.
+ *
+ *  Write paths live in fieldwork-mutations.ts (server-only).
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabase } from "@/lib/supabase/db";
+import { warnDegradedMode, seedOrEmpty } from "@/lib/data/degraded";
 import type {
   JournalEntry,
   JournalEntryType,
@@ -23,7 +34,7 @@ import type {
 
 const DEMO_USER_ID = "user_demo";
 
-const seedJournal: JournalEntry[] = [
+const seedJournalRaw: Omit<JournalEntry, "consent_status" | "consent_method" | "consent_jurisdiction" | "consent_captured_at">[] = [
   {
     id: "je_001",
     created_at: "2026-03-15T09:30:00Z",
@@ -117,6 +128,16 @@ const seedJournal: JournalEntry[] = [
 // never display anything resembling a real research contact. Real
 // contacts live in research.contacts (Supabase) and are scoped per
 // user_id via RLS.
+// Seed entries predate the consent columns (migration 011); mark them
+// explicitly not_required rather than editing every literal.
+const seedJournal: JournalEntry[] = seedJournalRaw.map((e) => ({
+  ...e,
+  consent_status: "not_required" as const,
+  consent_method: null,
+  consent_jurisdiction: null,
+  consent_captured_at: null,
+}));
+
 const seedContacts: Contact[] = [
   {
     id: "ct_001",
@@ -309,14 +330,17 @@ const seedProtocols: FieldProtocol[] = [
 
 // ── Journal ─────────────────────────────────────────────────────────
 
-export async function getJournalEntries(filters?: {
-  entry_type?: JournalEntryType;
-  tag?: string;
-  search?: string;
-  pinned_only?: boolean;
-  limit?: number;
-}): Promise<JournalEntry[]> {
-  const sb = getSupabase();
+export async function getJournalEntries(
+  filters?: {
+    entry_type?: JournalEntryType;
+    tag?: string;
+    search?: string;
+    pinned_only?: boolean;
+    limit?: number;
+  },
+  client?: SupabaseClient | null,
+): Promise<JournalEntry[]> {
+  const sb = client ?? getSupabase();
   if (sb) {
     try {
       let query = sb
@@ -362,11 +386,14 @@ export async function getJournalEntries(filters?: {
   }
   if (filters?.pinned_only) result = result.filter((e) => e.is_pinned);
   result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  return result.slice(0, filters?.limit ?? 50);
+  return seedOrEmpty(result.slice(0, filters?.limit ?? 50), []);
 }
 
-export async function getJournalEntryById(id: string): Promise<JournalEntry | null> {
-  const sb = getSupabase();
+export async function getJournalEntryById(
+  id: string,
+  client?: SupabaseClient | null,
+): Promise<JournalEntry | null> {
+  const sb = client ?? getSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -376,20 +403,31 @@ export async function getJournalEntryById(id: string): Promise<JournalEntry | nu
         .eq("id", id)
         .single();
       if (!error && data) return data as JournalEntry;
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getJournalEntryById", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getJournalEntryById",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getJournalEntryById", "supabase unavailable");
   }
-  return seedJournal.find((e) => e.id === id) ?? null;
+  return seedOrEmpty(seedJournal.find((e) => e.id === id) ?? null, null);
 }
 
 // ── Contacts ────────────────────────────────────────────────────────
 
-export async function getContacts(filters?: {
-  role?: ContactRole;
-  tag?: string;
-  search?: string;
-  limit?: number;
-}): Promise<Contact[]> {
-  const sb = getSupabase();
+export async function getContacts(
+  filters?: {
+    role?: ContactRole;
+    tag?: string;
+    search?: string;
+    limit?: number;
+  },
+  client?: SupabaseClient | null,
+): Promise<Contact[]> {
+  const sb = client ?? getSupabase();
   if (sb) {
     try {
       let query = sb
@@ -433,11 +471,14 @@ export async function getContacts(filters?: {
     );
   }
   result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  return result.slice(0, filters?.limit ?? 100);
+  return seedOrEmpty(result.slice(0, filters?.limit ?? 100), []);
 }
 
-export async function getContactById(id: string): Promise<Contact | null> {
-  const sb = getSupabase();
+export async function getContactById(
+  id: string,
+  client?: SupabaseClient | null,
+): Promise<Contact | null> {
+  const sb = client ?? getSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -447,18 +488,29 @@ export async function getContactById(id: string): Promise<Contact | null> {
         .eq("id", id)
         .single();
       if (!error && data) return data as Contact;
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getContactById", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getContactById",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getContactById", "supabase unavailable");
   }
-  return seedContacts.find((c) => c.id === id) ?? null;
+  return seedOrEmpty(seedContacts.find((c) => c.id === id) ?? null, null);
 }
 
 // ── Protocols ───────────────────────────────────────────────────────
 
-export async function getProtocols(filters?: {
-  status?: ProtocolStatus;
-  limit?: number;
-}): Promise<FieldProtocol[]> {
-  const sb = getSupabase();
+export async function getProtocols(
+  filters?: {
+    status?: ProtocolStatus;
+    limit?: number;
+  },
+  client?: SupabaseClient | null,
+): Promise<FieldProtocol[]> {
+  const sb = client ?? getSupabase();
   if (sb) {
     try {
       let query = sb
@@ -472,17 +524,28 @@ export async function getProtocols(filters?: {
 
       const { data, error } = await query;
       if (!error && data) return data as FieldProtocol[];
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getProtocols", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getProtocols",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getProtocols", "supabase unavailable");
   }
 
   let result = [...seedProtocols];
   if (filters?.status) result = result.filter((p) => p.status === filters.status);
   result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  return result.slice(0, filters?.limit ?? 50);
+  return seedOrEmpty(result.slice(0, filters?.limit ?? 50), []);
 }
 
-export async function getProtocolById(id: string): Promise<FieldProtocol | null> {
-  const sb = getSupabase();
+export async function getProtocolById(
+  id: string,
+  client?: SupabaseClient | null,
+): Promise<FieldProtocol | null> {
+  const sb = client ?? getSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -492,13 +555,23 @@ export async function getProtocolById(id: string): Promise<FieldProtocol | null>
         .eq("id", id)
         .single();
       if (!error && data) return data as FieldProtocol;
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getProtocolById", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getProtocolById",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getProtocolById", "supabase unavailable");
   }
-  return seedProtocols.find((p) => p.id === id) ?? null;
+  return seedOrEmpty(seedProtocols.find((p) => p.id === id) ?? null, null);
 }
 
-export async function getProtocolTemplates(): Promise<FieldProtocol[]> {
-  return getProtocols({ status: "template" });
+export async function getProtocolTemplates(
+  client?: SupabaseClient | null,
+): Promise<FieldProtocol[]> {
+  return getProtocols({ status: "template" }, client);
 }
 
 export function getProtocolProgress(protocol: FieldProtocol): {

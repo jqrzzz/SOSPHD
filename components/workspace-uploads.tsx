@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createUploadAction, deleteUploadAction } from "@/lib/workspace-actions";
+import { getSupabase, getCurrentUserId } from "@/lib/supabase/db";
 import type { Upload, UploadCategory } from "@/lib/data/workspace-types";
 import { cn, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -75,19 +76,8 @@ export function WorkspaceUploads({
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(
-    async (prev: { error?: string; success?: boolean } | null, formData: FormData) => {
-      const result = await createUploadAction(prev, formData);
-      if (result?.success) {
-        setOpen(false);
-        setSelectedFile(null);
-        toast.success("File reference saved");
-        router.refresh();
-      }
-      return result;
-    },
-    null,
-  );
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,6 +95,74 @@ export function WorkspaceUploads({
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     setSelectedFile(file);
+  }
+
+  /**
+   * Upload the file to the private `research-uploads` bucket FIRST
+   * (path: {auth.uid()}/{uuid}-{filename}, enforced by storage RLS),
+   * then persist metadata with the storage path as `url`. If the
+   * storage upload fails, no metadata row is written — no more
+   * url="#" phantom references.
+   */
+  async function handleUploadSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    if (!selectedFile || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const sb = getSupabase();
+      const userId = await getCurrentUserId();
+      if (!sb || !userId) {
+        setError("Sign in required to upload files.");
+        return;
+      }
+      const safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${userId}/${crypto.randomUUID()}-${safeName}`;
+      const { error: uploadError } = await sb.storage
+        .from("research-uploads")
+        .upload(path, selectedFile, { contentType: selectedFile.type || undefined });
+      if (uploadError) {
+        setError(`Upload failed: ${uploadError.message}`);
+        return;
+      }
+      const fd = new FormData(form);
+      fd.set("url", path);
+      const result = await createUploadAction(null, fd);
+      if (result?.error) {
+        // Metadata failed after the file landed — remove the orphan object.
+        await sb.storage.from("research-uploads").remove([path]);
+        setError(result.error);
+        return;
+      }
+      toast.success("File uploaded");
+      setSelectedFile(null);
+      setOpen(false);
+      router.refresh();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /** Private bucket — serve via a short-lived signed URL. */
+  async function downloadUpload(upload: Upload) {
+    const sb = getSupabase();
+    if (!sb) {
+      toast.error("Supabase is not configured.");
+      return;
+    }
+    if (!upload.url || upload.url === "#") {
+      toast.error("This is a legacy metadata-only reference — no file was stored.");
+      return;
+    }
+    const { data, error: signError } = await sb.storage
+      .from("research-uploads")
+      .createSignedUrl(upload.url, 300);
+    if (signError || !data?.signedUrl) {
+      toast.error(`Could not create download link: ${signError?.message ?? "unknown error"}`);
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -140,7 +198,7 @@ export function WorkspaceUploads({
             <DialogHeader>
               <DialogTitle>Upload File</DialogTitle>
             </DialogHeader>
-            <form action={formAction} className="flex flex-col gap-4">
+            <form onSubmit={handleUploadSubmit} className="flex flex-col gap-4">
               {/* File picker */}
               <div className="flex flex-col gap-2">
                 <Label>File</Label>
@@ -194,7 +252,35 @@ export function WorkspaceUploads({
                 name="category"
                 value={selectedFile ? detectCategory(selectedFile.type) : "other"}
               />
-              <input type="hidden" name="url" value="#" />
+              {/* url is set by handleUploadSubmit to the storage path
+                  after a successful upload. */}
+              <input type="hidden" name="url" value="pending-upload" />
+
+              {/* Research consent for the file's content (recordings!) */}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="upload-consent">Research consent</Label>
+                <Select name="consent_status" defaultValue="not_required">
+                  <SelectTrigger id="upload-consent">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_required">Not required (self-authored)</SelectItem>
+                    <SelectItem value="pending">Pending — consent not yet captured</SelectItem>
+                    <SelectItem value="obtained">Obtained</SelectItem>
+                    <SelectItem value="declined">Declined — exclude from research</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex flex-1 flex-col gap-2">
+                  <Label htmlFor="upload-consent-method">Consent method</Label>
+                  <Input id="upload-consent-method" name="consent_method" placeholder="verbal / written / recorded" />
+                </div>
+                <div className="flex flex-1 flex-col gap-2">
+                  <Label htmlFor="upload-consent-jurisdiction">Jurisdiction</Label>
+                  <Input id="upload-consent-jurisdiction" name="consent_jurisdiction" placeholder="ISO code, e.g. TH" maxLength={8} />
+                </div>
+              </div>
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="upload-tags">Tags (comma-separated)</Label>
@@ -219,14 +305,16 @@ export function WorkspaceUploads({
                   <Input id="upload-doc" name="linked_doc_id" placeholder="doc_001" />
                 </div>
               </div>
-              {state?.error && (
-                <p className="text-sm text-destructive" role="alert">{state.error}</p>
+              {error && (
+                <p className="text-sm text-destructive" role="alert">{error}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Saves file metadata for reference tracking. File content is not uploaded.
+                Uploads to the private research-uploads bucket, then saves the
+                metadata reference. Files are served via short-lived signed
+                links.
               </p>
               <Button type="submit" disabled={pending || !selectedFile}>
-                {pending ? "Saving..." : "Save Reference"}
+                {pending ? "Uploading..." : "Upload & Save"}
               </Button>
             </form>
           </DialogContent>
@@ -293,20 +381,30 @@ export function WorkspaceUploads({
                     {formatDate(upload.created_at, "short")}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        if (window.confirm(`Delete "${upload.filename}"?`)) {
-                          deleteUploadAction(upload.id);
-                          toast.success("File reference deleted");
-                          router.refresh();
-                        }
-                      }}
-                    >
-                      Delete
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => downloadUpload(upload)}
+                      >
+                        Download
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          if (window.confirm(`Delete "${upload.filename}"?`)) {
+                            deleteUploadAction(upload.id);
+                            toast.success("File reference deleted");
+                            router.refresh();
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -1,5 +1,6 @@
 /* ─── Docs Module Types ────────────────────────────────────────────────
- *  Mirror the target Postgres schema for docs and doc_versions.
+ *  Mirror the live research.{docs,doc_versions} rows — except
+ *  Doc.site_id, which has no DB column (mapDbDoc coerces it to null).
  * ────────────────────────────────────────────────────────────────────── */
 
 export type DocStatus = "draft" | "active" | "archived";

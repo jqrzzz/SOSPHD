@@ -11,8 +11,10 @@ import { FadeIn } from "@/components/motion/fade-in";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 
+const PAGE_SIZE = 50;
+
 export default async function CasesPage(props: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   const searchParams = await props.searchParams;
   const statusFilter = searchParams.status as
@@ -27,11 +29,29 @@ export default async function CasesPage(props: {
     search: searchQuery,
   });
 
-  const eventCountMap = await getEventCountsByCaseIds(cases.map((c) => c.id));
-
+  // Counts come from the FULL filtered set; the table renders one page.
   const openCount = cases.filter((c) => c.status === "open").length;
   const activeCount = cases.filter((c) => c.status === "active").length;
   const closedCount = cases.filter((c) => c.status === "closed").length;
+
+  const totalPages = Math.max(1, Math.ceil(cases.length / PAGE_SIZE));
+  const page = Math.min(
+    totalPages,
+    Math.max(1, Number.parseInt(searchParams.page ?? "1", 10) || 1),
+  );
+  const pageCases = cases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Event counts only for the visible page — keeps the IN() clause small.
+  const eventCountMap = await getEventCountsByCaseIds(pageCases.map((c) => c.id));
+
+  const pageHref = (target: number) => {
+    const params = new URLSearchParams();
+    if (statusFilter) params.set("status", statusFilter);
+    if (searchQuery) params.set("q", searchQuery);
+    if (target > 1) params.set("page", String(target));
+    const qs = params.toString();
+    return qs ? `/cases?${qs}` : "/cases";
+  };
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -138,6 +158,9 @@ export default async function CasesPage(props: {
                     <th className="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                       Chief complaint
                     </th>
+                    <th className="hidden px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground lg:table-cell">
+                      Corridor
+                    </th>
                     <th className="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                       Status
                     </th>
@@ -150,7 +173,7 @@ export default async function CasesPage(props: {
                   </tr>
                 </thead>
                 <tbody>
-                  {cases.map((c) => {
+                  {pageCases.map((c) => {
                     const eventCount = eventCountMap.get(c.id) ?? 0;
                     return (
                       <tr
@@ -176,6 +199,9 @@ export default async function CasesPage(props: {
                         <td className="max-w-[260px] truncate px-4 py-3 text-sm text-muted-foreground">
                           {c.chief_complaint}
                         </td>
+                        <td className="hidden max-w-[180px] truncate px-4 py-3 text-xs text-muted-foreground lg:table-cell">
+                          {c.corridor ?? (c.site_id !== "unknown" ? c.site_id : "—")}
+                        </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={c.status} />
                         </td>
@@ -199,6 +225,39 @@ export default async function CasesPage(props: {
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border/60 px-4 py-2.5">
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  Page {page} of {totalPages} · {cases.length} cases
+                </span>
+                <div className="flex items-center gap-2">
+                  {page > 1 ? (
+                    <Link
+                      href={pageHref(page - 1)}
+                      className="rounded-md border border-border/70 px-2.5 py-1 text-xs text-foreground transition-colors hover:bg-accent"
+                    >
+                      ← Prev
+                    </Link>
+                  ) : (
+                    <span className="rounded-md border border-border/40 px-2.5 py-1 text-xs text-muted-foreground/40">
+                      ← Prev
+                    </span>
+                  )}
+                  {page < totalPages ? (
+                    <Link
+                      href={pageHref(page + 1)}
+                      className="rounded-md border border-border/70 px-2.5 py-1 text-xs text-foreground transition-colors hover:bg-accent"
+                    >
+                      Next →
+                    </Link>
+                  ) : (
+                    <span className="rounded-md border border-border/40 px-2.5 py-1 text-xs text-muted-foreground/40">
+                      Next →
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </Card>
         )}
       </div>

@@ -3,48 +3,78 @@ import Link from "next/link";
 const STEPS = [
   {
     number: "1",
-    title: "Log a Case",
-    page: "/cases",
-    pageLabel: "Cases",
+    title: "Track the PhD Spine",
+    page: "/spine",
+    pageLabel: "Spine",
     description:
-      "Start by creating a medical-emergency case. Each case tracks a tourist patient, their condition, severity, and current status. This is the raw data your research is built on.",
-    actions: ["Click 'New Case' and fill in the details", "Update status as the case progresses", "Add timeline events to record what happened and when"],
+      "The spine is home base: phases, steps, open definitional questions, and where the program stands. Start every session here.",
+    actions: [
+      "Check the current phase and the 'up next' step",
+      "Review open questions before making methodology calls",
+    ],
   },
   {
     number: "2",
-    title: "Check the Dashboard",
-    page: "/dashboard",
-    pageLabel: "Dashboard",
+    title: "Observe Cases (read-only)",
+    page: "/cases",
+    pageLabel: "Cases",
     description:
-      "The dashboard gives you a live overview of all your cases — total counts, severity breakdown, response times, and trends. Use it to spot patterns at a glance.",
-    actions: ["Review summary stats across all cases", "Use Paper Builder to draft research narratives from your data"],
+      "Cases arrive automatically from SOSCOMMAND — SOSPHD never creates or edits them. Open one to see its milestone timeline, computed TTTA/TTGP/TTDC, operational context, and the AI recommendation surface Paper 2 measures.",
+    actions: [
+      "Open a case to review its timeline and metrics",
+      "Add milestone events the sync missed (operator-entered, provenance-stamped)",
+      "Generate recommendations, then accept or override each with a reason — every decision is the Paper 2 audit trail",
+    ],
   },
   {
     number: "3",
+    title: "Capture Fieldwork & Contacts",
+    page: "/fieldwork",
+    pageLabel: "Field Journal",
+    description:
+      "Site visits, conversations, interviews, ideas — with corridor tagging and the research-consent gate. Contacts is the research network CRM. Records involving other people need consent captured AT THE TIME to be usable in a paper.",
+    actions: [
+      "Log entries same-day; set consent status, method, and jurisdiction",
+      "Use the consent script in docs/consent-framework.md before recording anyone",
+      "Link entries to contacts and corridors so coverage analysis sees them",
+    ],
+  },
+  {
+    number: "4",
+    title: "Check the Dashboard & Freeze Datasets",
+    page: "/dashboard",
+    pageLabel: "Dashboard",
+    description:
+      "Distributions of TTTA, TTGP, and TTDC across all cases, the Paper 2 coordination view, corridor coverage, and the weekly digest. Before drafting results, freeze an analysis snapshot — papers cite a named frozen dataset, not a live dashboard.",
+    actions: [
+      "Review metric distributions and missing milestones",
+      "Freeze a labeled snapshot before any analysis you intend to cite",
+      "Use Paper Builder to draft sections from the live provenance data",
+    ],
+  },
+  {
+    number: "5",
     title: "Write & Organise Docs",
     page: "/docs",
     pageLabel: "Docs",
     description:
-      "Create research documents — paper drafts, field logs, one-pagers. Docs are version-tracked so you never lose earlier work. Organise them into folders and tag them.",
-    actions: ["Create a new doc from a template or start blank", "Edit with Markdown — every save creates a version", "Use AI polish to clean up your writing"],
+      "Research documents — paper drafts, field logs, methods notes. Version-tracked, foldered, tagged. The /protocol page holds the versioned Intervention Protocol the recommendation engine cites.",
+    actions: [
+      "Draft in Markdown; save versions at meaningful checkpoints",
+      "Use the AI tools (summarize, outline, extract tasks) on any doc",
+    ],
   },
   {
-    number: "4",
-    title: "Use the Workspace",
+    number: "6",
+    title: "Use the Workspace & Advisor",
     page: "/workspace",
     pageLabel: "Workspace",
     description:
-      "The workspace is your research bench — capture quick notes, track tasks, log file metadata, and build mind maps to connect your ideas visually.",
-    actions: ["Jot notes and tag them to cases or themes", "Create tasks to track your research to-dos", "Build mind maps to visualise how concepts connect"],
-  },
-  {
-    number: "5",
-    title: "Ask the Advisor",
-    page: "/advisor",
-    pageLabel: "Advisor",
-    description:
-      "The AI advisor knows your cases, docs, and workspace. Ask it questions about your research, get methodology suggestions, or brainstorm hypotheses. It also has Quick Capture for fast note/task creation.",
-    actions: ["Start a session and ask a research question", "Use Quick Capture to log a note or task on the fly"],
+      "The bench: notes, tasks, mind maps, and real file uploads (private bucket, consent-tagged). The Advisor is a streaming AI assistant that sees your cases, metrics, gaps, and tasks.",
+    actions: [
+      "Upload recordings/documents with their consent status",
+      "Ask the Advisor 'what should I work on next?' — it reads the live gap analysis",
+    ],
   },
 ];
 
@@ -54,7 +84,7 @@ export default function GuidePage() {
       {/* Header */}
       <header className="border-b border-border px-6 py-5">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          How to Use ResearchOS
+          How to Use SOS PHD
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           A simple walkthrough of the platform — what each section does and what you should do in it.
@@ -66,12 +96,13 @@ export default function GuidePage() {
         <div className="rounded-lg border border-border bg-card p-5">
           <h2 className="text-sm font-semibold text-foreground">What is this app?</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            ResearchOS is a PhD research platform for studying tourist medical-emergency coordination.
-            It connects to a live operational database so you can observe real cases, document your
-            research, and build publications — all in one place. Think of it as five tools in one:
+            SOS PHD is the research workbench for studying tourist medical-emergency coordination.
+            It reads live operational cases (read-only — cases originate in SOSCOMMAND), computes the
+            TTTA/TTGP/TTDC metrics, runs the human-AI recommendation loop Paper 2 measures, and holds
+            all of the researcher's own material:
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {["Cases = data", "Dashboard = overview", "Docs = writing", "Workspace = organising", "Advisor = AI help"].map(
+            {["Spine = plan", "Cases = data (read-only)", "Fieldwork = capture", "Dashboard = analysis", "Docs = writing", "Workspace = bench", "Advisor = AI help"].map(
               (label) => (
                 <span
                   key={label}
@@ -128,8 +159,9 @@ export default function GuidePage() {
       {/* Footer tip */}
       <div className="border-t border-border px-6 py-4">
         <p className="text-xs text-muted-foreground">
-          Tip: You can always get back here from the sidebar. If something feels broken, check the
-          Dashboard first — it tells you if data is flowing correctly.
+          Tip: If something feels broken, check the Dashboard first — it tells you whether data is
+          flowing. A [SOSPHD:DEGRADED] warning in the server logs means a read fell back to empty
+          data and needs attention.
         </p>
       </div>
     </div>

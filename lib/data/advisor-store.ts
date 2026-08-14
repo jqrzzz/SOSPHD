@@ -1,15 +1,25 @@
-/* ─── Advisor Store — READ paths ───────────────────────────────────────
+/* ─── Advisor Store — READ paths (SERVER ONLY) ─────────────────────────
  *  Queries research.{notes, tasks, advisor_sessions, advisor_messages}.
- *  Falls back to seed data when Supabase is unavailable (with a
- *  [SOSPHD:DEGRADED] warning so it's not silent).
  *
- *  Writes live in advisor-mutations.ts (server-only) so importing
- *  the server Supabase client doesn't pollute the client bundle.
+ *  SERVER ONLY as of the Phase 2 client unification: every consumer of
+ *  this store is a server context (server components, API routes,
+ *  lib/agent/tools.ts, lib/data/context-builder.ts), and the previous
+ *  browser client carried no session cookies on the server — queries ran
+ *  as `anon`, RLS returned nothing, and the seed fallback silently served
+ *  fabricated content. The `server-only` import makes any future client
+ *  import a build error instead of a repeat of that bug.
  *
- *  Per Phase 3 of audit-action-plan.md, this file is reads-only.
+ *  Fallback policy (lib/data/degraded.ts): seed data in dev, EMPTY in
+ *  production, always with a [SOSPHD:DEGRADED] warning.
+ *
+ *  Per Phase 3 of audit-action-plan.md, this file is reads-only; writes
+ *  live in advisor-mutations.ts.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
+import "server-only";
+
+import { getServerSupabase } from "@/lib/supabase/server-auth";
+import { warnDegradedMode, seedOrEmpty } from "@/lib/data/degraded";
 import type {
   ResearchNote,
   ResearchTask,
@@ -153,7 +163,7 @@ const seedSessions: AdvisorSession[] = [
 // ── Notes (reads only — writes in advisor-mutations.ts) ─────────────
 
 export async function getNotes(limit = 10): Promise<ResearchNote[]> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -173,9 +183,12 @@ export async function getNotes(limit = 10): Promise<ResearchNote[]> {
   } else {
     warnDegradedMode("getNotes", "supabase env vars missing");
   }
-  return [...seedNotes]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, limit);
+  return seedOrEmpty(
+    [...seedNotes]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, limit),
+    [],
+  );
 }
 
 // ── Tasks (reads only) ──────────────────────────────────────────────
@@ -184,7 +197,7 @@ export async function getTasks(filters?: {
   status?: TaskStatus;
   limit?: number;
 }): Promise<ResearchTask[]> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       let query = sb
@@ -216,13 +229,13 @@ export async function getTasks(filters?: {
     if (a.priority !== b.priority) return a.priority - b.priority;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
-  return result.slice(0, filters?.limit ?? 50);
+  return seedOrEmpty(result.slice(0, filters?.limit ?? 50), []);
 }
 
 // ── Sessions (reads only) ───────────────────────────────────────────
 
 export async function getSessions(): Promise<AdvisorSession[]> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -241,7 +254,10 @@ export async function getSessions(): Promise<AdvisorSession[]> {
   } else {
     warnDegradedMode("getSessions", "supabase env vars missing");
   }
-  return [...seedSessions].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  return seedOrEmpty(
+    [...seedSessions].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    ),
+    [],
   );
 }

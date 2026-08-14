@@ -15,6 +15,7 @@
 
 import { requireAuthOrThrow } from "@/lib/supabase/server-auth";
 import { getProtocolById } from "./fieldwork-store";
+import type { ConsentStatus } from "./types";
 import type {
   JournalEntry,
   JournalEntryType,
@@ -36,6 +37,10 @@ export async function createJournalEntry(data: {
   contact_ids?: string[];
   linked_case_id?: string | null;
   attachments?: JournalAttachment[];
+  consent_status?: ConsentStatus;
+  consent_method?: string | null;
+  consent_jurisdiction?: string | null;
+  consent_captured_at?: string | null;
 }): Promise<JournalEntry> {
   const { supabase: sb, userId } = await requireAuthOrThrow();
 
@@ -54,6 +59,10 @@ export async function createJournalEntry(data: {
       linked_case_id: data.linked_case_id ?? null,
       attachments: data.attachments ?? [],
       is_pinned: false,
+      consent_status: data.consent_status ?? "not_required",
+      consent_method: data.consent_method ?? null,
+      consent_jurisdiction: data.consent_jurisdiction ?? null,
+      consent_captured_at: data.consent_captured_at ?? null,
     })
     .select()
     .single();
@@ -215,11 +224,14 @@ export async function createProtocolFromTemplate(
     linked_contact_ids?: string[];
   },
 ): Promise<FieldProtocol> {
-  const template = await getProtocolById(templateId);
+  // Auth first so the template lookup runs on the server client with the
+  // caller's session — the store's default browser client has no session
+  // in this server-only module (Phase 2 fix).
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const template = await getProtocolById(templateId, sb);
   if (!template) {
     throw new Error("Template not found");
   }
-  const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
     .schema("research")
     .from("protocols")

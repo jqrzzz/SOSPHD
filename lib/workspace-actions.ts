@@ -30,6 +30,11 @@ const uploadSchema = z.object({
   notes: z.string().optional().default(""),
   linked_case_id: z.string().optional().default(""),
   linked_doc_id: z.string().optional().default(""),
+  consent_status: z
+    .enum(["not_required", "pending", "obtained", "declined"])
+    .default("not_required"),
+  consent_method: z.string().optional().default(""),
+  consent_jurisdiction: z.string().optional().default(""),
 });
 
 // ── Upload actions ───────────────────────────────────────────────────
@@ -48,6 +53,9 @@ export async function createUploadAction(
     notes: formData.get("notes") ?? "",
     linked_case_id: formData.get("linked_case_id") ?? "",
     linked_doc_id: formData.get("linked_doc_id") ?? "",
+    consent_status: formData.get("consent_status") ?? "not_required",
+    consent_method: formData.get("consent_method") ?? "",
+    consent_jurisdiction: formData.get("consent_jurisdiction") ?? "",
   };
 
   const parsed = uploadSchema.safeParse(raw);
@@ -73,6 +81,13 @@ export async function createUploadAction(
       notes: parsed.data.notes,
       linked_case_id: parsed.data.linked_case_id || null,
       linked_doc_id: parsed.data.linked_doc_id || null,
+      consent_status: parsed.data.consent_status,
+      consent_method: parsed.data.consent_method || null,
+      consent_jurisdiction: parsed.data.consent_jurisdiction || null,
+      consent_captured_at:
+        parsed.data.consent_status === "obtained"
+          ? new Date().toISOString()
+          : null,
     });
   } catch (err) {
     return {

@@ -30,7 +30,7 @@ SOSPHD is **one of six apps** sharing a single Supabase project (`jnbxkvlkqmwnql
 | Route | What you can do |
 |---|---|
 | `/spine` | PhD phase tracker. Where I am in the program. |
-| `/cases` | Operational cases (sourced from SOSCOMMAND), with TTTA/TTGP/TTDC metrics computed per case. |
+| `/cases` | Operational cases (SOSCOMMAND) unioned with historical research cases, with TTTA/TTGP/TTDC computed per case. |
 | `/cases/[id]` | Single-case detail: timeline, metrics, operational context, AI recommendations + decisions. The Paper 2 surface. |
 | `/dashboard` | Phase 1 (Paper 1) dashboard. Distributions of TTTA, TTGP, TTDC across all cases. |
 | `/dashboard/paper2` | Phase 2 (Paper 2) dashboard. Acceptance rate, confidence calibration, engine breakdown, override reasons. |
@@ -59,12 +59,12 @@ Event timestamps come from two sources, distinguishable by `actor_id`:
 
 ## Bootstrap (development)
 
-Requires Node 22+.
+Requires Node 22+ and pnpm 10 (`corepack enable` or `npm i -g pnpm`).
 
 ```bash
-git clone https://github.com/jqrzzz/sosphd.git
-cd sosphd
-npm install --legacy-peer-deps
+git clone https://github.com/jqrzzz/SOSPHD.git
+cd SOSPHD
+pnpm install --frozen-lockfile
 ```
 
 ### Environment variables
@@ -84,19 +84,19 @@ SOSPHD_MODEL_RECOMMENDATIONS=gpt-4o
 SOSPHD_MODEL_DEFAULT=gpt-4o-mini
 ```
 
-**Dev without Supabase.** If `NEXT_PUBLIC_SUPABASE_*` is missing, the app runs in degraded mode: middleware skips auth redirects, server actions return `dev_user`, and read paths emit `[SOSPHD:DEGRADED]` warnings to console. You'll see seed/empty data in the UI. This is intentional for clean checkouts but **must** be configured for any deployment.
+**Dev without Supabase.** If `NEXT_PUBLIC_SUPABASE_*` is missing, the app runs in degraded mode: middleware skips auth redirects, AI route handlers return `dev_user`, server actions throw `AuthRequiredError`, and read paths emit `[SOSPHD:DEGRADED]` warnings to console. You'll see seed/empty data in the UI. This is intentional for clean checkouts; in production builds `lib/env.ts:assertProductionEnv` refuses to serve requests until the Supabase vars are set.
 
 ```bash
-npm run dev    # http://localhost:3000
+pnpm dev    # http://localhost:3000
 ```
 
 ### Run the gates
 
 ```bash
-npm run lint        # ESLint v9 flat config
-npx tsc --noEmit    # TypeScript strict check
-npm run build       # production build
-npm test            # Vitest unit tests
+pnpm run lint         # ESLint v9 flat config
+pnpm exec tsc --noEmit  # TypeScript strict check
+pnpm run build        # production build
+pnpm test             # Vitest unit tests
 ```
 
 CI runs all four on every push and PR (`.github/workflows/ci.yml`).
@@ -105,10 +105,13 @@ CI runs all four on every push and PR (`.github/workflows/ci.yml`).
 
 ## Database
 
-The schema lives in `supabase/migrations/`. The two files that matter for SOSPHD specifically:
+The schema lives in `supabase/migrations/`. The files that matter most for SOSPHD specifically:
 
 - `20260516_004_research_schema_snapshot.sql` — full DDL for the `research.*` schema (10 tables, 7 enums, RLS policies, indexes). Authoritative; idempotent. A fresh clone applying migrations in order reaches the same state the live project has.
 - `20260516_005_recommendations_decision_audit.sql` — adds `decided_by` + `decided_at` to `research.recommendations` with a CHECK constraint enforcing the pending/decided invariant.
+- `20260519_006_case_events_dedup_and_triage.sql` — the `(case_id, event_type, occurred_at, actor_id)` dedup constraint + the TRIAGE_COMPLETE trigger.
+- `20260528_008_research_cases_allowlist.sql` — `research.cases` dimension + the SD-001 `allowed_users` allowlist gating the research spine.
+- `20260813_009` … `20260813_013` — grants normalization, decision immutability, consent fields, frozen analysis snapshots, and the private `research-uploads` storage bucket.
 
 The shared Supabase project has 400+ other migrations owned by SOSCOMMAND, SOSWEBSITE, etc. They live in those repos.
 

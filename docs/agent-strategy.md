@@ -2,7 +2,7 @@
 
 > Long-term plan for evolving SOSPHD from a research workbench into a credentialed, citable, callable AI agent in the tourist-medical-emergency-coordination niche. This doc is meant to evolve — update it when decisions are made, items are completed, or the landscape shifts.
 
-**Last updated**: 2026-05-18
+**Last updated**: 2026-08-13 (asset table + naming corrected; body still reflects the May 2026 landscape scan)
 **Owner**: Juan Quiroz Jr.
 **Companion docs**: [`CLAUDE.md`](../CLAUDE.md) (project rules), [`app/protocol/page.tsx`](../app/protocol/page.tsx) (intervention protocol v0.1)
 
@@ -30,12 +30,12 @@ Built between Feb–May 2026. Don't rebuild these.
 | Intervention protocol (citable, versioned) | [`/protocol`](../app/protocol/page.tsx), [`lib/protocol.ts`](../lib/protocol.ts) | ✓ Live. v0.1, six numbered sections, git-versioned audit trail |
 | Recommendation engine with provenance | [`lib/recommendations.ts`](../lib/recommendations.ts), [`POST /api/recommendations/generate`](../app/api/recommendations/generate/route.ts) | ✓ Live. engine_version, confidence, protocol cited in prompt |
 | First-class decision audit | `research.recommendations.decided_by`, `decided_at` | ✓ Live. Migration `20260516_005` + CHECK constraint |
-| Operational data sync | [`lib/data/sync.ts`](../lib/data/sync.ts) | ✓ Live. SOSCOMMAND → research.case_events, idempotent |
+| Operational data sync | DB triggers — [`supabase/migrations/20260402_003`](../supabase/migrations/20260402_003_auto_sync_triggers.sql) + [`20260519_006`](../supabase/migrations/20260519_006_case_events_dedup_and_triage.sql) | ✓ Live. SOSCOMMAND → research.case_events, dedup'd, SECURITY DEFINER. (`lib/data/sync.ts` was deleted — triggers replaced app-level sync.) |
 | Pure analytics (no DB N+1) | [`lib/data/analytics.ts`](../lib/data/analytics.ts) | ✓ Live. 3 queries regardless of dataset size |
 | Centralized AI config | [`lib/ai/config.ts`](../lib/ai/config.ts) | ✓ Live. Per-surface model overrides via env var |
 | Auth gates on all LLM endpoints | All `app/api/*/route.ts` | ✓ Live. `requireAuthenticatedUser` |
 | Server-side auth helper | [`lib/supabase/server-auth.ts`](../lib/supabase/server-auth.ts) | ✓ Live |
-| Tests for new analytics + sync | `lib/data/__tests__/*` | ✓ 48 passing |
+| Tests | `lib/**/__tests__/*` | ✓ 12 suites (analytics, metrics, projections, sanitizers, model routing, intervention classification, missingness, backfill transform) |
 | CI gates: lint, typecheck, build, test | `.github/workflows/ci.yml` | ✓ Green |
 
 **Key implication**: the agent-shaped scaffold is already there. The work ahead is wrapping it for external consumption, not rebuilding it.
@@ -79,8 +79,8 @@ Phrased as a one-line value proposition: *"The only externally-callable AI agent
 
 Goal: another agent can authenticate, call, and receive a self-justifying response.
 
-- [ ] **Service tokens** — `phd_service_tokens(token_hash, owner_email, scopes, rate_limit_qpm, monthly_quota, expires_at, last_used_at)`. SHA-256 hashed storage (pattern already in `service_account_tokens` in SOSCOMMAND). Bearer auth middleware on `/api/agent` and `/api/recommendations/generate`. Admin page at `/admin/tokens`.
-- [ ] **Usage metering** — `phd_api_usage(token_id, route, action, model_used, tokens_in, tokens_out, latency_ms, cents_charged, occurred_at)`. Surfaced as a chart on the admin page.
+- [ ] **Service tokens** — `research.service_tokens(token_hash, owner_email, scopes, rate_limit_qpm, monthly_quota, expires_at, last_used_at)`. SHA-256 hashed storage (pattern already in `service_account_tokens` in SOSCOMMAND). Bearer auth middleware on `/api/agent` and `/api/recommendations/generate`. Admin page at `/admin/tokens`.
+- [ ] **Usage metering** — `research.api_usage(token_id, route, action, model_used, tokens_in, tokens_out, latency_ms, cents_charged, occurred_at)`. Surfaced as a chart on the admin page.
 - [ ] **Provenance receipts on every response** — extend `AgentResponse.meta` to include: `engine_version`, `protocol_version`, `queries_run[]`, `citations[]` (case ids, paper sections, doc ids), `confidence`, `confidence_basis`, `data_window`. Make this the default response shape, not an opt-in.
 - [ ] **PHI redaction tier** — token scopes: `aggregate` (counts, rates, distributions only) vs `case-level` (individual rows with patient_ref). Default new tokens to `aggregate`. The `case-level` tier requires manual approval + a documented business reason.
 - [ ] **Hard scope rejection** — when a caller asks something outside the protocol's §1 scope (clinical orders, regions outside SEA, etc.), return a structured `{ refusal: "out_of_scope", reason, suggested_alternatives }` rather than attempting a low-confidence answer.

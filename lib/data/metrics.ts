@@ -17,10 +17,12 @@ import type { CaseEvent, EventType, MetricResult } from "./types";
  *
  * MEASUREMENT PROJECTION NOTE: when a case has multiple events of
  * the same type (e.g. a multi-leg journey with two FACILITY_ARRIVAL
- * events), only the first leg contributes to TTTA/TTGP/TTDC. This is
- * reinforced by the DB trigger dedup at (case_id, event_type) — see
- * `migrations/003_auto_sync_triggers.sql`. Paper 1's methods section
- * must document this assumption.
+ * events), only the first leg contributes to TTTA/TTGP/TTDC. The DB
+ * deliberately PERMITS multiple same-type events — its dedup is the
+ * full tuple (case_id, event_type, occurred_at, actor_id), see
+ * supabase/migrations/20260519_006_case_events_dedup_and_triage.sql —
+ * so the earliest-of-type rule lives HERE in findEvent, not in the
+ * schema. docs/measurement-projection.md §4 is the methods writeup.
  */
 function findEvent(events: CaseEvent[], type: EventType): CaseEvent | undefined {
   return events.find((e) => e.event_type === type);

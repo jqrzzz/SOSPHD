@@ -80,6 +80,59 @@ export default async function CaseDetailPage(props: {
               {recommendations.length} recommendation
               {recommendations.length === 1 ? "" : "s"}
             </p>
+            {/* Research dimensions (populated for research.cases rows) */}
+            {(caseData.corridor ||
+              caseData.diagnosis_bucket ||
+              caseData.payer_entity ||
+              caseData.nationality ||
+              caseData.evacuated != null) && (
+              <dl className="mt-1 flex flex-wrap gap-x-5 gap-y-1.5">
+                {caseData.corridor && (
+                  <div className="flex items-baseline gap-1.5">
+                    <dt className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60">
+                      Corridor
+                    </dt>
+                    <dd className="text-xs text-foreground/90">{caseData.corridor}</dd>
+                  </div>
+                )}
+                {caseData.diagnosis_bucket && (
+                  <div className="flex items-baseline gap-1.5">
+                    <dt className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60">
+                      Diagnosis
+                    </dt>
+                    <dd className="text-xs text-foreground/90">
+                      {caseData.diagnosis_bucket.replaceAll("_", " ")}
+                    </dd>
+                  </div>
+                )}
+                {caseData.payer_entity && (
+                  <div className="flex items-baseline gap-1.5">
+                    <dt className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60">
+                      Payer
+                    </dt>
+                    <dd className="text-xs text-foreground/90">{caseData.payer_entity}</dd>
+                  </div>
+                )}
+                {caseData.nationality && (
+                  <div className="flex items-baseline gap-1.5">
+                    <dt className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60">
+                      Nationality
+                    </dt>
+                    <dd className="text-xs text-foreground/90">{caseData.nationality}</dd>
+                  </div>
+                )}
+                {caseData.evacuated != null && (
+                  <div className="flex items-baseline gap-1.5">
+                    <dt className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60">
+                      Evacuated
+                    </dt>
+                    <dd className="text-xs text-foreground/90">
+                      {caseData.evacuated ? "Yes" : "No"}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            )}
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 /* ─── Supabase-Backed Data Store ─────────────────────────────────────
- *  Reads cases from public schema (operational).
- *  Reads/writes events & recommendations from research schema.
+ *  Reads cases from public.cases (operational) UNIONED with
+ *  research.cases (historical/research-native) — see getCases.
+ *  Reads/writes events & recommendations from the research schema.
  *  All functions are async — consumers must await.
  *
  *  When Supabase env vars are not configured (e.g. local dev without
@@ -150,6 +151,11 @@ export function toResearchCase(row: Record<string, unknown>): Case {
     patient_ref: (row.patient_ref as string) ?? "Unknown",
     notes: "",
     source: "historical",
+    corridor: (row.corridor as string | null) ?? null,
+    diagnosis_bucket: (row.diagnosis_bucket as string | null) ?? null,
+    payer_entity: (row.payer_entity as string | null) ?? null,
+    nationality: (row.nationality as string | null) ?? null,
+    evacuated: (row.evacuated as boolean | null) ?? null,
   };
 }
 
@@ -159,8 +165,11 @@ export function toResearchCase(row: Record<string, unknown>): Case {
 // `public.cases` has ~40 columns; selecting "*" pulls every one across
 // the wire (including PHI-adjacent fields SOSPHD has no business
 // touching). Keep this list minimal and document additions.
+// patients() projects medical_id ONLY. full_name was previously included
+// here — pulled over the wire on every case read and then discarded by
+// toCase(). Real-name PHI has no business transiting SOSPHD at all.
 const CASE_COLUMNS =
-  "id, case_number, patient_id, status, priority, country, incident_description, notes, created_at, patients(full_name, medical_id)";
+  "id, case_number, patient_id, status, priority, country, incident_description, notes, created_at, patients(medical_id)";
 
 // Inverse of mapStatus — given a research bucket, the set of
 // operational statuses that project into it. Used to push the status
@@ -225,7 +234,7 @@ export async function getResearchCases(
       .schema("research")
       .from("cases")
       .select(
-        "id, status, severity, country, incident_summary, patient_ref, created_at",
+        "id, status, severity, country, incident_summary, patient_ref, created_at, corridor, diagnosis_bucket, payer_entity, nationality, evacuated",
       )
       .order("created_at", { ascending: false });
     if (statusFilter) {
@@ -300,7 +309,7 @@ export async function getCaseById(id: string): Promise<Case | undefined> {
         .schema("research")
         .from("cases")
         .select(
-          "id, status, severity, country, incident_summary, patient_ref, created_at",
+          "id, status, severity, country, incident_summary, patient_ref, created_at, corridor, diagnosis_bucket, payer_entity, nationality, evacuated",
         )
         .eq("id", id)
         .maybeSingle(),

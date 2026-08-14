@@ -9,15 +9,39 @@ import { useEffect, useState } from "react";
 import { CommandPalette } from "@/components/command-palette";
 import { QuickCaptureNote, QuickCaptureTask } from "@/components/advisor-quick-capture";
 
-const NAV_ITEMS = [
-  { href: "/spine", label: "PhD Spine", icon: SpineIcon },
-  { href: "/fieldwork", label: "Field Journal", icon: JournalIcon },
-  { href: "/contacts", label: "Contacts", icon: UsersIcon },
-  { href: "/cases", label: "Cases", icon: ClipboardIcon },
-  { href: "/docs", label: "Docs", icon: FileTextIcon },
-  { href: "/workspace", label: "Workspace", icon: FolderIcon },
-  { href: "/dashboard", label: "Dashboard", icon: ChartIcon },
-  { href: "/advisor", label: "Advisor", icon: BrainIcon },
+// Grouped by job-to-be-done so the sidebar reads as a map of the
+// research program, not a flat feature list.
+const NAV_SECTIONS = [
+  {
+    heading: "Research",
+    items: [
+      { href: "/spine", label: "PhD Spine", icon: SpineIcon },
+      { href: "/cases", label: "Cases", icon: ClipboardIcon },
+      { href: "/dashboard", label: "Dashboard", icon: ChartIcon },
+    ],
+  },
+  {
+    heading: "Field",
+    items: [
+      { href: "/fieldwork", label: "Field Journal", icon: JournalIcon },
+      { href: "/contacts", label: "Contacts", icon: UsersIcon },
+    ],
+  },
+  {
+    heading: "Writing",
+    items: [
+      { href: "/docs", label: "Docs", icon: FileTextIcon },
+      { href: "/workspace", label: "Workspace", icon: FolderIcon },
+      { href: "/advisor", label: "Advisor", icon: BrainIcon },
+    ],
+  },
+  {
+    heading: "Reference",
+    items: [
+      { href: "/protocol", label: "Protocol", icon: ShieldIcon },
+      { href: "/guide", label: "Guide", icon: CompassIcon },
+    ],
+  },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -89,10 +113,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav
-          className="flex flex-1 flex-col gap-0.5 p-3"
+          className="flex flex-1 flex-col gap-3 overflow-y-auto p-3"
           aria-label="Main navigation"
         >
-          {NAV_ITEMS.map((item) => {
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.heading} className="flex flex-col gap-0.5">
+              <span className="px-3 pb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/30">
+                {section.heading}
+              </span>
+              {section.items.map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
@@ -128,7 +157,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {item.label}
               </Link>
             );
-          })}
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="flex flex-col gap-1.5 border-t border-sidebar-border/80 p-3">
@@ -303,6 +334,24 @@ function UsersIcon({ className }: { className?: string }) {
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function CompassIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
     </svg>
   );
 }

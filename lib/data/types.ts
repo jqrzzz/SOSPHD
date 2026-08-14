@@ -1,6 +1,7 @@
-/* ─── ResearchOS Domain Types ────────────────────────────────────────────
- *  Mirror the target Postgres schema exactly.
- *  When Supabase is connected, these become the Row types.
+/* ─── SOSPHD Domain Types ────────────────────────────────────────────────
+ *  Mirror the live research.* Row types (with one legacy exception:
+ *  Case.site_id has no DB column — the read layer fills it from
+ *  public.cases.country / research.cases.country).
  * ────────────────────────────────────────────────────────────────────── */
 
 // ── Event taxonomy (provenance-critical) ──────────────────────────────
@@ -27,6 +28,29 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   DEFINITIVE_CARE_START: "Definitive Care Start",
   DISCHARGE: "Discharge",
   NOTE: "Note",
+};
+
+// ── Consent (research-usability gate; migration 011) ──────────────────
+
+/**
+ * Whether a fieldwork record (journal entry, upload) may enter research
+ * outputs. Mirrors research.consent_status:
+ *  - not_required: self-authored, no third party involved
+ *  - pending: third party involved, consent not yet captured
+ *  - obtained: informed consent captured (method + timestamp set)
+ *  - declined: refused — operational context only, NEVER research data
+ */
+export type ConsentStatus =
+  | "not_required"
+  | "pending"
+  | "obtained"
+  | "declined";
+
+export const CONSENT_STATUS_LABELS: Record<ConsentStatus, string> = {
+  not_required: "Not required (self-authored)",
+  pending: "Pending — third party, consent not yet captured",
+  obtained: "Obtained",
+  declined: "Declined — exclude from research",
 };
 
 // ── Case ──────────────────────────────────────────────────────────────
@@ -64,6 +88,13 @@ export interface Case {
   patient_ref: string;
   notes: string;
   source?: CaseSource;
+  /** Research dimensions — populated for research.cases rows (backfill);
+   *  null/undefined for operational rows until a deriver exists. */
+  corridor?: string | null;
+  diagnosis_bucket?: string | null;
+  payer_entity?: string | null;
+  nationality?: string | null;
+  evacuated?: boolean | null;
 }
 
 // ── Event (the provenance spine) ──────────────────────────────────────

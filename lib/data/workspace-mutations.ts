@@ -8,6 +8,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { requireAuthOrThrow } from "@/lib/supabase/server-auth";
+import type { ConsentStatus } from "./types";
 import type {
   Upload,
   UploadCategory,
@@ -28,6 +29,10 @@ export async function createUpload(data: {
   notes?: string;
   linked_case_id?: string | null;
   linked_doc_id?: string | null;
+  consent_status?: ConsentStatus;
+  consent_method?: string | null;
+  consent_jurisdiction?: string | null;
+  consent_captured_at?: string | null;
 }): Promise<Upload> {
   const { supabase: sb, userId } = await requireAuthOrThrow();
   const { data: row, error } = await sb
@@ -44,6 +49,10 @@ export async function createUpload(data: {
       notes: data.notes ?? "",
       linked_case_id: data.linked_case_id ?? null,
       linked_doc_id: data.linked_doc_id ?? null,
+      consent_status: data.consent_status ?? "not_required",
+      consent_method: data.consent_method ?? null,
+      consent_jurisdiction: data.consent_jurisdiction ?? null,
+      consent_captured_at: data.consent_captured_at ?? null,
     })
     .select()
     .single();

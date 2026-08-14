@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { getDashboardSummary, getCaseMetricRows } from "@/lib/data/analytics";
+import { getDashboardSummary, getCaseMetricRows, getMissingnessReport, getCaseBreakdowns } from "@/lib/data/analytics";
+import { getSnapshots } from "@/lib/data/snapshots";
+import { SnapshotControls } from "@/components/snapshot-controls";
 import { DashboardSummaryCards } from "@/components/dashboard-summary";
 import { DashboardMetricChart } from "@/components/dashboard-metric-chart";
 import { DashboardCaseTable } from "@/components/dashboard-case-table";
@@ -50,13 +52,17 @@ const SEVERITY_DOT: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [summary, rows, pulse, nextActions, gaps] = await Promise.all([
-    getDashboardSummary(),
-    getCaseMetricRows(),
-    getResearchPulse(),
-    suggestNextActions(5),
-    detectGaps(),
-  ]);
+  const [summary, rows, pulse, nextActions, gaps, snapshots, missingness, breakdowns] =
+    await Promise.all([
+      getDashboardSummary(),
+      getCaseMetricRows(),
+      getResearchPulse(),
+      suggestNextActions(5),
+      detectGaps(),
+      getSnapshots(),
+      getMissingnessReport(),
+      getCaseBreakdowns(),
+    ]);
 
   const palette = HEALTH_COLORS[pulse.health] ?? HEALTH_COLORS.good;
   const [coverNum, coverDenom] = pulse.corridorCoverage.split("/").map(Number);
@@ -100,6 +106,93 @@ export default async function DashboardPage() {
             </Card>
           </FadeIn>
         ) : (
+          <>
+            <DashboardSummaryCards summary={summary} />
+            <DashboardMetricChart rows={rows} />
+            <DashboardCaseTable rows={rows} />
+          </>
+        )}
+
+        {/* Milestone missingness — Paper 1's denominators. Explains WHY a
+            metric shows N/A: a TTTA/TTGP/TTDC value only exists when both
+            endpoint milestones were recorded. Historical backfill rows carry
+            FIRST_CONTACT (and occasionally TRANSPORT_ACTIVATED) only. */}
+        <FadeIn>
+          <Card>
+            <CardContent className="flex flex-col gap-3 p-5">
+              <div className="flex items-baseline justify-between">
+                <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Milestone coverage · Paper 1 denominators
+                </h2>
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {missingness.complete_cases}/{missingness.total_cases} cases with full provenance
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                {missingness.by_milestone.map((m) => {
+                  const presentRate =
+                    missingness.total_cases > 0
+                      ? Math.round((m.present / missingness.total_cases) * 100)
+                      : 0;
+                  return (
+                    <div
+                      key={m.event_type}
+                      className="flex flex-col gap-1 rounded-lg border border-border/50 bg-background/40 p-2.5"
+                    >
+                      <span className="truncate font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                        {m.event_type.replaceAll("_", " ")}
+                      </span>
+                      <span className="font-mono text-lg font-semibold tabular-nums text-foreground">
+                        {presentRate}%
+                      </span>
+                      <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
+                        {m.present} of {missingness.total_cases}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                A metric is computable only when both of its endpoint milestones
+                were recorded. Low coverage here is itself a Paper 1 finding —
+                historical records rarely captured coordination timestamps,
+                which is what prospective logging fixes.
+              </p>
+            </CardContent>
+          </Card>
+        </FadeIn>
+
+        {/* Dimension breakdowns — Paper 1 distribution figures */}
+        <FadeIn>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <BreakdownCard
+              title="Cases by corridor"
+              items={breakdowns.by_corridor.slice(0, 7)}
+              total={breakdowns.total_cases}
+            />
+            <BreakdownCard
+              title={`Top payers · ${breakdowns.by_payer.length} entities`}
+              items={breakdowns.by_payer.slice(0, 7)}
+              total={breakdowns.total_cases}
+            />
+            <BreakdownCard
+              title="Diagnosis mix"
+              items={breakdowns.by_diagnosis.slice(0, 7)}
+              total={breakdowns.total_cases}
+            />
+          </div>
+        </FadeIn>
+
+        {/* Frozen snapshots — the citable datasets papers reference */}
+        <FadeIn>
+          <SnapshotControls snapshots={snapshots} />
+        </FadeIn>
+
+        {/* ── Agent pulse — heuristic health score + suggested actions.
+            Deliberately LAST: the synthetic score and gap heuristics are
+            navigation aids, not research data, so real Paper 1 numbers
+            lead the page. ── */}
+        {summary.total_cases > 0 && (
           <>
             {/* ── Hero: research health ring + supporting tiles ───────── */}
             <FadeIn>
@@ -303,14 +396,56 @@ export default async function DashboardPage() {
                 )}
               </div>
             )}
-
-            <DashboardSummaryCards summary={summary} />
-            <DashboardMetricChart rows={rows} />
-            <DashboardCaseTable rows={rows} />
           </>
         )}
       </div>
     </div>
+  );
+}
+
+function BreakdownCard({
+  title,
+  items,
+  total,
+}: {
+  title: string;
+  items: { label: string; count: number }[];
+  total: number;
+}) {
+  const max = items[0]?.count ?? 1;
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-2.5 p-5">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          {title}
+        </h2>
+        {items.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No data yet.</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {items.map((item) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <span className="w-32 shrink-0 truncate text-xs text-foreground/85" title={item.label}>
+                  {item.label.replaceAll("_", " ")}
+                </span>
+                <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-muted/50">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary/80 to-primary/50"
+                    style={{ width: `${Math.max(2, Math.round((item.count / max) * 100))}%` }}
+                  />
+                </div>
+                <span className="w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {item.count}
+                  <span className="text-muted-foreground/50">
+                    {" "}· {total > 0 ? Math.round((item.count / total) * 100) : 0}%
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

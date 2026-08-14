@@ -226,10 +226,11 @@ export const RESEARCH_DOMAIN = {
 
   /** Historical data reference */
   historicalData: {
-    caseCount: 843,
+    caseCount: 836,
     dateRange: "2018-2020",
-    source: "Google Sheets (not yet in Supabase)",
-    status: "pending_import" as const,
+    source:
+      "research.cases (ingested 2026-08-13 from the operational registry; batches in docs/backfill-plan.md)",
+    status: "imported" as const,
   },
 } as const;
 

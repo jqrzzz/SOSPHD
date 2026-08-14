@@ -1,4 +1,16 @@
 import { describe, it, expect } from "vitest";
+
+describe("bucketDiagnosis word-boundary matching", () => {
+  it("does not let 'cut' substring-match 'acute' (45-case live regression)", () => {
+    expect(bucketDiagnosis("Acute otitis externa")).toBe("ent");
+    expect(bucketDiagnosis("Acute bronchitis")).toBe("respiratory");
+    expect(bucketDiagnosis("Acute MI / chest pain")).toBe("cardiac");
+    expect(bucketDiagnosis("cut left big toe")).toBe("trauma");
+    expect(bucketDiagnosis("AGE with dehydration")).toBe("gastro");
+    expect(bucketDiagnosis("haemorrhage post fall")).toBe("trauma");
+  });
+});
+
 import { historicalCaseToRows, ALL_MILESTONES } from "../transform";
 import {
   normalizePayer,

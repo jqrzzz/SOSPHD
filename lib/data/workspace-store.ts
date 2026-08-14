@@ -1,22 +1,31 @@
-/* ─── Workspace Store — READ paths ─────────────────────────────────────
+/* ─── Workspace Store — READ paths (SERVER ONLY) ───────────────────────
  *  Queries research.uploads, research.mind_maps.
- *  Falls back to seed data when Supabase is unavailable (with a
- *  [SOSPHD:DEGRADED] warning so it's not silent).
  *
- *  Writes live in workspace-mutations.ts (server-only) so importing
- *  the server Supabase client doesn't pollute the client bundle.
+ *  SERVER ONLY as of the Phase 2 client unification: every consumer is a
+ *  server context (workspace + mindmap pages), and the previous browser
+ *  client carried no session cookies on the server — queries ran as
+ *  `anon`, RLS returned nothing, and the seed fallback silently served
+ *  fabricated content. The `server-only` import makes any future client
+ *  import a build error instead of a repeat of that bug.
  *
- *  Per Phase 3 of audit-action-plan.md, this file is reads-only.
+ *  Fallback policy (lib/data/degraded.ts): seed data in dev, EMPTY in
+ *  production, always with a [SOSPHD:DEGRADED] warning.
+ *
+ *  Per Phase 3 of audit-action-plan.md, this file is reads-only; writes
+ *  live in workspace-mutations.ts.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { getSupabase, warnDegradedMode } from "@/lib/supabase/db";
+import "server-only";
+
+import { getServerSupabase } from "@/lib/supabase/server-auth";
+import { warnDegradedMode, seedOrEmpty } from "@/lib/data/degraded";
 import type { Upload, UploadCategory, MindMap } from "./workspace-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────
 
 const DEMO_USER_ID = "user_demo";
 
-const seedUploads: Upload[] = [
+const seedUploadsRaw: Omit<Upload, "consent_status" | "consent_method" | "consent_jurisdiction" | "consent_captured_at">[] = [
   {
     id: "upload_001",
     created_at: "2026-02-06T09:00:00Z",
@@ -61,6 +70,15 @@ const seedUploads: Upload[] = [
   },
 ];
 
+// Seed uploads predate the consent columns (migration 011).
+const seedUploads: Upload[] = seedUploadsRaw.map((u) => ({
+  ...u,
+  consent_status: "not_required" as const,
+  consent_method: null,
+  consent_jurisdiction: null,
+  consent_captured_at: null,
+}));
+
 const seedMindMaps: MindMap[] = [
   {
     id: "mm_001",
@@ -95,7 +113,7 @@ export async function getUploads(filters?: {
   category?: UploadCategory;
   search?: string;
 }): Promise<Upload[]> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       let query = sb
@@ -133,13 +151,18 @@ export async function getUploads(filters?: {
         u.tags.some((t: string) => t.toLowerCase().includes(q)),
     );
   }
-  return result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return seedOrEmpty(
+    result.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    ),
+    [],
+  );
 }
 
 // ── Mind Maps (reads only — writes in workspace-mutations.ts) ──────
 
 export async function getMindMaps(): Promise<MindMap[]> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -158,13 +181,16 @@ export async function getMindMaps(): Promise<MindMap[]> {
   } else {
     warnDegradedMode("getMindMaps", "supabase env vars missing");
   }
-  return [...seedMindMaps].sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+  return seedOrEmpty(
+    [...seedMindMaps].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    ),
+    [],
   );
 }
 
 export async function getMindMapById(id: string): Promise<MindMap | null> {
-  const sb = getSupabase();
+  const sb = await getServerSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -174,8 +200,16 @@ export async function getMindMapById(id: string): Promise<MindMap | null> {
         .eq("id", id)
         .single();
       if (!error && data) return data as MindMap;
-    } catch { /* fall through */ }
+      if (error) warnDegradedMode("getMindMapById", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getMindMapById",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getMindMapById", "supabase unavailable");
   }
-  return seedMindMaps.find((m) => m.id === id) ?? null;
+  return seedOrEmpty(seedMindMaps.find((m) => m.id === id) ?? null, null);
 }
 

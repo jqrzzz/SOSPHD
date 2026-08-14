@@ -10,7 +10,7 @@
 
 import { getCases, getAllCaseEvents, getAllRecommendations } from "./store";
 import { computeTTTA, computeTTGP, computeTTDC, formatDuration } from "./metrics";
-import type { Case, CaseEvent, Recommendation } from "./types";
+import type { Case, CaseEvent, EventType, Recommendation } from "./types";
 
 function groupByCaseId<T extends { case_id: string }>(
   items: T[],
@@ -450,6 +450,148 @@ export function computePaper2Coordination(
     unique_engines: engineMap.size,
     cases_with_recommendations: seenCaseIds.size,
   };
+}
+
+// ── Paper 1: milestone missingness (denominator reporting) ──────────
+
+/** The seven milestone events a complete case records (NOTE excluded). */
+export const MILESTONE_EVENT_TYPES: EventType[] = [
+  "FIRST_CONTACT",
+  "TRIAGE_COMPLETE",
+  "TRANSPORT_ACTIVATED",
+  "FACILITY_ARRIVAL",
+  "GUARANTEED_PAYMENT",
+  "DEFINITIVE_CARE_START",
+  "DISCHARGE",
+];
+
+export interface MilestoneMissingness {
+  event_type: EventType;
+  present: number;
+  missing: number;
+  /** missing / total_cases; null when there are no cases. */
+  missing_rate: number | null;
+}
+
+export interface MissingnessReport {
+  total_cases: number;
+  by_milestone: MilestoneMissingness[];
+  /** Cases with every milestone present — the "complete provenance" n. */
+  complete_cases: number;
+}
+
+/**
+ * Pure aggregator: per-milestone presence counts across all cases.
+ * Paper 1's methods section must report which milestones are missing
+ * and how often — these are the denominators behind every TTTA/TTGP/
+ * TTDC statistic (a metric is only computable when both its endpoints
+ * were recorded). Same batch shape as the other aggregators, so
+ * callers can share the three-round-trip fetch.
+ */
+export function computeMissingness(
+  allCases: { id: string }[],
+  allEvents: CaseEvent[],
+): MissingnessReport {
+  const typesByCase = new Map<string, Set<EventType>>();
+  for (const e of allEvents) {
+    const set = typesByCase.get(e.case_id) ?? new Set<EventType>();
+    set.add(e.event_type);
+    typesByCase.set(e.case_id, set);
+  }
+
+  const total = allCases.length;
+  let completeCases = 0;
+  const presentCounts = new Map<EventType, number>(
+    MILESTONE_EVENT_TYPES.map((t) => [t, 0]),
+  );
+
+  for (const c of allCases) {
+    const present = typesByCase.get(c.id) ?? new Set<EventType>();
+    let complete = true;
+    for (const t of MILESTONE_EVENT_TYPES) {
+      if (present.has(t)) {
+        presentCounts.set(t, (presentCounts.get(t) ?? 0) + 1);
+      } else {
+        complete = false;
+      }
+    }
+    if (complete) completeCases += 1;
+  }
+
+  return {
+    total_cases: total,
+    complete_cases: completeCases,
+    by_milestone: MILESTONE_EVENT_TYPES.map((event_type) => {
+      const present = presentCounts.get(event_type) ?? 0;
+      return {
+        event_type,
+        present,
+        missing: total - present,
+        missing_rate: total > 0 ? (total - present) / total : null,
+      };
+    }),
+  };
+}
+
+export async function getMissingnessReport(): Promise<MissingnessReport> {
+  const [allCases, allEvents] = await Promise.all([
+    getCases(),
+    getAllCaseEvents(),
+  ]);
+  return computeMissingness(allCases, allEvents);
+}
+
+// ── Paper 1: dimension breakdowns (corridor / payer / diagnosis) ────
+
+export interface DimensionCount {
+  label: string;
+  count: number;
+}
+
+export interface CaseBreakdowns {
+  total_cases: number;
+  by_corridor: DimensionCount[];
+  by_payer: DimensionCount[];
+  by_diagnosis: DimensionCount[];
+  by_nationality: DimensionCount[];
+  evacuated_count: number;
+}
+
+function countBy(
+  cases: Case[],
+  pick: (c: Case) => string | null | undefined,
+  unknownLabel: string,
+): DimensionCount[] {
+  const counts = new Map<string, number>();
+  for (const c of cases) {
+    const key = pick(c) || unknownLabel;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Pure aggregator over the unified case list's research dimensions
+ * (populated for research.cases rows; operational rows count under the
+ * unknown label until a corridor deriver exists for them). Full lists,
+ * sorted descending — callers slice for display.
+ */
+export function computeCaseBreakdowns(allCases: Case[]): CaseBreakdowns {
+  return {
+    total_cases: allCases.length,
+    by_corridor: countBy(allCases, (c) => c.corridor, "Unassigned"),
+    by_payer: countBy(allCases, (c) => c.payer_entity, "Unknown"),
+    by_diagnosis: countBy(allCases, (c) => c.diagnosis_bucket, "unclassified"),
+    by_nationality: countBy(allCases, (c) => c.nationality, "Unknown"),
+    evacuated_count: allCases.filter((c) => c.evacuated === true).length,
+  };
+}
+
+export async function getCaseBreakdowns(): Promise<CaseBreakdowns> {
+  const allCases = await getCases();
+  return computeCaseBreakdowns(allCases);
 }
 
 // ── Paper builder context ───────────────────────────────────────────

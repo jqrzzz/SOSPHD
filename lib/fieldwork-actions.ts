@@ -25,6 +25,11 @@ const journalSchema = z.object({
   tags: z.string().optional().default(""),
   contact_ids: z.string().optional().default(""),
   linked_case_id: z.string().optional().default(""),
+  consent_status: z
+    .enum(["not_required", "pending", "obtained", "declined"])
+    .default("not_required"),
+  consent_method: z.string().optional().default(""),
+  consent_jurisdiction: z.string().optional().default(""),
 });
 
 const contactSchema = z.object({
@@ -56,6 +61,9 @@ export async function createJournalAction(
     tags: formData.get("tags") ?? "",
     contact_ids: formData.get("contact_ids") ?? "",
     linked_case_id: formData.get("linked_case_id") ?? "",
+    consent_status: formData.get("consent_status") ?? "not_required",
+    consent_method: formData.get("consent_method") ?? "",
+    consent_jurisdiction: formData.get("consent_jurisdiction") ?? "",
   };
 
   const parsed = journalSchema.safeParse(raw);
@@ -81,6 +89,15 @@ export async function createJournalAction(
       tags: tagList,
       contact_ids: contactIdList,
       linked_case_id: parsed.data.linked_case_id || null,
+      consent_status: parsed.data.consent_status,
+      consent_method: parsed.data.consent_method || null,
+      consent_jurisdiction: parsed.data.consent_jurisdiction || null,
+      // Stamp capture time when consent was actually obtained; consent
+      // cannot be granted retroactively, so the timestamp is the record.
+      consent_captured_at:
+        parsed.data.consent_status === "obtained"
+          ? new Date().toISOString()
+          : null,
     });
     revalidatePath("/fieldwork");
     return { success: true, id: entry.id };

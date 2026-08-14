@@ -74,10 +74,10 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
 ## Key Architecture
 
 - **Read paths** (`lib/data/*-store.ts`) — typed wrappers over Supabase queries. Seed-data fallback in dev with `[SOSPHD:DEGRADED]` warnings.
-- **Write paths** (`lib/data/*-mutations.ts`) — server-only mutation files. All use `requireAuthOrThrow` from `lib/data/server-auth.ts`; errors are thrown loudly (no silent failure).
+- **Write paths** (`lib/data/*-mutations.ts`) — server-only mutation files. All use `requireAuthOrThrow` from `lib/supabase/server-auth.ts`; errors are thrown loudly (no silent failure).
 - **Server actions** (`lib/*-actions.ts`) — zod-validated, call mutation functions, revalidate paths. Return `{ error }` envelopes on failure.
 - **Config** (`lib/config.ts`) — single source of truth for owner, corridors, thesis, app metadata.
-- **Auth** — server-side via `lib/data/server-auth.ts:requireAuthOrThrow` (used by mutations). Browser-side via `lib/supabase/db.ts:getCurrentUserId`. Middleware in `middleware.ts` handles route protection.
+- **Auth** — server-side via `lib/supabase/server-auth.ts:requireAuthOrThrow` (used by mutations). Browser-side via `lib/supabase/db.ts:getCurrentUserId`. Middleware in `middleware.ts` handles route protection.
 
 ## App Pages
 
@@ -91,6 +91,8 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
 | `/workspace` | Mind maps, uploads, notes, tasks |
 | `/dashboard` | Analytics dashboard |
 | `/advisor` | AI research advisor chat |
+| `/protocol` | Intervention Protocol (versioned, citable — Paper 2's spec) |
+| `/guide` | Onboarding walkthrough of the app's surfaces |
 
 ## PhD Metrics
 
@@ -115,7 +117,7 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
 - **Respect the shared database** — only write to the `research.*` schema, never modify other projects' tables.
 - **Read-only access to operational data** — SOSPHD can read from other projects' tables for research but never writes to them. Key data sources:
   - SOSPRO: `cases` (status pipeline, gop_status), `case_activities` (timestamped audit log), `transfers` (picked_up_at, delivered_at) — clinic/transport-level metrics
-  - SOSWEBSITE: `cases`, `case_status_history` (full audit trail), `case_episodes` (treatment events with timestamps), `guarantees_of_payment`, `insurer_interactions`, `providers`, `payers`, `patients` — the 39-table core operational schema and primary data source for TTTA/TTGP/TTDC
+  - SOSWEBSITE: `cases`, `case_status_history` (full audit trail), `case_episodes` (treatment events with timestamps), `guarantees_of_payment`, `insurer_interactions`, `providers`, `payers`, `patients` — the 39-table core operational schema (shared `cases` spine with SOSCOMMAND; the sync triggers read these tables for TTTA/TTGP/TTDC milestones)
   - SOSCOMMAND: `cases`, `case_activity_log`, `case_transport` (actual_departure/arrival), `case_gop` (issued_at/settled_at), `claims` — extended operational data
   - SOSTRAVEL: `emergency_cases`, `facilities` — patient-facing incident data
 - **AI automation preferred** — lean into AI for categorization, analysis, guidance.

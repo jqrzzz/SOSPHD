@@ -737,6 +737,53 @@ function NewEntryDialog({
             </div>
           )}
 
+          {/* Research consent — records involving other people are only
+              usable in research outputs with informed consent, and consent
+              cannot be captured retroactively. */}
+          <div className="flex flex-col gap-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+            <span className="text-xs font-medium text-amber-300">
+              Research consent
+            </span>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="je-consent-status">Status</Label>
+              <Select name="consent_status" defaultValue="not_required">
+                <SelectTrigger id="je-consent-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="not_required">Not required (self-authored)</SelectItem>
+                  <SelectItem value="pending">Pending — consent not yet captured</SelectItem>
+                  <SelectItem value="obtained">Obtained</SelectItem>
+                  <SelectItem value="declined">Declined — exclude from research</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="je-consent-method">Method</Label>
+                <Input
+                  id="je-consent-method"
+                  name="consent_method"
+                  placeholder="verbal / written / recorded"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="je-consent-jurisdiction">Jurisdiction</Label>
+                <Input
+                  id="je-consent-jurisdiction"
+                  name="consent_jurisdiction"
+                  placeholder="ISO code, e.g. TH"
+                  maxLength={8}
+                />
+              </div>
+            </div>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              See docs/consent-framework.md for the consent script. Entries
+              involving providers, clients, or recordings need consent to be
+              citable in a paper.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor="je-location">Location</Label>

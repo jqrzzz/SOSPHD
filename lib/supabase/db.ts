@@ -37,34 +37,6 @@ export async function getCurrentUserId(): Promise<string | null> {
   }
 }
 
-/**
- * Emits a one-shot warning when a store function takes the seed /
- * empty fallback path. Helps catch the case where production is
- * silently serving demo data because of a misconfigured client.
- *
- * Lifetime: the dedup Map lives in module scope. In a Vercel
- * serverless model that's per-worker — fresh on every cold start.
- * In `next dev`, it lasts the lifetime of the dev server. Neither
- * is cross-request-globally-perfect; that's by design — we want one
- * warning per worker per (key, reason), not one ever.
- *
- * Pass a positive `ttlMs` for stricter throttling: the same
- * (key, reason) won't warn again until that many ms have elapsed.
- */
-const _warnedKeys = new Map<string, number>();
-const DEFAULT_TTL_MS = 0; // 0 = once-per-worker
-
-export function warnDegradedMode(
-  key: string,
-  reason: string,
-  ttlMs: number = DEFAULT_TTL_MS,
-) {
-  const tag = `${key}:${reason}`;
-  const now = Date.now();
-  const last = _warnedKeys.get(tag);
-  if (last !== undefined && (ttlMs === 0 || now - last < ttlMs)) return;
-  _warnedKeys.set(tag, now);
-  console.warn(
-    `[SOSPHD:DEGRADED] ${key} — ${reason}. Returning fallback/empty data.`,
-  );
-}
+// warnDegradedMode and the seed-vs-empty policy moved to
+// lib/data/degraded.ts so server-only stores don't have to import this
+// browser-client module to reach them.
