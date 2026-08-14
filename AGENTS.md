@@ -56,6 +56,8 @@ All are in schema `research`, all have RLS `auth.uid() = user_id`, so
 | `mind_maps` | update `nodes` / `edges` (JSONB arrays), `updated_at` | Node: `{id, x, y, label, color, radius, nodeType?, origin?}`. Edge: `{id, from, to, label?}`. Never replace the arrays wholesale — append/modify. Agent node ids use an `ag-` prefix. |
 | `docs` + `doc_versions` | append to `docs.content_md`, bump `updated_at`; insert a `doc_versions` row (`doc_id, user_id, content_md, note`) with the new full content | Never overwrite a doc's content destructively. |
 | `doc_annotations` | READ open annotations before revising a doc (`quote` = the passage, `comment` = what to change). Do not resolve or delete them — resolution is the owner's judgement in the app. | The paper-revision loop: annotate → revise → new version → owner resolves. |
+| `institutions`, `institution_requirements` | `source_url` is REQUIRED on every row. Set `verified_at` ONLY after reading the official page for the **current** admissions cycle — a date inferred from a previous year stays NULL and the UI marks it unverified. | A wrong deadline costs a whole application cycle. Same discipline as the `[REF:]` placeholders in the papers: never state what you have not checked. |
+| `outreach` | Write DRAFTS only (`status='draft'`). Never set `status='sent'` or send mail on the owner's behalf. | First contact with a prospective supervisor is a one-shot impression; the owner reviews and sends. |
 
 Corridor values (free text, but use these canonical six):
 `Koh Samui → Bangkok`, `Phuket → Bangkok`, `Chiang Mai → Bangkok`,

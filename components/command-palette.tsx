@@ -44,6 +44,7 @@ const NAV_ITEMS = [
   { label: "Corridor Briefings", href: "/dashboard/corridors", group: "Navigate" },
   { label: "Paper Builder", href: "/dashboard/paper-builder", group: "Navigate" },
   { label: "Papers", href: "/papers", group: "Navigate" },
+  { label: "Applications", href: "/apply", group: "Navigate" },
   { label: "Statistics", href: "/dashboard/statistics", group: "Navigate" },
   { label: "Weekly Digest", href: "/dashboard/digest", group: "Navigate" },
   { label: "Intervention Protocol", href: "/protocol", group: "Navigate" },

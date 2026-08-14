@@ -32,6 +32,7 @@ const NAV_SECTIONS = [
     heading: "Writing",
     items: [
       { href: "/papers", label: "Papers", icon: BookIcon },
+      { href: "/apply", label: "Applications", icon: StampIcon },
       { href: "/docs", label: "Docs", icon: FileTextIcon },
       { href: "/workspace", label: "Workspace", icon: FolderIcon },
       { href: "/advisor", label: "Advisor", icon: BrainIcon },
@@ -275,6 +276,16 @@ function SpineIcon({ className }: { className?: string }) {
       <path d="M7 10h10" />
       <path d="M8 14h8" />
       <path d="M9 18h6" />
+    </svg>
+  );
+}
+
+function StampIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M5 22h14" />
+      <path d="M19.27 13.73A2.5 2.5 0 0 0 17.5 13h-11A2.5 2.5 0 0 0 4 15.5V18h16v-2.5c0-.66-.26-1.3-.73-1.77Z" />
+      <path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 2 1 2 1 3.5V13" />
     </svg>
   );
 }
