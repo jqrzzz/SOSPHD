@@ -47,8 +47,11 @@
     --input: 220 12% 16%;
     --ring: 170 50% 38%;
 
-    /* Charts */
-    --chart-1: 170 50% 38%;
+    /* Charts. chart-1 is the single-series data hue — teal-600 #0d9488,
+       validated (dataviz six-checks) against the dark card surface:
+       lightness band, chroma floor, ≥3:1 contrast all pass. The old
+       170 50% 38% failed the chroma floor (read gray in marks). */
+    --chart-1: 175 84% 32%;
     --chart-2: 38 92% 50%;
     --chart-3: 280 65% 60%;
     --chart-4: 340 75% 55%;

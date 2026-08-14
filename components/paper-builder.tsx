@@ -137,7 +137,7 @@ export function PaperBuilder({ totalCases, closedCases }: PaperBuilderProps) {
                 key={s.key}
                 variant={activeSection === s.key ? "default" : "outline"}
                 size="sm"
-                className="flex flex-col items-start gap-0.5 py-3 text-left"
+                className="flex h-auto w-full flex-col items-start gap-0.5 py-3 text-left"
                 disabled={isPending}
                 onClick={() => generate(s.key)}
               >
@@ -152,7 +152,9 @@ export function PaperBuilder({ totalCases, closedCases }: PaperBuilderProps) {
                   )}
                 </span>
                 {!(isPending && activeSection === s.key) && (
-                  <span className="text-[10px] font-normal text-muted-foreground">
+                  // Button's base class is whitespace-nowrap — without the
+                  // override these descriptions overflow the w-72 card.
+                  <span className="w-full whitespace-normal text-[10px] font-normal leading-snug text-muted-foreground">
                     {s.description}
                   </span>
                 )}

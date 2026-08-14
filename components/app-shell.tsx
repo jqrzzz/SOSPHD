@@ -97,11 +97,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent"
           />
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-[0_4px_12px_-4px_hsl(170_50%_38%/0.5)]">
-            <span className="font-mono text-[11px] font-bold tracking-tight">
-              S
-            </span>
-          </div>
+          {/* The Signal — Tourist SOS brand mark (public/brand/, from the
+              soswebsite kit; geometry is canonical, do not edit the SVGs).
+              Animated variant drifts the Morse rings; stills under
+              prefers-reduced-motion. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/signal-mark-animated.svg"
+            alt=""
+            aria-hidden="true"
+            className="h-8 w-8 shrink-0"
+          />
           <div className="flex flex-col leading-tight">
             <span className="text-[13px] font-semibold tracking-tight text-sidebar-foreground">
               SOS PHD
@@ -211,7 +217,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <MenuIcon className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold text-foreground md:hidden">
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground md:hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/signal-mark-dark.svg"
+              alt=""
+              aria-hidden="true"
+              className="h-5 w-5"
+            />
             SOS PHD
           </span>
 

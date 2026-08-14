@@ -1,6 +1,10 @@
 # Agent Integration Plan — driving SOSPHD from Claude, Cowork, and OpenClaw
 
-**Status**: PROPOSED — awaiting owner review. Nothing in this plan is built yet.
+**Status**: Phases 1 + 2 GREENLIT (owner, 2026-08-14) and built — see `AGENTS.md`
+(the agent contract) and `mcp/` (the server + setup in `mcp/README.md`).
+Scope locked as **single-user by design**: the server is stdio-only, runs on
+the owner's machines, signs in as the owner. Phase 3 (remote endpoint) stays
+parked indefinitely.
 **Date**: 2026-08-14
 
 ## The idea in one paragraph

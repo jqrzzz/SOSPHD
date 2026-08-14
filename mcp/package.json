@@ -1,0 +1,22 @@
+{
+  "name": "sosphd-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Personal MCP server for SOSPHD — lets Claude / Cowork / OpenClaw write notes, journal entries, tasks, contacts, mind-map nodes, and doc appends into the research.* schema as the authenticated owner (RLS-scoped).",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -55,6 +55,10 @@ export interface MindMapNode {
   color: string; // hex
   radius: number;
   nodeType?: MindMapNodeType;
+  /** Provenance: "agent" = created via the MCP server (AGENTS.md rule 6).
+   *  Absent/"app" = created by the owner in the canvas. Canvas renders a
+   *  teal marker on agent nodes. */
+  origin?: "app" | "agent";
 }
 
 export interface MindMapEdge {

@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { CorridorJourney } from "@/components/process-diagrams";
+
 const STEPS = [
   {
     number: "1",
@@ -90,6 +92,16 @@ export default function GuidePage() {
           A simple walkthrough of the platform — what each section does and what you should do in it.
         </p>
       </header>
+
+      {/* The journey being studied */}
+      <div className="px-6 pt-6">
+        <div className="rounded-lg border border-border bg-card p-5">
+          <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            The journey this research measures
+          </p>
+          <CorridorJourney />
+        </div>
+      </div>
 
       {/* Overview card */}
       <div className="px-6 pt-6">

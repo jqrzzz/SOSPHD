@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" fill="none" role="img" aria-label="Tourist SOS">
+  <!-- The Signal — Tourist SOS. ANIMATED variant: ring DRIFT only (Law 9: drift = watching).
+       Signals travel; the world holds still — the axis never rotates (Law 8). The core does
+       NOT pulse here: pulse means genuinely live, and a logo asset is not a live state.
+       Timings per BRAND.md section 7 ambient band (34-50s, linear). Reduced motion stills all.
+       Canonical geometry: kit/logo-reference.tsx + BRAND.md section 3. DO NOT EDIT VALUES. -->
+  <title>Tourist SOS — The Signal</title>
+  <style>
+    @keyframes signal-drift-rim      { from { stroke-dashoffset: 80;  } to { stroke-dashoffset: -280; } }
+    @keyframes signal-drift-equator  { from { stroke-dashoffset: 0;   } to { stroke-dashoffset: -360; } }
+    @keyframes signal-drift-meridian { from { stroke-dashoffset: 200; } to { stroke-dashoffset: -160; } }
+    .rim      { animation: signal-drift-rim      40s linear infinite; }
+    .equator  { animation: signal-drift-equator  48s linear infinite; }
+    .meridian { animation: signal-drift-meridian 44s linear infinite; }
+    @media (prefers-reduced-motion: reduce) {
+      .rim, .equator, .meridian { animation: none; }
+    }
+  </style>
+  <ellipse class="meridian" cx="240" cy="240" rx="52" ry="170" transform="rotate(-23.4 240 240)"
+    stroke="#5EEAD4" stroke-width="15" stroke-linecap="butt" pathLength="360"
+    stroke-dasharray="9 7 9 7 9 14 72 7 72 7 72 14 9 7 9 7 9 20"
+    stroke-dashoffset="200" opacity="0.62"/>
+  <ellipse class="equator" cx="240" cy="240" rx="170" ry="52" transform="rotate(-23.4 240 240)"
+    stroke="#5EEAD4" stroke-width="15" stroke-linecap="butt" pathLength="360"
+    stroke-dasharray="9 7 9 7 9 14 72 7 72 7 72 14 9 7 9 7 9 20"
+    stroke-dashoffset="0" opacity="0.62"/>
+  <circle class="rim" cx="240" cy="240" r="170"
+    stroke="#5EEAD4" stroke-width="22" stroke-linecap="butt" pathLength="360"
+    stroke-dasharray="9 7 9 7 9 14 72 7 72 7 72 14 9 7 9 7 9 20"
+    stroke-dashoffset="80"/>
+  <circle cx="240" cy="240" r="22" fill="#E10600"/>
+</svg>

@@ -33,6 +33,21 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
 
+  // Node scripts (plain .mjs under mcp/) — declare Node globals so no-undef
+  // stays accurate. TS files don't need this (typescript-eslint disables
+  // no-undef; the compiler handles undefined names there).
+  {
+    files: ["mcp/scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+      },
+    },
+  },
+
   // Project-specific rules
   {
     files: ["**/*.{ts,tsx,js,mjs,cjs}"],

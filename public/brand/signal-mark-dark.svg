@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" fill="none" role="img" aria-label="Tourist SOS">
+  <!-- The Signal — Tourist SOS. Three rings (rim, equator, meridian) carrying S-O-S
+       in true Morse (pathLength 360), square-cut, on a -23.4deg axis, red core (Terra).
+       Canonical geometry: kit/logo-reference.tsx + BRAND.md section 3. DO NOT EDIT VALUES.
+       Tone: GLOW (#5EEAD4) — for dark fields. -->
+  <title>Tourist SOS — The Signal</title>
+  <ellipse cx="240" cy="240" rx="52" ry="170" transform="rotate(-23.4 240 240)"
+    stroke="#5EEAD4" stroke-width="15" stroke-linecap="butt" pathLength="360"
+    stroke-dasharray="9 7 9 7 9 14 72 7 72 7 72 14 9 7 9 7 9 20"
+    stroke-dashoffset="200" opacity="0.62"/>
+  <ellipse cx="240" cy="240" rx="170" ry="52" transform="rotate(-23.4 240 240)"
+    stroke="#5EEAD4" stroke-width="15" stroke-linecap="butt" pathLength="360"
+    stroke-dasharray="9 7 9 7 9 14 72 7 72 7 72 14 9 7 9 7 9 20"
+    opacity="0.62"/>
+  <circle cx="240" cy="240" r="170"
+    stroke="#5EEAD4" stroke-width="22" stroke-linecap="butt" pathLength="360"
+    stroke-dasharray="9 7 9 7 9 14 72 7 72 7 72 14 9 7 9 7 9 20"
+    stroke-dashoffset="80"/>
+  <circle cx="240" cy="240" r="22" fill="#E10600"/>
+</svg>

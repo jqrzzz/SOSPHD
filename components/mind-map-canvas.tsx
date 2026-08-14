@@ -164,10 +164,26 @@ function renderNodeShape(
       );
   }
 
+  // Provenance marker: agent-created nodes (MCP server) get a small teal
+  // dot on the shoulder so the owner's own thinking stays distinguishable.
+  const agentMark = node.origin === "agent" && (
+    <circle
+      cx={node.x + node.radius * 0.8}
+      cy={node.y - node.radius * 0.8}
+      r={4}
+      fill="hsl(170 50% 45%)"
+      stroke="hsl(220 20% 6%)"
+      strokeWidth="1.5"
+    >
+      <title>Added by agent</title>
+    </circle>
+  );
+
   return (
     <>
       {glow}
       {shape}
+      {agentMark}
     </>
   );
 }

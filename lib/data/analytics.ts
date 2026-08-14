@@ -594,6 +594,68 @@ export async function getCaseBreakdowns(): Promise<CaseBreakdowns> {
   return computeCaseBreakdowns(allCases);
 }
 
+// ── Monthly volume (statistics view) ────────────────────────────────
+
+export interface MonthlyVolume {
+  /** "2019-07" — sortable key */
+  month: string;
+  /** "Jul 19" — display label */
+  label: string;
+  count: number;
+}
+
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/**
+ * Pure aggregator: cases per calendar month, with zero-count months
+ * filled in between the first and last month present — a month with no
+ * rows (July 2019 is a known recording gap) must render as an explicit
+ * zero, not silently vanish from the axis.
+ */
+export function computeMonthlyVolume(allCases: Case[]): MonthlyVolume[] {
+  // Bucket in Asia/Bangkok (+07:00), the registry's operating timezone.
+  // Backfill rows are stored as midnight +07:00, so UTC bucketing would
+  // shift every first-of-month case into the previous month.
+  const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const counts = new Map<string, number>();
+  for (const c of allCases) {
+    const d = new Date(c.created_at);
+    if (Number.isNaN(d.getTime())) continue;
+    const local = new Date(d.getTime() + BKK_OFFSET_MS);
+    const key = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  if (counts.size === 0) return [];
+
+  const keys = [...counts.keys()].sort();
+  const [firstY, firstM] = keys[0].split("-").map(Number);
+  const [lastY, lastM] = keys[keys.length - 1].split("-").map(Number);
+
+  const out: MonthlyVolume[] = [];
+  for (let y = firstY, m = firstM; y < lastY || (y === lastY && m <= lastM); ) {
+    const key = `${y}-${String(m).padStart(2, "0")}`;
+    out.push({
+      month: key,
+      label: `${MONTH_LABELS[m - 1]} ${String(y).slice(2)}`,
+      count: counts.get(key) ?? 0,
+    });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return out;
+}
+
+export async function getMonthlyVolume(): Promise<MonthlyVolume[]> {
+  const allCases = await getCases();
+  return computeMonthlyVolume(allCases);
+}
+
 // ── Paper builder context ───────────────────────────────────────────
 
 export interface PaperBuilderContext {
