@@ -48,6 +48,29 @@ export function registerDocTools(server: McpServer): void {
   );
 
   server.tool(
+    "list_doc_annotations",
+    "List the owner's margin notes on a research document (open ones by default) — " +
+      "read these before revising a draft; each open note is a review comment to address " +
+      "in the next version. Resolving notes stays a human action in the app.",
+    {
+      doc_id: z.string().uuid().describe("From search_docs"),
+      include_resolved: z.boolean().optional().describe("Default false"),
+    },
+    async ({ doc_id, include_resolved }) => {
+      const { q } = await research("doc_annotations");
+      let query = q
+        .select("id, created_at, quote, comment, resolved")
+        .eq("doc_id", doc_id)
+        .order("created_at", { ascending: true });
+      if (!include_resolved) query = query.eq("resolved", false);
+      const { data, error } = await query;
+      if (error) return fail(`list_doc_annotations failed: ${error.message}`);
+      const rows = data as unknown[];
+      return okJson({ count: rows.length, annotations: rows });
+    },
+  );
+
+  server.tool(
     "append_to_doc",
     "Append markdown to the end of a research document and snapshot a version. " +
       "Never overwrites existing content — rewriting stays a human action in /docs.",

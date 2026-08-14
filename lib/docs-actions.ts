@@ -8,6 +8,9 @@ import {
   createDoc,
   updateDoc,
   createVersion,
+  createAnnotation,
+  setAnnotationResolved,
+  deleteAnnotation,
 } from "@/lib/data/docs-mutations";
 
 // ── Schemas ──────────────────────────────────────────────────────────
@@ -179,4 +182,57 @@ export async function restoreVersionAction(data: {
 
   revalidatePath(`/docs/${data.doc_id}`);
   return { success: true };
+}
+
+// ── Annotations ─────────────────────────────────────────────────────
+
+const createAnnotationSchema = z.object({
+  doc_id: z.string().min(1),
+  quote: z.string().max(600).optional().default(""),
+  comment: z.string().min(1, "Comment is required").max(4000),
+});
+
+export async function createAnnotationAction(data: {
+  doc_id: string;
+  quote?: string;
+  comment: string;
+}): Promise<{ error?: string }> {
+  const parsed = createAnnotationSchema.safeParse(data);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid annotation" };
+  }
+  try {
+    await createAnnotation(parsed.data);
+    revalidatePath(`/docs/${parsed.data.doc_id}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to save annotation" };
+  }
+}
+
+export async function setAnnotationResolvedAction(data: {
+  id: string;
+  doc_id: string;
+  resolved: boolean;
+}): Promise<{ error?: string }> {
+  try {
+    await setAnnotationResolved(data.id, data.resolved);
+    revalidatePath(`/docs/${data.doc_id}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to update annotation" };
+  }
+}
+
+export async function deleteAnnotationAction(data: {
+  id: string;
+  doc_id: string;
+}): Promise<{ error?: string }> {
+  try {
+    await deleteAnnotation(data.id);
+    revalidatePath(`/docs/${data.doc_id}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to delete annotation" };
+  }
 }

@@ -5,10 +5,11 @@ agent — Claude Code, Claude Cowork, OpenClaw, Claude Desktop. Single-user by
 design: it signs in to Supabase **as you**, so RLS enforces every boundary
 and no service-role key exists anywhere.
 
-15 tools: `create_note`, `search_notes`, `add_task`, `list_open_tasks`,
+16 tools: `create_note`, `search_notes`, `add_task`, `list_open_tasks`,
 `complete_task`, `add_journal_entry`, `list_recent_journal`, `add_contact`,
 `search_contacts`, `list_mind_maps`, `add_mind_map_node`,
-`link_mind_map_nodes`, `search_docs`, `append_to_doc`, `get_baseline_stats`.
+`link_mind_map_nodes`, `search_docs`, `list_doc_annotations`,
+`append_to_doc`, `get_baseline_stats`.
 
 Everything an agent writes is tagged (`tags: ['agent']`, mind-map nodes get
 `origin: "agent"`) so you can always tell your writing from an agent's. The

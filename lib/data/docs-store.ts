@@ -21,7 +21,7 @@ import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server-auth";
 import { warnDegradedMode, seedOrEmpty } from "@/lib/data/degraded";
-import type { Doc, DocVersion, DocStatus } from "./docs-types";
+import type { Doc, DocVersion, DocStatus, DocAnnotation } from "./docs-types";
 
 // ── Seed data (fallback) ─────────────────────────────────────────────
 
@@ -396,4 +396,34 @@ export async function getAllTags(): Promise<string[]> {
     }
   }
   return Array.from(tagSet).sort();
+}
+
+// ── Annotations ─────────────────────────────────────────────────────
+
+export async function getAnnotationsByDocId(
+  docId: string,
+): Promise<DocAnnotation[]> {
+  const sb = await getServerSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .schema("research")
+        .from("doc_annotations")
+        .select("*")
+        .eq("doc_id", docId)
+        .order("resolved", { ascending: true })
+        .order("created_at", { ascending: false });
+      if (!error && data) return data as DocAnnotation[];
+      if (error) warnDegradedMode("getAnnotationsByDocId", error.message);
+    } catch (e) {
+      warnDegradedMode(
+        "getAnnotationsByDocId",
+        e instanceof Error ? e.message : "supabase query threw",
+      );
+    }
+  } else {
+    warnDegradedMode("getAnnotationsByDocId", "supabase unavailable");
+  }
+  // No seed annotations — an empty margin is the correct empty state.
+  return [];
 }

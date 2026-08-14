@@ -55,6 +55,7 @@ All are in schema `research`, all have RLS `auth.uid() = user_id`, so
 | `contacts` | `user_id, name, role, organization?, title?, email?, phone?, location?, corridor?, notes?, tags[]` | `role` ∈ doctor, nurse, hospital_admin, insurance, embassy, transport, government, academic, ngo, fixer, other. |
 | `mind_maps` | update `nodes` / `edges` (JSONB arrays), `updated_at` | Node: `{id, x, y, label, color, radius, nodeType?, origin?}`. Edge: `{id, from, to, label?}`. Never replace the arrays wholesale — append/modify. Agent node ids use an `ag-` prefix. |
 | `docs` + `doc_versions` | append to `docs.content_md`, bump `updated_at`; insert a `doc_versions` row (`doc_id, user_id, content_md, note`) with the new full content | Never overwrite a doc's content destructively. |
+| `doc_annotations` | READ open annotations before revising a doc (`quote` = the passage, `comment` = what to change). Do not resolve or delete them — resolution is the owner's judgement in the app. | The paper-revision loop: annotate → revise → new version → owner resolves. |
 
 Corridor values (free text, but use these canonical six):
 `Koh Samui → Bangkok`, `Phuket → Bangkok`, `Chiang Mai → Bangkok`,

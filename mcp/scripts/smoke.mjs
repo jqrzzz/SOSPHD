@@ -70,12 +70,13 @@ try {
 
   const list = await request("tools/list", {});
   const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-  check(`tools/list returns 15 tools (got ${names.length})`, names.length === 15);
+  check(`tools/list returns 16 tools (got ${names.length})`, names.length === 16);
   const expected = [
     "add_contact", "add_journal_entry", "add_mind_map_node", "add_task",
     "append_to_doc", "complete_task", "create_note", "get_baseline_stats",
-    "link_mind_map_nodes", "list_mind_maps", "list_open_tasks",
-    "list_recent_journal", "search_contacts", "search_docs", "search_notes",
+    "link_mind_map_nodes", "list_doc_annotations", "list_mind_maps",
+    "list_open_tasks", "list_recent_journal", "search_contacts",
+    "search_docs", "search_notes",
   ];
   check("tool names match", JSON.stringify(names) === JSON.stringify(expected));
 
