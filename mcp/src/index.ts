@@ -22,9 +22,9 @@ const server = new McpServer({ name: "sosphd", version: "0.1.0" });
 registerCaptureTools(server); // create_note, search_notes, add_task, list_open_tasks, complete_task
 registerFieldworkTools(server); // add_journal_entry, list_recent_journal, add_contact, search_contacts
 registerMindMapTools(server); // list_mind_maps, add_mind_map_node, link_mind_map_nodes
-registerDocTools(server); // search_docs, append_to_doc
+registerDocTools(server); // search_docs, list_doc_annotations, append_to_doc
 registerBaselineTools(server); // get_baseline_stats
 
 await server.connect(new StdioServerTransport());
 // stdout is the protocol channel — human-facing logs go to stderr.
-console.error("[sosphd-mcp] ready — 15 tools registered");
+console.error("[sosphd-mcp] ready — 16 tools registered");

@@ -1,8 +1,13 @@
 import { notFound } from "next/navigation";
-import { getDocById, getVersionsByDocId } from "@/lib/data/docs-store";
+import {
+  getAnnotationsByDocId,
+  getDocById,
+  getVersionsByDocId,
+} from "@/lib/data/docs-store";
 import { getCases } from "@/lib/data/store";
 import { DocEditor } from "@/components/doc-editor";
 import { DocAITools } from "@/components/doc-ai-tools";
+import { DocAnnotations } from "@/components/doc-annotations";
 import { DocVersions } from "@/components/doc-versions";
 import { Badge } from "@/components/ui/badge";
 
@@ -16,9 +21,10 @@ export default async function DocDetailPage(props: {
     notFound();
   }
 
-  const [versions, cases] = await Promise.all([
+  const [versions, cases, annotations] = await Promise.all([
     getVersionsByDocId(doc.id),
     getCases(),
+    getAnnotationsByDocId(doc.id),
   ]);
 
   return (
@@ -45,6 +51,7 @@ export default async function DocDetailPage(props: {
         <DocEditor doc={doc} cases={cases} />
 
         <aside className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-t border-border bg-card/50 p-4 lg:w-72 lg:border-l lg:border-t-0">
+          <DocAnnotations docId={doc.id} annotations={annotations} />
           <DocAITools docId={doc.id} />
           <DocVersions docId={doc.id} versions={versions} />
         </aside>

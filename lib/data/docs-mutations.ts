@@ -14,7 +14,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { requireAuthOrThrow } from "@/lib/supabase/server-auth";
-import type { Doc, DocVersion } from "./docs-types";
+import type { Doc, DocVersion, DocAnnotation } from "./docs-types";
 
 // Local copy of the read store's mapping helpers (intentional duplication
 // so mutations doesn't depend on the read store and stay independently
@@ -126,4 +126,58 @@ export async function createVersion(data: {
     throw new Error(`Failed to create version: ${error?.message}`);
   }
   return mapDbVersion(row as Record<string, unknown>);
+}
+
+// ── Annotations ─────────────────────────────────────────────────────
+
+export async function createAnnotation(data: {
+  doc_id: string;
+  quote?: string;
+  comment: string;
+}): Promise<DocAnnotation> {
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const { data: row, error } = await sb
+    .schema("research")
+    .from("doc_annotations")
+    .insert({
+      doc_id: data.doc_id,
+      user_id: userId,
+      quote: data.quote ?? "",
+      comment: data.comment,
+    })
+    .select()
+    .single();
+  if (error || !row) {
+    throw new Error(`Failed to create annotation: ${error?.message}`);
+  }
+  return row as DocAnnotation;
+}
+
+export async function setAnnotationResolved(
+  id: string,
+  resolved: boolean,
+): Promise<void> {
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const { error } = await sb
+    .schema("research")
+    .from("doc_annotations")
+    .update({ resolved })
+    .eq("id", id)
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`Failed to update annotation: ${error.message}`);
+  }
+}
+
+export async function deleteAnnotation(id: string): Promise<void> {
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const { error } = await sb
+    .schema("research")
+    .from("doc_annotations")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`Failed to delete annotation: ${error.message}`);
+  }
 }

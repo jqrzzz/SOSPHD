@@ -60,3 +60,19 @@ export const DOC_FOLDERS = [
 ] as const;
 
 export type DocFolder = (typeof DOC_FOLDERS)[number];
+
+// ── Annotations ─────────────────────────────────────────────────────
+
+/** A margin note on a doc — the owner's review comment on a passage.
+ *  `quote` is the annotated text verbatim at annotation time (a note,
+ *  not an anchored range — it may drift as the doc is revised).
+ *  Agents read open annotations and address them in the next version. */
+export interface DocAnnotation {
+  id: string;
+  created_at: string;
+  doc_id: string;
+  user_id: string;
+  quote: string;
+  comment: string;
+  resolved: boolean;
+}
