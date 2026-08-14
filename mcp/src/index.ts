@@ -11,6 +11,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { registerAdmissionsTools } from "./tools/admissions.js";
 import { registerBaselineTools } from "./tools/baseline.js";
 import { registerCaptureTools } from "./tools/capture.js";
 import { registerDocTools } from "./tools/docs.js";
@@ -24,7 +25,8 @@ registerFieldworkTools(server); // add_journal_entry, list_recent_journal, add_c
 registerMindMapTools(server); // list_mind_maps, add_mind_map_node, link_mind_map_nodes
 registerDocTools(server); // search_docs, list_doc_annotations, append_to_doc
 registerBaselineTools(server); // get_baseline_stats
+registerAdmissionsTools(server); // institutions, requirements, outreach drafts
 
 await server.connect(new StdioServerTransport());
 // stdout is the protocol channel — human-facing logs go to stderr.
-console.error("[sosphd-mcp] ready — 16 tools registered");
+console.error("[sosphd-mcp] ready — 23 tools registered");

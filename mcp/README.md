@@ -5,11 +5,19 @@ agent — Claude Code, Claude Cowork, OpenClaw, Claude Desktop. Single-user by
 design: it signs in to Supabase **as you**, so RLS enforces every boundary
 and no service-role key exists anywhere.
 
-16 tools: `create_note`, `search_notes`, `add_task`, `list_open_tasks`,
-`complete_task`, `add_journal_entry`, `list_recent_journal`, `add_contact`,
-`search_contacts`, `list_mind_maps`, `add_mind_map_node`,
-`link_mind_map_nodes`, `search_docs`, `list_doc_annotations`,
-`append_to_doc`, `get_baseline_stats`.
+23 tools.
+
+*Research workspace* — `create_note`, `search_notes`, `add_task`,
+`list_open_tasks`, `complete_task`, `add_journal_entry`,
+`list_recent_journal`, `add_contact`, `search_contacts`, `list_mind_maps`,
+`add_mind_map_node`, `link_mind_map_nodes`, `search_docs`,
+`list_doc_annotations`, `append_to_doc`, `get_baseline_stats`.
+
+*Admissions* — `list_institutions`, `get_institution`, `add_institution`,
+`add_requirement`, `update_institution_stage`, `draft_outreach`,
+`list_outreach`. Requirements demand a `source_url`; `verified` may only be
+set after reading the official page for the current cycle. Outreach is saved
+as a draft — the server has no send capability by design.
 
 Everything an agent writes is tagged (`tags: ['agent']`, mind-map nodes get
 `origin: "agent"`) so you can always tell your writing from an agent's. The
