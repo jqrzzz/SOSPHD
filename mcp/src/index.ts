@@ -16,6 +16,7 @@ import { registerBaselineTools } from "./tools/baseline.js";
 import { registerCaptureTools } from "./tools/capture.js";
 import { registerDocTools } from "./tools/docs.js";
 import { registerFieldworkTools } from "./tools/fieldwork.js";
+import { registerFundingTools } from "./tools/funding.js";
 import { registerMindMapTools } from "./tools/mindmaps.js";
 
 const server = new McpServer({ name: "sosphd", version: "0.1.0" });
@@ -26,7 +27,8 @@ registerMindMapTools(server); // list_mind_maps, add_mind_map_node, link_mind_ma
 registerDocTools(server); // search_docs, list_doc_annotations, append_to_doc
 registerBaselineTools(server); // get_baseline_stats
 registerAdmissionsTools(server); // institutions, requirements, outreach drafts
+registerFundingTools(server); // grants, fellowships, donors
 
 await server.connect(new StdioServerTransport());
 // stdout is the protocol channel — human-facing logs go to stderr.
-console.error("[sosphd-mcp] ready — 23 tools registered");
+console.error("[sosphd-mcp] ready — 27 tools registered");
