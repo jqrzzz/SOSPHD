@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCaseBreakdowns } from "../analytics";
+import { computeCaseBreakdowns, computeMonthlyVolume } from "../analytics";
 import type { Case } from "../types";
 
 function mkCase(overrides: Partial<Case>): Case {
@@ -38,5 +38,35 @@ describe("computeCaseBreakdowns", () => {
     expect(b.total_cases).toBe(0);
     expect(b.by_corridor).toEqual([]);
     expect(b.evacuated_count).toBe(0);
+  });
+});
+
+describe("computeMonthlyVolume", () => {
+  it("counts per month and fills gap months with explicit zeros", () => {
+    const cases = [
+      mkCase({ created_at: "2019-06-05T00:00:00+07:00" }),
+      mkCase({ created_at: "2019-06-20T00:00:00+07:00" }),
+      // July 2019 intentionally absent — the known recording gap
+      mkCase({ created_at: "2019-08-01T00:00:00+07:00" }),
+    ];
+    const v = computeMonthlyVolume(cases);
+    expect(v.map((m) => m.month)).toEqual(["2019-06", "2019-07", "2019-08"]);
+    expect(v.map((m) => m.count)).toEqual([2, 0, 1]);
+    expect(v[1].label).toBe("Jul 19");
+  });
+
+  it("spans year boundaries in order", () => {
+    const cases = [
+      mkCase({ created_at: "2018-12-15T00:00:00+07:00" }),
+      mkCase({ created_at: "2019-02-01T00:00:00+07:00" }),
+    ];
+    const v = computeMonthlyVolume(cases);
+    expect(v.map((m) => m.month)).toEqual(["2018-12", "2019-01", "2019-02"]);
+    expect(v.map((m) => m.count)).toEqual([1, 0, 1]);
+  });
+
+  it("returns empty for no cases and skips unparseable dates", () => {
+    expect(computeMonthlyVolume([])).toEqual([]);
+    expect(computeMonthlyVolume([mkCase({ created_at: "not-a-date" })])).toEqual([]);
   });
 });

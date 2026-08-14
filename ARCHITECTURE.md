@@ -932,7 +932,21 @@ and every row's value is `"#"`. No storage bucket is configured anywhere.
   data. Migration `20260813_010` additionally makes decided recommendations
   immutable at the DB layer via a `BEFORE UPDATE` trigger.
 
-### 8.15 Test coverage
+### 8.15 PostgREST exposed schemas — the missing switch (found 2026-08-14)
+
+**Every REST call to `.schema("research")` returns 406 until `research` is added
+to the project's Exposed schemas list** (Supabase Dashboard → Project Settings →
+Data API → "Exposed schemas"). Grants and RLS were verified correct; the API edge
+logs showed all research-table requests (journal_entries, contacts, cases, notes,
+tasks, docs, …) failing with 406 while public-schema requests returned 200 —
+PostgREST refuses to address a schema it has not been told to serve. This was the
+true root cause of "the app shows nothing real": dev masked it with seed
+fallbacks, production rendered empty states. Diagnosing store code, grants, or
+RLS for empty reads is wasted effort until this switch is checked. The setting is
+platform config (not in the database), so no migration can fix it — it is a
+one-time Dashboard action per project.
+
+### 8.16 Test coverage
 
 Ten Vitest files, all unit tests, all pure-function or mocked:
 `lib/data/__tests__/` (analytics, metrics, retry, store-projections),

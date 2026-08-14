@@ -6,6 +6,7 @@ import { CountUp } from "@/components/motion/count-up";
 import { ProgressRing } from "@/components/motion/progress-ring";
 import { StaggerContainer, StaggerItem } from "@/components/motion/stagger";
 import { FadeIn } from "@/components/motion/fade-in";
+import { ResearchPipeline } from "@/components/process-diagrams";
 import {
   PHD_PHASES,
   OPEN_QUESTIONS,
@@ -104,6 +105,18 @@ export default async function SpinePage() {
       />
 
       <div className="flex flex-col gap-6 p-4 sm:p-6">
+        {/* ── The pipeline at a glance ─────────────────────────────── */}
+        <FadeIn>
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                How field work becomes papers
+              </p>
+              <ResearchPipeline />
+            </CardContent>
+          </Card>
+        </FadeIn>
+
         {/* ── Hero: overall progress ring + key facts ──────────────── */}
         <FadeIn>
           <Card className="surface-lifted overflow-hidden">

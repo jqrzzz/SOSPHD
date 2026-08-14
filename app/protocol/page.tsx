@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { CoordinationTimeline } from "@/components/process-diagrams";
 import { Button } from "@/components/ui/button";
 import {
   PROTOCOL_VERSION,
@@ -37,6 +38,15 @@ export default function ProtocolPage() {
       />
 
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6">
+        <Card>
+          <CardContent className="p-4 sm:p-6">
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              What the intervention measures
+            </p>
+            <CoordinationTimeline />
+          </CardContent>
+        </Card>
+
         <Card className="surface-lifted">
           <CardContent className="flex flex-col gap-2 p-5 sm:p-6">
             <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-primary/90">
