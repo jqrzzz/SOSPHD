@@ -13,6 +13,7 @@ import type {
   InstitutionRequirement,
   Outreach,
 } from "./admissions-types";
+import { emailIsVerified, type Contact } from "./fieldwork-types";
 
 export async function getInstitutions(): Promise<Institution[]> {
   const sb = await getServerSupabase();
@@ -96,4 +97,46 @@ export async function getOutreach(institutionId?: string): Promise<Outreach[]> {
     return [];
   }
   return (data ?? []) as Outreach[];
+}
+
+/**
+ * People attached to a target — prospective supervisors for an
+ * institution, or programme officers for a funder. Ordered so the ones
+ * worth emailing first come first.
+ */
+export async function getContactsForTarget(target: {
+  institutionId?: string;
+  opportunityId?: string;
+}): Promise<Contact[]> {
+  const sb = await getServerSupabase();
+  if (!sb) {
+    warnDegradedMode("getContactsForTarget", "supabase unavailable");
+    return [];
+  }
+  let query = sb.schema("research").from("contacts").select("*");
+  if (target.institutionId) query = query.eq("institution_id", target.institutionId);
+  else if (target.opportunityId) query = query.eq("opportunity_id", target.opportunityId);
+  else return [];
+
+  const { data, error } = await query;
+  if (error) {
+    warnDegradedMode("getContactsForTarget", error.message);
+    return [];
+  }
+
+  const rank: Record<string, number> = {
+    first_wave: 0,
+    second_wave: 1,
+    background: 2,
+  };
+  return ((data ?? []) as Contact[]).sort((a, b) => {
+    const ra = rank[a.outreach_priority ?? "background"] ?? 3;
+    const rb = rank[b.outreach_priority ?? "background"] ?? 3;
+    if (ra !== rb) return ra - rb;
+    // Then those we can actually email.
+    const ea = emailIsVerified(a) ? 0 : 1;
+    const eb = emailIsVerified(b) ? 0 : 1;
+    if (ea !== eb) return ea - eb;
+    return a.name.localeCompare(b.name);
+  });
 }

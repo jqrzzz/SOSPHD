@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getFundingOpportunityById } from "@/lib/data/funding-store";
-import { getOutreach } from "@/lib/data/admissions-store";
+import { getContactsForTarget, getOutreach } from "@/lib/data/admissions-store";
+import { PeopleToContact } from "@/components/people-to-contact";
 import {
   ELIGIBILITY_BLURB,
   ELIGIBILITY_LABELS,
@@ -26,9 +27,11 @@ export default async function FundingDetailPage(props: {
   const o = await getFundingOpportunityById(id);
   if (!o) notFound();
 
-  const outreach = (await getOutreach()).filter(
-    (x) => x.opportunity_id === o.id,
-  );
+  const [allOutreach, people] = await Promise.all([
+    getOutreach(),
+    getContactsForTarget({ opportunityId: o.id }),
+  ]);
+  const outreach = allOutreach.filter((x) => x.opportunity_id === o.id);
   const days = o.next_deadline ? daysUntil(o.next_deadline) : null;
 
   return (
@@ -170,6 +173,18 @@ export default async function FundingDetailPage(props: {
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardContent className="p-5">
+            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Who to contact
+            </p>
+            <PeopleToContact
+              contacts={people}
+              emptyHint="No contact point recorded yet. For funders a general grants inbox is often the correct route — unlike academic outreach, foundations expect it."
+            />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardContent className="p-5">
