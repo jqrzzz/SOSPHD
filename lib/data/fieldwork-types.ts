@@ -82,6 +82,33 @@ export interface Contact {
   notes: string;
   linked_journal_ids: string[];   // journal entries where they appear
   business_card_url: string | null; // photo of business card
+
+  // ── Outreach linkage (migration 019) ──
+  // Prospective supervisors and funder programme officers are the same
+  // shape as the rest of the research network, so they live here too.
+  institution_id: string | null;  // the PhD programme they belong to
+  opportunity_id: string | null;  // or the funder they administer
+  research_focus: string | null;
+  recent_work: string | null;     // what a tailored email would reference
+  /** Where the email address was actually seen. An address with no
+   *  source is unverified: pattern-guessed addresses either bounce or
+   *  reach a stranger, and a wrong first contact cannot be undone. */
+  email_source_url: string | null;
+  email_verified_at: string | null;
+  outreach_priority: OutreachPriority | null;
+}
+
+export type OutreachPriority = "first_wave" | "second_wave" | "background";
+
+export const OUTREACH_PRIORITY_LABELS: Record<OutreachPriority, string> = {
+  first_wave: "First wave",
+  second_wave: "Second wave",
+  background: "Background",
+};
+
+/** An email is only safe to send to if we saw it on an official page. */
+export function emailIsVerified(c: Pick<Contact, "email" | "email_source_url">): boolean {
+  return Boolean(c.email && c.email_source_url);
 }
 
 // ── Field Protocols (Checklists) ────────────────────────────────────

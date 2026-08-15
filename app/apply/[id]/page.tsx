@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { PeopleToContact } from "@/components/people-to-contact";
 import {
   NotesEditor,
   OutreachPanel,
@@ -9,6 +10,7 @@ import {
   StageControl,
 } from "@/components/admissions-controls";
 import {
+  getContactsForTarget,
   getInstitutionById,
   getOutreach,
   getRequirements,
@@ -55,9 +57,10 @@ export default async function InstitutionPage(props: {
   const institution = await getInstitutionById(id);
   if (!institution) notFound();
 
-  const [requirements, outreach] = await Promise.all([
+  const [requirements, outreach, people] = await Promise.all([
     getRequirements(institution.id),
     getOutreach(institution.id),
+    getContactsForTarget({ institutionId: institution.id }),
   ]);
 
   const days = institution.next_deadline
@@ -218,6 +221,22 @@ export default async function InstitutionPage(props: {
         </div>
 
         <aside className="flex w-full shrink-0 flex-col gap-6 lg:w-96">
+          <Card>
+            <CardContent className="p-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                People to contact
+              </p>
+              <PeopleToContact
+                contacts={people}
+                emptyHint={
+                  institution.supervisor_required
+                    ? "No named supervisors yet — and this programme requires an agreed supervisor before you can apply, so finding them is the critical path."
+                    : undefined
+                }
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="p-5">
               <OutreachPanel
