@@ -3,6 +3,7 @@ import {
   CANONICAL_REQUIREMENTS,
   computeCoverage,
   coverageSummary,
+  portfolioRollup,
 } from "../admissions-coverage";
 import type { InstitutionRequirement } from "../admissions-types";
 
@@ -113,9 +114,26 @@ describe("computeCoverage", () => {
   });
 
   it("surfaces recorded requirements that match nothing canonical", () => {
-    const odd = req({ label: "Capacity check: 0.5 FTE sustained" });
+    // School-specific quirks belong in `extra` rather than being forced
+    // into the taxonomy. LSHTM's "which doctorate" decision is a real one.
+    const odd = req({ label: "Decide PhD vs DrPH" });
     const c = computeCoverage(NO_SUPERVISOR, [odd], NOW);
     expect(c.extra.map((r) => r.id)).toEqual([odd.id]);
+  });
+
+  it("recognises an FTE capacity note as evidence about format compatibility", () => {
+    // Real data: LSHTM records "Capacity check: 0.5 FTE sustained". That is
+    // exactly the question format_compatibility asks, so it must count as
+    // established rather than sitting unmatched while the item reads unknown.
+    const c = computeCoverage(NO_SUPERVISOR, [
+      req({
+        label: "Capacity check: 0.5 FTE sustained",
+        detail: "part-time candidature needs ~0.5 FTE (full-time = 35 hrs/week).",
+        verified_at: "2026-08-14T00:00:00Z",
+      }),
+    ], NOW);
+    expect(c.items.find((i) => i.canonical.slug === "format_compatibility")!.state)
+      .toBe("verified");
   });
 });
 
@@ -197,5 +215,130 @@ describe("picking between several rows that match one item", () => {
       req({ label: "GRE note two" }),
     ], NOW);
     expect(c.extra).toHaveLength(0);
+  });
+});
+
+describe("scope", () => {
+  it("tags every canonical item", () => {
+    for (const c of CANONICAL_REQUIREMENTS) {
+      expect(["portfolio", "per_school"], c.slug).toContain(c.scope);
+    }
+  });
+
+  it("keeps fees, interviews and supervisor agreements per-school", () => {
+    const bySlug = (s: string) => CANONICAL_REQUIREMENTS.find((c) => c.slug === s)!;
+    for (const slug of ["application_fee", "interview", "supervisor_agreement", "funding_application", "personal_statement"]) {
+      expect(bySlug(slug).scope, slug).toBe("per_school");
+    }
+    // One sitting, one CV, one set of transcripts serve every school.
+    for (const slug of ["gre", "english_test", "cv", "transcripts", "referees"]) {
+      expect(bySlug(slug).scope, slug).toBe("portfolio");
+    }
+  });
+});
+
+describe("portfolioRollup", () => {
+  const school = (
+    id: string,
+    next_deadline: string | null,
+    requirements: InstitutionRequirement[] = [],
+  ) => ({ id, name: id, next_deadline, supervisor_required: false, requirements });
+
+  it("collapses the same item across schools into one action", () => {
+    const actions = portfolioRollup(
+      [school("a", "2026-10-01"), school("b", "2026-12-01"), school("c", null)],
+      NOW,
+    );
+    const cv = actions.find((a) => a.canonical.slug === "cv")!;
+    expect(cv.blocking.map((b) => b.id).sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("excludes per-school items entirely", () => {
+    const actions = portfolioRollup([school("a", "2026-10-01")], NOW);
+    expect(actions.every((a) => a.canonical.scope === "portfolio")).toBe(true);
+    expect(actions.some((a) => a.canonical.slug === "application_fee")).toBe(false);
+  });
+
+  it("measures lateness against the soonest deadline it would miss", () => {
+    // Referees need 60 days. School 'a' is 46 days out, 'b' is 107.
+    const actions = portfolioRollup(
+      [school("a", "2026-10-01"), school("b", "2026-12-01")],
+      NOW,
+    );
+    const referees = actions.find((a) => a.canonical.slug === "referees")!;
+    expect(referees.earliestDeadline).toBe("2026-10-01");
+    expect(referees.daysToEarliest).toBe(46);
+    expect(referees.behind).toBe(true);
+  });
+
+  it("drops a school once its copy of the work is done", () => {
+    const done = req({ label: "Academic CV", status: "done" });
+    const actions = portfolioRollup(
+      [school("a", "2026-10-01", [done]), school("b", "2026-12-01")],
+      NOW,
+    );
+    expect(actions.find((a) => a.canonical.slug === "cv")!.blocking.map((b) => b.id))
+      .toEqual(["b"]);
+  });
+
+  it("keeps a school that merely has no date, since undated is not settled", () => {
+    const actions = portfolioRollup([school("a", null)], NOW);
+    const cv = actions.find((a) => a.canonical.slug === "cv")!;
+    expect(cv.blocking.map((b) => b.id)).toEqual(["a"]);
+    expect(cv.earliestDeadline).toBeNull();
+    expect(cv.daysToEarliest).toBeNull();
+    expect(cv.behind).toBe(false);
+  });
+
+  it("does not list an item a school has ruled out", () => {
+    const na = req({ label: "GRE", status: "not_applicable" });
+    const actions = portfolioRollup([school("a", "2026-10-01", [na])], NOW);
+    expect(actions.some((a) => a.canonical.slug === "gre")).toBe(false);
+  });
+
+  it("orders late work first, then by how many schools it unblocks", () => {
+    const actions = portfolioRollup(
+      [school("a", "2026-10-01"), school("b", "2026-12-01")],
+      NOW,
+    );
+    const late = actions.filter((a) => a.behind);
+    expect(late.length).toBeGreaterThan(0);
+    expect(actions.slice(0, late.length).every((a) => a.behind)).toBe(true);
+  });
+});
+
+describe("optional requirements", () => {
+  it("does not report an item the school called optional as behind", () => {
+    // Duke-NUS records the GRE as optional. Knowing it is optional is a
+    // positive finding, not an absence — it must not read as late work.
+    const c = computeCoverage(
+      { next_deadline: "2026-09-25", supervisor_required: false },
+      [req({ label: "GRE (optional from 2026 intake)", mandatory: false })],
+      NOW,
+    );
+    const gre = c.items.find((i) => i.canonical.slug === "gre")!;
+    expect(gre.state).toBe("recorded");
+    expect(gre.behind).toBe(false);
+  });
+
+  it("drops an optional item from the portfolio rollup for that school", () => {
+    const actions = portfolioRollup([
+      { id: "a", name: "a", next_deadline: "2026-10-01", supervisor_required: false,
+        requirements: [req({ label: "GRE", mandatory: false })] },
+      { id: "b", name: "b", next_deadline: "2026-12-01", supervisor_required: false,
+        requirements: [] },
+    ], NOW);
+    expect(actions.find((a) => a.canonical.slug === "gre")!.blocking.map((b) => b.id))
+      .toEqual(["b"]);
+  });
+
+  it("still blocks when the item is merely unknown", () => {
+    // No row means no mandatory flag. Not knowing whether a school
+    // requires something is not the same as being told it does not.
+    const actions = portfolioRollup([
+      { id: "a", name: "a", next_deadline: "2026-10-01", supervisor_required: false,
+        requirements: [] },
+    ], NOW);
+    expect(actions.find((a) => a.canonical.slug === "gre")!.blocking).toHaveLength(1);
   });
 });

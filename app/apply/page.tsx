@@ -19,7 +19,12 @@ import {
   DeadlineTimeline,
   SchoolComparison,
 } from "@/components/school-comparison";
-import { computeCoverage, coverageSummary } from "@/lib/data/admissions-coverage";
+import { PortfolioPanel } from "@/components/portfolio-panel";
+import {
+  computeCoverage,
+  coverageSummary,
+  portfolioRollup,
+} from "@/lib/data/admissions-coverage";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -67,6 +72,17 @@ export default async function ApplyPage() {
   const nextUp = dated[0];
   const unverifiedCount = institutions.filter((i) => !i.verified_at).length;
   const supervisorFirst = active.filter((i) => i.supervisor_required);
+
+  // Shared work, counted once across every school still in play.
+  const portfolio = portfolioRollup(
+    active.map((i) => ({
+      id: i.id,
+      name: i.name,
+      next_deadline: i.next_deadline,
+      supervisor_required: i.supervisor_required,
+      requirements: reqsByInstitution.get(i.id) ?? [],
+    })),
+  );
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -130,6 +146,10 @@ export default async function ApplyPage() {
             </CardContent>
           </Card>
         </section>
+
+        {/* Shared work first. Five applications look like sixty problems
+            until the items that are one piece of work are counted once. */}
+        <PortfolioPanel actions={portfolio} />
 
         {/* Deadline strip — see the pile-up, don't infer it from a list */}
         {dated.length > 0 && (
