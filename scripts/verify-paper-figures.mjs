@@ -93,12 +93,22 @@ const CHECKS = [
 
   { section: "§5.4 / abstract", label: "gastrointestinal cases", expected: 231,
     run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "gastro")) },
-  { section: "§5.4 / abstract", label: "trauma cases", expected: 179,
+  { section: "§5.4 / abstract", label: "trauma cases", expected: 170,
     run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "trauma")) },
-  { section: "§5.4 / abstract", label: "animal bite cases", expected: 109,
+  { section: "§5.4 / abstract", label: "animal bite cases", expected: 114,
     run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "animal_bite")) },
-  { section: "§5.4", label: "marine cases", expected: 42,
+  { section: "§5.4", label: "marine cases", expected: 46,
     run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "marine")) },
+
+  // §4.4 distinguishes two kinds of non-classification. Earlier drafts
+  // reported only the first and understated the unknown by 98 cases.
+  { section: "§4.4 / §5.4", label: "cases with NO diagnosis text", expected: 54,
+    run: async () => {
+      const { data } = await research.from("cases").select("diagnosis_bucket");
+      return (data ?? []).filter((r) => !r.diagnosis_bucket).length;
+    } },
+  { section: "§4.4 / §5.4", label: "cases bucketed 'other' (text, no rule matched)", expected: 98,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "other")) },
 
   { section: "§5.5 / abstract", label: "evacuations", expected: 49,
     run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("evacuated", true)) },

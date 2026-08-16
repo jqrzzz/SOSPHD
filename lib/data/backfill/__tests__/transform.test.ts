@@ -107,3 +107,37 @@ describe("normalize helpers", () => {
     expect(mapHistoricalSeverity(null)).toBeNull();
   });
 });
+
+describe("bucketDiagnosis — mechanism outranks anatomy", () => {
+  // Regression for the 2026-08-15 audit: nine rows were mis-bucketed as
+  // trauma because trauma's body-part and generic-wound keywords were
+  // evaluated before the mechanism buckets. These are the real strings.
+  it("files monkey injuries as animal_bite even when a body part is named", () => {
+    expect(bucketDiagnosis("monkey bite, right knee")).toBe("animal_bite");
+    expect(bucketDiagnosis("Monkey bite left shoulder")).toBe("animal_bite");
+    expect(bucketDiagnosis("monkey scratch right knee")).toBe("animal_bite");
+    expect(
+      bucketDiagnosis(
+        "bitten by a monkey on left leg and has laceration wound right plantar 5 hours ago",
+      ),
+    ).toBe("animal_bite");
+  });
+
+  it("files marine injuries as marine even when described as a wound or cut", () => {
+    expect(bucketDiagnosis("Cut by coral left ring toe")).toBe("marine");
+    expect(bucketDiagnosis("Sea urchin wound left foot")).toBe("marine");
+    expect(bucketDiagnosis("multiple puncture wounds due to sea urchin")).toBe("marine");
+    expect(bucketDiagnosis("stung by sea urchin left knee")).toBe("marine");
+  });
+
+  it("still files genuine trauma as trauma", () => {
+    expect(bucketDiagnosis("motorbike accident, fractured ankle")).toBe("trauma");
+    expect(bucketDiagnosis("fall from height, laceration to shoulder")).toBe("trauma");
+    expect(bucketDiagnosis("cut left big toe")).toBe("trauma");
+  });
+
+  it("does not let the reorder steal gastro cases", () => {
+    expect(bucketDiagnosis("abdominal pain and vomiting")).toBe("gastro");
+    expect(bucketDiagnosis("food poisoning with dehydration")).toBe("gastro");
+  });
+});
