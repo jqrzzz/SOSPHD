@@ -77,6 +77,21 @@ export interface CanonicalRequirement {
  */
 export const CANONICAL_REQUIREMENTS: CanonicalRequirement[] = [
   {
+    slug: "entry_qualification",
+    label: "Candidate meets the minimum entry qualification",
+    kind: "process",
+    applicability: "universal",
+    scope: "per_school",
+    why:
+      "The precondition beneath every other requirement, and the one most easily assumed. Schools differ sharply on whether a bachelor's degree alone admits to a doctorate: Singapore and Hong Kong generally accept a good honours bachelor's directly, the UK accepts an upper second or overseas equivalent, and Japanese doctoral programmes normally require a master's with only a narrow research-equivalence exception. Subject relevance is assessed separately from level, and a degree outside health or social science invites the question directly. Unmet, no amount of work on anything else below matters — and the remedy is a further degree, measured in years rather than weeks.",
+    leadDays: 180,
+    match: [
+      "entry requirement", "entry qualification", "minimum qualification",
+      "master", "masters", "bachelor", "honours", "second class", "2nd upper",
+      "upper second", "degree requirement", "academic qualification", "equivalence",
+    ],
+  },
+  {
     slug: "format_compatibility",
     label: "Programme can be done without abandoning the operation",
     kind: "process",

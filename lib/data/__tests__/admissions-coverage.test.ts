@@ -372,3 +372,41 @@ describe("greStance", () => {
       .toBe("not_required");
   });
 });
+
+describe("entry qualification", () => {
+  const entry = () =>
+    CANONICAL_REQUIREMENTS.find((c) => c.slug === "entry_qualification")!;
+
+  it("leads the canonical set — it is the precondition beneath everything else", () => {
+    expect(CANONICAL_REQUIREMENTS[0].slug).toBe("entry_qualification");
+  });
+
+  it("is per-school, because the bar differs by jurisdiction", () => {
+    expect(entry().scope).toBe("per_school");
+    expect(entry().applicability).toBe("universal");
+  });
+
+  it("matches how schools actually word their entry bar", () => {
+    // Real wordings encountered across the shortlist.
+    for (const label of [
+      "Bachelor with good honours (2nd Upper or equivalent) minimum",
+      "Master's degree normally required for DrPH applicants",
+      "Entry requirement: upper second-class honours degree",
+    ]) {
+      const c = computeCoverage(NO_SUPERVISOR, [req({ label })], NOW);
+      expect(
+        c.items.find((i) => i.canonical.slug === "entry_qualification")!.state,
+        label,
+      ).toBe("recorded");
+    }
+  });
+
+  it("reads as behind against any near deadline, because the remedy takes years", () => {
+    // Unmet, the fix is a further degree. A 90-day runway does not touch it.
+    const c = computeCoverage(
+      { next_deadline: "2026-11-01", supervisor_required: false }, [], NOW,
+    );
+    expect(c.items.find((i) => i.canonical.slug === "entry_qualification")!.behind)
+      .toBe(true);
+  });
+});
