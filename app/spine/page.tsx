@@ -17,6 +17,8 @@ import {
 } from "@/lib/data/phd-spine";
 import type { StepStatus } from "@/lib/data/phd-spine";
 import { suggestNextActions, getResearchPulse } from "@/lib/agent";
+import { AttentionPanel } from "@/components/attention-panel";
+import { getAttention } from "@/lib/data/attention";
 
 /* ── Status helpers ───────────────────────────────────────────── */
 
@@ -89,9 +91,10 @@ export default async function SpinePage() {
   const nextStep = getNextStep();
   const unresolvedQuestions = getUnresolvedQuestions();
 
-  const [nextActions, pulse] = await Promise.all([
+  const [nextActions, pulse, attention] = await Promise.all([
     suggestNextActions(3),
     getResearchPulse(),
+    getAttention(),
   ]);
 
   const health = HEALTH_PALETTE[pulse.health] ?? HEALTH_PALETTE.good;
@@ -105,6 +108,11 @@ export default async function SpinePage() {
       />
 
       <div className="flex flex-col gap-6 p-4 sm:p-6">
+        {/* ── What needs you, before anything else on the page ─────── */}
+        <FadeIn>
+          <AttentionPanel items={attention} />
+        </FadeIn>
+
         {/* ── The pipeline at a glance ─────────────────────────────── */}
         <FadeIn>
           <Card>
