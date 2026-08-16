@@ -15,6 +15,8 @@ import {
   getOutreach,
   getRequirements,
 } from "@/lib/data/admissions-store";
+import { CoveragePanel } from "@/components/coverage-panel";
+import { computeCoverage } from "@/lib/data/admissions-coverage";
 import {
   STUDY_FORMAT_LABELS,
   daysUntil,
@@ -67,6 +69,7 @@ export default async function InstitutionPage(props: {
     ? daysUntil(institution.next_deadline)
     : null;
   const pct = readiness(requirements);
+  const coverage = computeCoverage(institution, requirements);
 
   const byKind = new Map<RequirementKind, InstitutionRequirement[]>();
   for (const r of requirements) {
@@ -137,16 +140,35 @@ export default async function InstitutionPage(props: {
               fit {institution.fit_score}/5
             </span>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-secondary">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${pct}%` }}
-              />
+          {/* Two numbers, deliberately side by side. Progress alone is the
+              misleading one: it measures work against the requirements we
+              happen to know about, so it climbs toward 100% while whole
+              requirements remain undiscovered. The unknown count is the
+              honest denominator, and it is coloured, not the bar. */}
+          <div className="ml-auto flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {pct}% of known work
+              </span>
             </div>
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {pct}% ready
-            </span>
+            {coverage.unknown.length > 0 && (
+              <span
+                className={cn(
+                  "font-mono text-[10px]",
+                  coverage.unknownUniversal.length > 0
+                    ? "text-destructive"
+                    : "text-amber-400",
+                )}
+              >
+                {coverage.unknown.length} unestablished
+              </span>
+            )}
           </div>
         </div>
       </header>
@@ -221,6 +243,11 @@ export default async function InstitutionPage(props: {
         </div>
 
         <aside className="flex w-full shrink-0 flex-col gap-6 lg:w-96">
+          <CoveragePanel
+            coverage={coverage}
+            deadlineKnown={institution.next_deadline !== null}
+          />
+
           <Card>
             <CardContent className="p-5">
               <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">

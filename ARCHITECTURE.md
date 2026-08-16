@@ -1017,6 +1017,7 @@ Full detail, including two things deliberately *not* fixed here, is in
 | The database schema | `supabase/migrations/20260516_004_research_schema_snapshot.sql` (the snapshot), then the later migrations in order |
 | Operational→research event sync | `supabase/migrations/20260402_003_auto_sync_triggers.sql`, `…_006_case_events_dedup_and_triage.sql`, `…_020_case_event_clock_resolution.sql` — **not** application code |
 | Whether a coordination interval is real | `research.case_intervals` and the `resolution` column (§8.17); never difference `case_events` by hand |
+| What a school requires that nobody has established | `lib/data/admissions-coverage.ts` (`CANONICAL_REQUIREMENTS`) — a code taxonomy on purpose; per-school facts stay in the DB with `source_url`/`verified_at` |
 | Sidebar navigation | `components/app-shell.tsx` (`NAV_ITEMS`) |
 | Dashboard sub-tabs | `components/dashboard-nav.tsx` (`TABS`) |
 | The PhD phase tracker on `/spine` | `lib/data/phd-spine.ts` — plain data, `PHD_PHASES` and `OPEN_QUESTIONS` |

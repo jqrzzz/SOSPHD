@@ -29,8 +29,28 @@ describe("bandAttention", () => {
     expect(b.soon).toHaveLength(0);
   });
 
-  it("drops undated non-blockers from every band", () => {
+  it("gives undated non-blockers their own band instead of dropping them", () => {
+    // These used to vanish. An undated task and a school whose deadline
+    // nobody has established are both real work; being unassessable is
+    // worse than being distant, not better.
     const b = bandAttention([mk({ id: "undated", days: null })]);
+    expect(b.undated.map((i) => i.id)).toEqual(["undated"]);
     expect(b.overdue.length + b.soon.length + b.ahead.length + b.blocked.length).toBe(0);
+  });
+
+  it("keeps an undated blocker in the blocked band, not the undated one", () => {
+    const b = bandAttention([mk({ id: "blk", kind: "blocked", days: null })]);
+    expect(b.blocked.map((i) => i.id)).toEqual(["blk"]);
+    expect(b.undated).toHaveLength(0);
+  });
+
+  it("excludes undated items from the dated bands", () => {
+    const b = bandAttention([
+      mk({ id: "undated", days: null }),
+      mk({ id: "soon", days: 5 }),
+    ]);
+    expect(b.soon.map((i) => i.id)).toEqual(["soon"]);
+    expect(b.ahead).toHaveLength(0);
+    expect(b.overdue).toHaveLength(0);
   });
 });

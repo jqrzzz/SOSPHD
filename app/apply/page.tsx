@@ -19,6 +19,7 @@ import {
   DeadlineTimeline,
   SchoolComparison,
 } from "@/components/school-comparison";
+import { computeCoverage, coverageSummary } from "@/lib/data/admissions-coverage";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -208,6 +209,7 @@ function InstitutionRow({
 }) {
   const days = inst.next_deadline ? daysUntil(inst.next_deadline) : null;
   const pct = readiness(reqs);
+  const coverage = computeCoverage(inst, reqs);
 
   return (
     <Link href={`/apply/${inst.id}`} className="group">
@@ -280,9 +282,29 @@ function InstitutionRow({
                 Supervisor first
               </Badge>
             )}
-            <span className="ml-auto font-mono text-[10px] text-muted-foreground">
-              {APPLICATION_STAGE_LABELS[inst.stage]} · {reqs.length} requirement
-              {reqs.length === 1 ? "" : "s"} · {pct}% ready
+            <span className="ml-auto flex flex-wrap items-center justify-end gap-x-2 font-mono text-[10px] text-muted-foreground">
+              <span>
+                {APPLICATION_STAGE_LABELS[inst.stage]} · {reqs.length} requirement
+                {reqs.length === 1 ? "" : "s"} · {pct}% of known work
+              </span>
+              {/* Coverage, not progress. A row can be 100% on known work and
+                  still be missing half its requirements. */}
+              <span
+                className={cn(
+                  coverage.unknownUniversal.length > 0
+                    ? "text-destructive"
+                    : coverage.unknown.length > 0
+                      ? "text-amber-400"
+                      : "text-primary",
+                )}
+              >
+                · {coverageSummary(coverage)}
+              </span>
+              {coverage.behind.length > 0 && (
+                <span className="text-destructive">
+                  · {coverage.behind.length} past lead time
+                </span>
+              )}
             </span>
           </div>
         </CardContent>
