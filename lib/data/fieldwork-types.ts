@@ -96,6 +96,11 @@ export interface Contact {
   email_source_url: string | null;
   email_verified_at: string | null;
   outreach_priority: OutreachPriority | null;
+  /** The person's official page — faculty profile, lab site, staff
+   *  directory entry. This is where their address gets READ from, so the
+   *  verification queue links it next to the capture form. Was in the DB
+   *  from migration 019 but missing from this type until 2026-08-16. */
+  profile_url: string | null;
 }
 
 export type OutreachPriority = "first_wave" | "second_wave" | "background";

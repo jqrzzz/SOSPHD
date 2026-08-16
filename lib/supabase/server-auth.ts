@@ -30,6 +30,21 @@ export class AuthRequiredError extends Error {
 /**
  * Server-side Supabase client (reads auth cookies via Next.js headers).
  * Returns null if env vars are missing.
+ *
+ * DO NOT wrap createClient() in a try/catch here. It awaits cookies(),
+ * and during `next build` the framework signals "this page must be
+ * rendered per-request" by THROWING from cookies() — a catch swallows
+ * that signal, so Next prerenders the page as static HTML with the
+ * degraded-empty data baked in. That is exactly what happened: every
+ * data page (/apply, /dashboard, /spine, /funding, /contacts …) built
+ * as ○ static and would have served an empty shell in production,
+ * while looking perfectly fine under `next dev`, where everything
+ * renders per-request. Found 2026-08-16; see ARCHITECTURE §8.18.
+ *
+ * Letting the throw propagate is the fix: Next catches its own error
+ * and marks the route dynamic (ƒ). Nothing else calls this outside a
+ * request context, so there is no other error to defend against — the
+ * missing-env case is handled explicitly above.
  */
 export async function getServerSupabase(): Promise<SupabaseClient | null> {
   if (
@@ -38,11 +53,7 @@ export async function getServerSupabase(): Promise<SupabaseClient | null> {
   ) {
     return null;
   }
-  try {
-    return (await createClient()) as SupabaseClient;
-  } catch {
-    return null;
-  }
+  return (await createClient()) as SupabaseClient;
 }
 
 /**

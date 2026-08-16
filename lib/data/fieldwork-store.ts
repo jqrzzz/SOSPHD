@@ -164,6 +164,7 @@ const seedContacts: Contact[] = [
     email_source_url: null,
     email_verified_at: null,
     outreach_priority: null,
+    profile_url: null,
   },
   {
     id: "ct_002",
@@ -190,6 +191,7 @@ const seedContacts: Contact[] = [
     email_source_url: null,
     email_verified_at: null,
     outreach_priority: null,
+    profile_url: null,
   },
   {
     id: "ct_003",
@@ -216,6 +218,7 @@ const seedContacts: Contact[] = [
     email_source_url: null,
     email_verified_at: null,
     outreach_priority: null,
+    profile_url: null,
   },
   {
     id: "ct_004",
@@ -242,6 +245,7 @@ const seedContacts: Contact[] = [
     email_source_url: null,
     email_verified_at: null,
     outreach_priority: null,
+    profile_url: null,
   },
 ];
 

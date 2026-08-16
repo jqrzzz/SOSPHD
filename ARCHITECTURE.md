@@ -995,6 +995,33 @@ resolution and looked populated. Nothing had fired, so no data was affected.
 Full detail, including two things deliberately *not* fixed here, is in
 `docs/prospective-clock-audit.md`.
 
+### 8.18 A bare catch was turning every data page into a static empty shell (found + fixed 2026-08-16)
+
+`getServerSupabase` wrapped `createClient()` in `try { … } catch { return null }`.
+`createClient()` awaits `cookies()`, and during `next build` the framework's way
+of saying "this page must render per-request" is to **throw** from `cookies()` —
+so the catch swallowed the signal, `getServerSupabase` returned null, the page
+rendered its degraded-empty state, and Next happily prerendered that as static
+HTML. Every store-backed page (`/apply`, `/dashboard/*`, `/spine`, `/funding`,
+`/papers`, `/advisor`, `/workspace`) built as `○ static` and would serve an
+empty shell in production — while looking perfectly healthy under `next dev`,
+where everything renders per-request. The classic shape of this bug: invisible
+in exactly the environment you develop in.
+
+Two traps for whoever touches this next:
+
+- **A local build cannot show you the bug or the fix.** Without `.env.local`,
+  the env-var guard returns null before `cookies()` is reached, so every page
+  is legitimately static-degraded locally. Verify with dummy env:
+  `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy pnpm build`
+  and check the route table shows `ƒ` for data pages.
+- **Do not re-add the catch.** The missing-env case is already handled
+  explicitly above it; there is no other legitimate error to defend against,
+  and the "defensive" catch was the entire bug.
+
+`/contacts` and `/fieldwork` remain `○` on purpose — they are `"use client"`
+pages that fetch in the browser, so a static shell is their design.
+
 ---
 
 ## 9. Where to start

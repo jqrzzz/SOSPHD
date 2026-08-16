@@ -201,6 +201,36 @@ export async function updateContact(
   return row as Contact;
 }
 
+/**
+ * Record a contact's email address together with the official page it was
+ * read from. The two arrive as one atomic pair on purpose: the standing
+ * rule (AGENTS.md) is that an address may only be recorded when it was
+ * seen verbatim on an official page, never constructed or guessed — so a
+ * mutation that could set the email without its source would be a hole in
+ * that rule. `email_verified_at` stamps when the human attested to it.
+ */
+export async function recordContactEmail(
+  id: string,
+  email: string,
+  emailSourceUrl: string,
+): Promise<void> {
+  const { supabase: sb, userId } = await requireAuthOrThrow();
+  const { error } = await sb
+    .schema("research")
+    .from("contacts")
+    .update({
+      email,
+      email_source_url: emailSourceUrl,
+      email_verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`Failed to record contact email: ${error.message}`);
+  }
+}
+
 export async function deleteContact(id: string): Promise<void> {
   const { supabase: sb, userId } = await requireAuthOrThrow();
   const { error } = await sb

@@ -71,7 +71,10 @@ export default async function ApplyPage() {
   );
 
   const nextUp = dated[0];
-  const unverifiedCount = institutions.filter((i) => !i.verified_at).length;
+  const activeIds = new Set(active.map((i) => i.id));
+  const unverifiedReqCount = allReqs.filter(
+    (r) => !r.verified_at && activeIds.has(r.institution_id),
+  ).length;
   const supervisorFirst = active.filter((i) => i.supervisor_required);
 
   // Shared work, counted once across every school still in play.
@@ -135,17 +138,24 @@ export default async function ApplyPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="flex flex-col gap-1 p-5">
-              <span className="text-xs text-muted-foreground">Unverified</span>
-              <span className="text-2xl font-semibold tracking-tight text-foreground">
-                {unverifiedCount}
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                institutions whose dates still need confirming
-              </span>
-            </CardContent>
-          </Card>
+          {/* Links to the burn-down queue: the one admissions job only a
+              human browser can do, since institutional domains are blocked
+              from the research environment. */}
+          <Link href="/apply/verify" className="group">
+            <Card className="h-full transition-colors group-hover:border-primary/50">
+              <CardContent className="flex flex-col gap-1 p-5">
+                <span className="text-xs text-muted-foreground">
+                  Verification queue
+                </span>
+                <span className="text-2xl font-semibold tracking-tight text-foreground">
+                  {unverifiedReqCount}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  requirements to confirm against official pages →
+                </span>
+              </CardContent>
+            </Card>
+          </Link>
         </section>
 
         {/* Shared work first. Five applications look like sixty problems
