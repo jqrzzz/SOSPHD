@@ -444,6 +444,37 @@ export function computeCoverage(
   };
 }
 
+/**
+ * Where a school stands on the GRE.
+ *
+ * Separated out because it is a hard filter rather than one requirement
+ * among many: sitting the GRE has been ruled out, so a school that
+ * mandates it is ineligible no matter how well it fits otherwise.
+ */
+export type GreStance = "required" | "not_required" | "unknown";
+
+/**
+ * Read the GRE position from every matching row, not just the strongest.
+ *
+ * Deliberately conservative: if ANY row says the GRE is mandatory, the
+ * answer is "required", even when another row calls it optional. JHU is
+ * the live example — one row records "GRE optional" and another records a
+ * departmental page saying tests are required. Resolving that toward
+ * "not required" would be the expensive direction to be wrong in, because
+ * it hides an eligibility bar until the deadline has passed.
+ */
+export function greStance(requirements: InstitutionRequirement[]): GreStance {
+  const canonical = CANONICAL_REQUIREMENTS.find((c) => c.slug === "gre")!;
+  const rows = requirements.filter((r) => matches(r, canonical));
+  if (rows.length === 0) return "unknown";
+
+  const live = rows.filter(
+    (r) => r.status !== "waived" && r.status !== "not_applicable",
+  );
+  if (live.some((r) => r.mandatory)) return "required";
+  return "not_required";
+}
+
 /** A school as the rollup needs to see it. */
 export interface RollupSchool {
   id: string;

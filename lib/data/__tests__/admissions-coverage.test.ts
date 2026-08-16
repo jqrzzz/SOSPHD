@@ -3,6 +3,7 @@ import {
   CANONICAL_REQUIREMENTS,
   computeCoverage,
   coverageSummary,
+  greStance,
   portfolioRollup,
 } from "../admissions-coverage";
 import type { InstitutionRequirement } from "../admissions-types";
@@ -340,5 +341,34 @@ describe("optional requirements", () => {
         requirements: [] },
     ], NOW);
     expect(actions.find((a) => a.canonical.slug === "gre")!.blocking).toHaveLength(1);
+  });
+});
+
+describe("greStance", () => {
+  it("is unknown when nothing on file mentions the GRE", () => {
+    expect(greStance([req({ label: "Degree transcripts" })])).toBe("unknown");
+  });
+
+  it("reads a mandatory row as required", () => {
+    expect(greStance([req({ label: "GRE REQUIRED — no exceptions" })])).toBe("required");
+  });
+
+  it("reads an optional row as not required", () => {
+    expect(greStance([req({ label: "GRE (optional from 2026 intake)", mandatory: false })]))
+      .toBe("not_required");
+  });
+
+  it("resolves contradictory rows toward required", () => {
+    // JHU has both. Concluding "no GRE needed" from the optional row would
+    // hide an eligibility bar until the deadline had passed.
+    expect(greStance([
+      req({ label: "Statement of purpose, CV, references", detail: "GRE optional.", mandatory: false }),
+      req({ label: "CONFLICT: department page indicates GRE REQUIRED", mandatory: true }),
+    ])).toBe("required");
+  });
+
+  it("ignores a row that has been waived", () => {
+    expect(greStance([req({ label: "GRE", mandatory: true, status: "waived" })]))
+      .toBe("not_required");
   });
 });

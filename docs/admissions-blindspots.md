@@ -135,12 +135,86 @@ undated tasks and schools with no deadline on file vanished from the attention
 panel silently — exactly the items least safe to lose. They now have their own
 band, because being unassessable is worse than being distant, not better.
 
+## The no-GRE pass (2026-08-16, later the same day)
+
+The owner ruled out sitting the GRE. That turns out to steer the shortlist
+somewhere better rather than merely smaller, because **the GRE is essentially a
+US instrument** — UK, Singapore, Hong Kong, mainland China and Japanese research
+degrees do not use it.
+
+`greStance()` reads the position from every matching row and resolves
+contradictions toward `required`. JHU is why: one row records "GRE optional",
+another records a departmental page saying tests are required. Resolving that
+toward *not* required would hide an eligibility bar until the deadline had
+passed. The stance is shown as a chip on every row in `/apply`, so it never has
+to be rediscovered inside a school's page.
+
+### Parked
+
+| School | Reason |
+|---|---|
+| Harvard, Population Health Sciences | GRE required, stated with no exceptions |
+| Stanford, Health Policy | GRE required for the 2026-27 cycle |
+| Stanford, MS&E | Parked alongside; always the most tangential fit — coordination and operations modelling, but not a health-systems department |
+
+Withdrawn rather than deleted, with the reasoning appended to `fit_rationale`.
+The decision is reversible if the GRE is ever sat for another reason.
+
+### Added — five, all GRE-free
+
+**Mahidol University** (Bangkok) — fit 5, and its absence was the shortlist's
+single largest blindspot. The research is about Thailand, the data is in
+Thailand, the operation is in Thailand, and no Thai institution was under
+consideration. It dissolves `format_compatibility` rather than negotiating
+around it: no relocation, so the operation keeps running and the prospective
+data Papers 2 and 3 need keeps flowing. It also puts the ethics pathway under
+Thai PDPA in the same jurisdiction as the data, instead of asking a foreign IRB
+to rule on Thai patient records.
+
+**Nagasaki University TMGH — NU-LSHTM Joint PhD** (Japan) — fit 5. A joint
+degree awarded with LSHTM, already on the shortlist at fit 4, so it is a second
+route into the same relationship with a tropical-medicine department attached.
+Applicants may bring their own project rather than take one from the published
+list, which is the whole reason it fits an already-designed thesis. Confirmed
+interview stage. The Autumn 2026 round is at best imminent and probably gone.
+
+**University of Hong Kong, School of Public Health** — fit 4, and the best
+answer found so far to the format problem. HKU runs the PhD full-time *and*
+part-time, and part-time students — described as people who may hold a
+full-time job — can be granted approval to be away from Hong Kong for up to six
+months in an academic year. Three hours from Bangkok. The catch is recorded:
+part-time places are "very limited", and the Hong Kong PhD Fellowship Scheme
+requires full-time admission, so **the flexible route and the funded route are
+mutually exclusive** — a decision that has to be made before applying.
+
+**University of Tokyo, Global Health Policy** — fit 4. Health policy rather
+than clinical tropical medicine, which suits the coordination-and-systems
+framing better. English throughout including the thesis; TOEFL/IELTS the only
+test named. Two entry points a year off one early-January deadline, so missing
+a cycle costs six months rather than twelve.
+
+**Tsinghua Vanke School of Public Health** (Beijing) — fit 3, the
+weakest-evidenced of the batch and recorded as such. The sweep surfaced its
+International MPH, not an English-taught PhD; Tsinghua lists nine English
+doctoral programmes, mostly engineering and natural sciences, and whether public
+health is among them is unestablished. One hard bar found nowhere else on the
+shortlist: applicants must not be over 45 at enrolment.
+
+All five carry `next_deadline = NULL`. No cycle date could be established for
+any of them, and inventing one is worse than letting them sit in the attention
+panel's "no date on file" band — which is what that band was added for.
+
 ## Where the remaining risk sits
 
-Harvard and both Stanford programmes are at 6–11% coverage with no deadline, no
-contacts and two requirements each. They are placeholders rather than
-candidates, and all three are full-time US programmes, which runs straight into
-`format_compatibility`.
+The five new schools are at low coverage by construction — they were added
+today. More importantly, **none of them has a cycle date**, so five of ten live
+programmes cannot currently be planned against at all. Establishing those
+windows is worth more than any individual requirement, because a lead time
+measured against nothing is not a lead time.
+
+Tsinghua carries a prior question the others do not: whether an English-taught
+public health doctorate exists there at all. Until that resolves, nothing else
+about it is worth researching.
 
 Across all twenty-two prospective supervisors and funder contacts, **zero have a
 confirmed email address**. Every institutional domain was blocked, so addresses

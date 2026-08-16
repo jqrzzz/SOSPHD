@@ -23,6 +23,7 @@ import { PortfolioPanel } from "@/components/portfolio-panel";
 import {
   computeCoverage,
   coverageSummary,
+  greStance,
   portfolioRollup,
 } from "@/lib/data/admissions-coverage";
 import { cn } from "@/lib/utils";
@@ -230,6 +231,7 @@ function InstitutionRow({
   const days = inst.next_deadline ? daysUntil(inst.next_deadline) : null;
   const pct = readiness(reqs);
   const coverage = computeCoverage(inst, reqs);
+  const gre = greStance(reqs);
 
   return (
     <Link href={`/apply/${inst.id}`} className="group">
@@ -300,6 +302,34 @@ function InstitutionRow({
                 className="border-primary/40 text-[10px] text-primary"
               >
                 Supervisor first
+              </Badge>
+            )}
+            {/* A hard filter, not one requirement among many — sitting the
+                GRE is ruled out, so a school that mandates it is ineligible
+                however well it fits otherwise. Shown at list level so that
+                never has to be rediscovered inside a school's page. */}
+            {gre === "required" && (
+              <Badge
+                variant="outline"
+                className="border-destructive/50 text-[10px] text-destructive"
+              >
+                GRE required
+              </Badge>
+            )}
+            {gre === "not_required" && (
+              <Badge
+                variant="outline"
+                className="border-primary/30 text-[10px] text-primary/80"
+              >
+                No GRE
+              </Badge>
+            )}
+            {gre === "unknown" && (
+              <Badge
+                variant="outline"
+                className="border-amber-500/40 text-[10px] text-amber-400"
+              >
+                GRE unknown
               </Badge>
             )}
             <span className="ml-auto flex flex-wrap items-center justify-end gap-x-2 font-mono text-[10px] text-muted-foreground">
