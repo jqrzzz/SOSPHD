@@ -137,8 +137,29 @@ export default async function FundingPage() {
           </Card>
         )}
 
+        {/* Jump chips: three stacked category sections make a long page,
+            and which category you need is usually known before you scroll. */}
+        <nav className="flex flex-wrap gap-2">
+          {ELIGIBILITY_ORDER.filter((c) => byCategory.has(c)).map((category) => (
+            <a
+              key={category}
+              href={`#cat-${category}`}
+              className="rounded-md border border-border/60 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+            >
+              {ELIGIBILITY_LABELS[category]}
+              <span className="ml-1.5 text-foreground">
+                {byCategory.get(category)!.length}
+              </span>
+            </a>
+          ))}
+        </nav>
+
         {ELIGIBILITY_ORDER.filter((c) => byCategory.has(c)).map((category) => (
-          <section key={category} className="flex flex-col gap-3">
+          <section
+            key={category}
+            id={`cat-${category}`}
+            className="flex scroll-mt-4 flex-col gap-3"
+          >
             <div className="flex flex-col gap-0.5">
               <h2 className="text-sm font-medium text-foreground">
                 {ELIGIBILITY_LABELS[category]}

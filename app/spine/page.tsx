@@ -402,14 +402,18 @@ export default async function SpinePage() {
                         Source · {q.source}
                       </span>
                       {q.answer && (
-                        <div className="mt-1 rounded-lg border border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
-                          <span className="text-xs leading-relaxed text-emerald-200/90">
-                            <span className="font-semibold text-emerald-300">
-                              Answer:{" "}
-                            </span>
+                        /* Collapsed by default: seven resolved answers rendered
+                           in full made the landing page ~4,500px tall. The
+                           decision is one click away; the page is not. */
+                        <details className="group mt-1 rounded-lg border border-emerald-500/15 bg-emerald-500/5">
+                          <summary className="cursor-pointer select-none list-none px-3 py-2 text-xs font-semibold text-emerald-300 marker:content-none [&::-webkit-details-marker]:hidden">
+                            <span className="group-open:hidden">Show answer</span>
+                            <span className="hidden group-open:inline">Answer</span>
+                          </summary>
+                          <span className="block px-3 pb-2 text-xs leading-relaxed text-emerald-200/90">
                             {q.answer}
                           </span>
-                        </div>
+                        </details>
                       )}
                     </CardContent>
                   </Card>

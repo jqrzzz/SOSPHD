@@ -138,28 +138,46 @@ export default async function VerifyPage() {
           </Card>
         )}
 
-        {schools.map((school) => {
+        {/* Ninety-plus rows across ten schools is a burn-down, not a read.
+            Each school collapses behind a native <details> — no client
+            state — with its count and deadline on the summary line, and
+            only the most urgent school starts open. Progress is visible
+            from the closed summaries alone. */}
+        {schools.map((school, idx) => {
           const reqs = bySchool.get(school.id) ?? [];
           const days = school.next_deadline ? daysUntil(school.next_deadline) : null;
           return (
-            <Card key={school.id}>
-              <CardContent className="flex flex-col gap-3 p-5">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <Link
-                    href={`/apply/${school.id}`}
-                    className="text-sm font-medium text-foreground hover:text-primary"
-                  >
+            <details
+              key={school.id}
+              open={idx === 0}
+              className="group rounded-xl border bg-card text-card-foreground shadow-sm"
+            >
+              <summary className="flex cursor-pointer select-none list-none flex-wrap items-baseline justify-between gap-2 p-5 marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="flex items-baseline gap-2">
+                  <span className="font-mono text-[10px] text-muted-foreground transition-transform group-open:rotate-90">
+                    ▸
+                  </span>
+                  <span className="text-sm font-medium text-foreground">
                     {school.name}
                     <span className="ml-2 font-normal text-muted-foreground">
                       {school.programme}
                     </span>
-                  </Link>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {days === null
-                      ? "no deadline established — that is itself in this list"
-                      : `deadline in ${days}d`}
                   </span>
-                </div>
+                </span>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {reqs.length} to confirm ·{" "}
+                  {days === null
+                    ? "no deadline established — that is itself in this list"
+                    : `deadline in ${days}d`}
+                </span>
+              </summary>
+              <div className="flex flex-col gap-3 px-5 pb-5">
+                <Link
+                  href={`/apply/${school.id}`}
+                  className="text-xs text-primary underline underline-offset-2"
+                >
+                  Open this school&apos;s page ↗
+                </Link>
                 <ul className="flex flex-col gap-2">
                   {reqs.map((r) => (
                     <li
@@ -192,8 +210,8 @@ export default async function VerifyPage() {
                     </li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
+              </div>
+            </details>
           );
         })}
 

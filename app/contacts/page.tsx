@@ -127,7 +127,7 @@ export default function ContactsPage() {
         {/* Contact list */}
         <div className="flex w-full flex-col overflow-auto lg:w-[420px] lg:border-r lg:border-border/60">
           {/* Filters */}
-          <div className="flex items-center gap-2 border-b border-border/60 bg-background/40 p-3 backdrop-blur-md">
+          <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border/60 bg-background/80 p-3 backdrop-blur-md">
             <Input
               placeholder="Search name, org, tags…"
               value={search}
