@@ -19,6 +19,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { orIlikeContains } from "./pgrst";
 import { getSupabase } from "@/lib/supabase/db";
 import { warnDegradedMode, seedOrEmpty } from "@/lib/data/degraded";
 import type {
@@ -385,9 +386,9 @@ export async function getJournalEntries(
       if (filters?.entry_type) query = query.eq("entry_type", filters.entry_type);
       if (filters?.pinned_only) query = query.eq("is_pinned", true);
       if (filters?.tag) query = query.contains("tags", [filters.tag]);
-      if (filters?.search) query = query.or(
-        `title.ilike.%${filters.search}%,content.ilike.%${filters.search}%`
-      );
+      // Quoted via pgrst.ts — see ARCHITECTURE §8.4.
+      if (filters?.search)
+        query = query.or(orIlikeContains(["title", "content"], filters.search));
 
       const { data, error } = await query;
       if (!error && data) return data as JournalEntry[];
@@ -471,9 +472,11 @@ export async function getContacts(
 
       if (filters?.role) query = query.eq("role", filters.role);
       if (filters?.tag) query = query.contains("tags", [filters.tag]);
-      if (filters?.search) query = query.or(
-        `name.ilike.%${filters.search}%,organization.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`
-      );
+      // Quoted via pgrst.ts — see ARCHITECTURE §8.4.
+      if (filters?.search)
+        query = query.or(
+          orIlikeContains(["name", "organization", "notes"], filters.search),
+        );
 
       const { data, error } = await query;
       if (!error && data) return data as Contact[];

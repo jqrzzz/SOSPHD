@@ -18,6 +18,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import "server-only";
+import { orIlikeContains } from "./pgrst";
 
 import { getServerSupabase } from "@/lib/supabase/server-auth";
 import { warnDegradedMode, seedOrEmpty } from "@/lib/data/degraded";
@@ -266,9 +267,10 @@ export async function getDocs(filters?: {
       if (filters?.folder) query = query.eq("folder", filters.folder);
       if (filters?.status) query = query.eq("status", filters.status);
       if (filters?.tag) query = query.contains("tags", [filters.tag]);
-      if (filters?.search) query = query.or(
-        `title.ilike.%${filters.search}%,content_md.ilike.%${filters.search}%`
-      );
+      // Quoted via pgrst.ts so a comma or paren in the term stays a
+      // character instead of rewriting the filter tree (ARCHITECTURE §8.4).
+      if (filters?.search)
+        query = query.or(orIlikeContains(["title", "content_md"], filters.search));
 
       const { data, error } = await query;
       if (!error && data) return data.map((r) => mapDbDoc(r as Record<string, unknown>));

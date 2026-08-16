@@ -762,19 +762,26 @@ lookup lands in the seed path silently. In a tool whose output feeds a
 dissertation, a silent substitution of invented content for real content is a
 data-integrity hazard, not just a dev convenience.
 
-### 8.4 Raw search input is interpolated into PostgREST filter strings
+### 8.4 Raw search input is interpolated into PostgREST filter strings — FIXED 2026-08-16
 
-Four places build an `.or()` filter by string interpolation:
+Four places built an `.or()` filter by string interpolation
+(`lib/data/docs-store.ts:getDocs`, `lib/data/workspace-store.ts:getUploads`,
+`lib/data/fieldwork-store.ts:getJournalEntries` and `getContacts`). Not SQL
+injection — PostgREST parses the string — but a search term containing a comma
+or parenthesis changed the filter tree, and a crafted term could inject
+additional predicates. RLS bounded the blast radius to the caller's own rows;
+the filter was still attacker-controlled text.
 
-- `lib/data/docs-store.ts:getDocs` — `title.ilike.%${search}%,content_md.ilike.%${search}%`
-- `lib/data/workspace-store.ts:getUploads`
-- `lib/data/fieldwork-store.ts:getJournalEntries` and `getContacts`
-
-This is not SQL injection — PostgREST parses the string — but a search term
-containing a comma or parenthesis changes the filter tree, and a crafted term can
-inject additional predicates. RLS still bounds the result to the caller's own
-rows, so the blast radius is limited to that user's data, but the filter is
-attacker-controlled.
+Fixed with PostgREST's own escape hatch: values are double-quoted with `\"` and
+`\\` escaping, built by `lib/data/pgrst.ts` (`orIlikeContains`), which is now
+the only place these strings are constructed. The output format is pinned by
+exact-string unit tests, and `scripts/verify-security-invariants.mjs` carries
+matching parse probes against the live API — the unit tests pin helper→string,
+the probes pin string→PostgREST, and a change to either side requires re-running
+the other. The probes could not be run from the agent's container (egress-blocked
+to supabase.co): **run `pnpm verify:security` once from a machine with access
+before trusting search in production.** If a genuinely new search surface needs a
+different filter shape, extend `pgrst.ts` and its tests — never interpolate.
 
 ### 8.5 The two paths into the recommendation engine are gated differently — FIXED 2026-08-13
 
@@ -1044,6 +1051,8 @@ pages that fetch in the browser, so a static shell is their design.
 | The database schema | `supabase/migrations/20260516_004_research_schema_snapshot.sql` (the snapshot), then the later migrations in order |
 | Operational→research event sync | `supabase/migrations/20260402_003_auto_sync_triggers.sql`, `…_006_case_events_dedup_and_triage.sql`, `…_020_case_event_clock_resolution.sql` — **not** application code |
 | Whether a coordination interval is real | `research.case_intervals` and the `resolution` column (§8.17); never difference `case_events` by hand |
+| Search-term escaping for PostgREST or-filters | `lib/data/pgrst.ts` — the only place these strings are built (§8.4); verify with `pnpm verify:security` |
+| Whether RLS / the allowlist / the security_invoker view still hold | `pnpm verify:security` — live behavioral probes, run after any migration touching RLS, grants, views, or triggers |
 | What a school requires that nobody has established | `lib/data/admissions-coverage.ts` (`CANONICAL_REQUIREMENTS`) — a code taxonomy on purpose; per-school facts stay in the DB with `source_url`/`verified_at`. Findings in `docs/admissions-blindspots.md` |
 | Which application work is shared vs repeated per school | the `scope` field on each canonical item, rolled up by `portfolioRollup` — one CV serves every school, one fee does not |
 | Sidebar navigation | `components/app-shell.tsx` (`NAV_ITEMS`) |

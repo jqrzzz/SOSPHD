@@ -136,6 +136,13 @@ Five milestone types (`TRIAGE_COMPLETE`, `FACILITY_ARRIVAL`, `GUARANTEED_PAYMENT
 central claim is that they are *entirely absent*. If any becomes non-zero, that
 claim needs revising rather than the number.
 
+A sibling script, `pnpm verify:security`, probes the live API for the security
+invariants (anon sees nothing, anon writes nothing, the `security_invoker` view
+holds, the or-filter grammar parses). Run it after any migration touching RLS,
+grants, views, or triggers. Like `verify:figures` it talks to the live database
+and must never gate CI — and it cannot run from a remote agent container
+(egress-blocked); it needs a machine that can reach the project.
+
 ## Rules
 
 - **No overbuilding** — each SOS project does its own job. SOSPHD handles research only.

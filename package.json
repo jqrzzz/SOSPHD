@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify:figures": "node scripts/verify-paper-figures.mjs"
+    "verify:figures": "node scripts/verify-paper-figures.mjs",
+    "verify:security": "node scripts/verify-security-invariants.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.49",
