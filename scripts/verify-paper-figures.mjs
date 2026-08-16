@@ -26,6 +26,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, existsSync } from "node:fs";
+import { scanDocument } from "./lib/superseded.mjs";
 
 // ── Load .env.local without adding a dependency ──
 if (existsSync(".env.local")) {
@@ -217,6 +218,17 @@ async function countNonNull(column) {
   return count ?? 0;
 }
 
+/**
+ * The stale-figure scan. Its judgement lives in scripts/lib/superseded.mjs
+ * so it can be unit-tested — this script talks to a live database on
+ * import, so nothing defined inside it is testable.
+ */
+async function checkSuperseded() {
+  const { data, error } = await research.from("docs").select("title, content_md");
+  if (error) throw new Error(error.message);
+  return (data ?? []).flatMap((d) => scanDocument(d.title, d.content_md));
+}
+
 // The five milestones the paper asserts are empty. Any non-zero here
 // does not just change a number — it would weaken the paper's central
 // claim, so they are checked separately and reported loudly.
@@ -284,6 +296,23 @@ for (const t of MUST_BE_EMPTY) {
     failed += 1;
     console.log(`  ERROR ${t}: ${e.message}`);
   }
+}
+
+console.log("");
+try {
+  const hits = await checkSuperseded();
+  if (hits.length === 0) {
+    console.log("  PASS  no superseded figure survives in any document");
+  } else {
+    for (const h of hits) {
+      drifted += 1;
+      console.log(`  STALE "${h.wrong}" still appears in: ${h.title}`);
+      console.log(`        It was corrected to: ${h.right}`);
+    }
+  }
+} catch (e) {
+  failed += 1;
+  console.log(`  ERROR superseded-figure scan: ${e.message}`);
 }
 
 console.log(
