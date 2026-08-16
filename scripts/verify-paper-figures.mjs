@@ -150,7 +150,72 @@ const CHECKS = [
     run: async () => distinctCases("FIRST_CONTACT") },
   { section: "§5.7 — THE CENTRAL FINDING", label: "cases with TRANSPORT_ACTIVATED", expected: 9,
     run: async () => distinctCases("TRANSPORT_ACTIVATED") },
+
+  // §6.2 argues the nine TRANSPORT_ACTIVATED rows are not activation times
+  // at all: they are the same calendar date written into a second column.
+  // Two properties carry that argument, and both are assertions about the
+  // data rather than about the prose, so they belong here.
+  //
+  // (a) Every value sits at 00:00 Indochina Time (17:00Z). A field holding
+  //     genuine activation times would not put nine of nine at midnight.
+  // (b) The interval FIRST_CONTACT → TRANSPORT_ACTIVATED takes exactly two
+  //     values — 0 h and 24 h — and no other. Measured durations are
+  //     continuous; differenced dates can only land on day boundaries.
+  //
+  // If either stops holding, the source has changed and §5.7/§6.2 must be
+  // rewritten before the draft moves.
+  { section: "§6.2 — PROVENANCE", label: "TRANSPORT_ACTIVATED values off midnight ICT", expected: 0,
+    run: async () => {
+      const { data, error } = await research
+        .from("case_events").select("occurred_at").eq("event_type", "TRANSPORT_ACTIVATED");
+      if (error) throw new Error(error.message);
+      return (data ?? []).filter((r) => !/T17:00:00/.test(new Date(r.occurred_at).toISOString())).length;
+    } },
+  { section: "§6.2 — PROVENANCE", label: "distinct TTTA values (paper: exactly 2 — 0h and 24h)", expected: "0h,24h",
+    run: async () => {
+      const [{ data: fc }, { data: ta }] = await Promise.all([
+        research.from("case_events").select("case_id, occurred_at").eq("event_type", "FIRST_CONTACT"),
+        research.from("case_events").select("case_id, occurred_at").eq("event_type", "TRANSPORT_ACTIVATED"),
+      ]);
+      const first = new Map((fc ?? []).map((r) => [r.case_id, Date.parse(r.occurred_at)]));
+      const hours = new Set(
+        (ta ?? [])
+          .filter((r) => first.has(r.case_id))
+          .map((r) => (Date.parse(r.occurred_at) - first.get(r.case_id)) / 3_600_000),
+      );
+      return [...hours].sort((a, b) => a - b).map((h) => `${h}h`).join(",");
+    } },
+
+  // The paper's principal result, now enforceable as a query rather than
+  // asserted as prose. research.case_intervals (migration 020) nulls any
+  // interval whose endpoints are not both finer than a calendar day, so a
+  // non-zero count here means either new instrumented data has arrived — in
+  // which case the baseline paper needs a stated cut-off — or something has
+  // started differencing dates again.
+  { section: "§5.7 — THE CENTRAL FINDING", label: "computable TTTA over the whole registry", expected: 0,
+    run: async () => countNonNull("ttta_minutes") },
+  { section: "§5.7 — THE CENTRAL FINDING", label: "computable TTGP over the whole registry", expected: 0,
+    run: async () => countNonNull("ttgp_minutes") },
+  { section: "§5.7 — THE CENTRAL FINDING", label: "computable TTDC over the whole registry", expected: 0,
+    run: async () => countNonNull("ttdc_minutes") },
+
+  { section: "§4 / §6.2", label: "events still unclassified for clock resolution", expected: 0,
+    run: async () => {
+      const { data, error } = await research.from("case_events").select("resolution");
+      if (error) throw new Error(error.message);
+      return (data ?? []).filter((r) => !r.resolution).length;
+    } },
 ];
+
+/** Rows in research.case_intervals where the named interval is computable. */
+async function countNonNull(column) {
+  const { count, error } = await research
+    .from("case_intervals")
+    .select(column, { count: "exact", head: true })
+    .not(column, "is", null);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
 
 // The five milestones the paper asserts are empty. Any non-zero here
 // does not just change a number — it would weaken the paper's central

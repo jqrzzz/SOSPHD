@@ -969,6 +969,32 @@ the prompt sanitizers, the model routing. There are **no integration tests, no
 database tests, no component tests, and no end-to-end tests**. Nothing exercises
 RLS, the triggers, the server actions, or any route handler.
 
+### 8.17 Not every timestamp in `case_events` is a measurement (found 2026-08-16)
+
+An event's `occurred_at` can mean three different things, and until migration
+020 nothing recorded which. `research.case_events.resolution` now does:
+
+- `measured` — an operational time of when the event happened (`cases.triage_at`,
+  `case_episodes.start_date`, `cases.closed_date`).
+- `entry` — `now()` at the moment a record was written. A real timestamp, of the
+  data entry rather than the event. `TRANSPORT_ACTIVATED` and
+  `DEFINITIVE_CARE_START` from a case-status change are both this.
+- `date` — day resolution only. The entire 2018–2020 backfill, all 842 rows.
+
+**Never difference two events without checking this.** Use
+`research.case_intervals`, which returns NULL for any interval whose endpoints
+are not both finer than a calendar day. Over the current registry it yields 835
+rows and zero computable intervals — which is Paper 1's central result, and is
+asserted by `scripts/verify-paper-figures.mjs`.
+
+The audit that produced this found a live defect worth knowing about: the GOP
+trigger read `COALESCE(NEW.issued_date::timestamptz, now())`, and
+`guarantees_of_payment.issued_date` is a `date`, so it actively preferred
+midnight over the timestamp it already had. TTGP would have been recorded at day
+resolution and looked populated. Nothing had fired, so no data was affected.
+Full detail, including two things deliberately *not* fixed here, is in
+`docs/prospective-clock-audit.md`.
+
 ---
 
 ## 9. Where to start
@@ -989,7 +1015,8 @@ RLS, the triggers, the server actions, or any route handler.
 | Route protection or the public/private boundary | `lib/supabase/proxy.ts` (`isPublic`), then `middleware.ts` |
 | Who can read the research spine | `supabase/migrations/20260528_008_research_cases_allowlist.sql` and `research.allowed_users` |
 | The database schema | `supabase/migrations/20260516_004_research_schema_snapshot.sql` (the snapshot), then the later migrations in order |
-| Operational→research event sync | `supabase/migrations/20260402_003_auto_sync_triggers.sql` and `…_006_case_events_dedup_and_triage.sql` — **not** application code |
+| Operational→research event sync | `supabase/migrations/20260402_003_auto_sync_triggers.sql`, `…_006_case_events_dedup_and_triage.sql`, `…_020_case_event_clock_resolution.sql` — **not** application code |
+| Whether a coordination interval is real | `research.case_intervals` and the `resolution` column (§8.17); never difference `case_events` by hand |
 | Sidebar navigation | `components/app-shell.tsx` (`NAV_ITEMS`) |
 | Dashboard sub-tabs | `components/dashboard-nav.tsx` (`TABS`) |
 | The PhD phase tracker on `/spine` | `lib/data/phd-spine.ts` — plain data, `PHD_PHASES` and `OPEN_QUESTIONS` |
