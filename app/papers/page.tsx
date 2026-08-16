@@ -7,7 +7,7 @@ import { readingMinutes, wordCount } from "@/lib/markdown";
 import { formatDate } from "@/lib/utils";
 
 export const metadata = {
-  title: "Papers · SOSPHD",
+  title: "Papers",
   description: "The thesis papers — drafts, versions, and open annotations.",
 };
 

@@ -13,7 +13,7 @@ import { daysUntil, type InstitutionRequirement } from "@/lib/data/admissions-ty
 import { emailIsVerified } from "@/lib/data/fieldwork-types";
 
 export const metadata = {
-  title: "Verification queue · SOSPHD",
+  title: "Verification queue",
   description:
     "Everything recorded from search results that still needs confirming against an official page.",
 };

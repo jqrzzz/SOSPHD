@@ -58,6 +58,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const supabase = createClient();
+    // Degraded mode (no env): show the configured owner rather than
+    // crashing the shell — the shell wraps every page in the app.
+    if (!supabase) {
+      setUserEmail(APP_CONFIG.owner.email);
+      setUserName(APP_CONFIG.owner.name);
+      return;
+    }
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserEmail(user?.email ?? APP_CONFIG.owner.email);
       setUserName(
@@ -74,7 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handleSignOut = async () => {
     setIsSigningOut(true);
     const supabase = createClient();
-    await supabase.auth.signOut();
+    if (supabase) await supabase.auth.signOut();
     router.push("/");
     router.refresh();
   };

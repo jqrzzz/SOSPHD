@@ -16,7 +16,7 @@ import { daysUntil, deadlineUrgency } from "@/lib/data/admissions-types";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-  title: "Funding · SOSPHD",
+  title: "Funding",
   description:
     "Grants, fellowships, government schemes and donors — grouped by what you can actually apply for today.",
 };

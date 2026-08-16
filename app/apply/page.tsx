@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-  title: "Applications · SOSPHD",
+  title: "Applications",
   description:
     "PhD admissions pipeline — institutions, requirements, deadlines, and supervisor outreach.",
 };
@@ -174,18 +174,21 @@ export default async function ApplyPage() {
           </Card>
         )}
 
-        {/* Side-by-side comparison */}
-        <Card>
-          <CardContent className="p-5">
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              Compare
-            </p>
-            <SchoolComparison
-              institutions={active}
-              reqsByInstitution={reqsByInstitution}
-            />
-          </CardContent>
-        </Card>
+        {/* Side-by-side comparison — hidden when there is nothing to
+            compare, so the empty state is one message, not a bare box. */}
+        {active.length > 0 && (
+          <Card>
+            <CardContent className="p-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Compare
+              </p>
+              <SchoolComparison
+                institutions={active}
+                reqsByInstitution={reqsByInstitution}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Live pipeline, deadline order */}
         <section className="flex flex-col gap-3">

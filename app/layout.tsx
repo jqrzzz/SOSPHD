@@ -4,7 +4,12 @@ import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'SOS PHD | Research Automation for Tourist SOS',
+  // A template so every page that sets a plain title gets the suffix for
+  // free, and pages that set none still get a sensible default tab name.
+  title: {
+    default: 'SOS PHD | Research Automation for Tourist SOS',
+    template: '%s · SOS PHD',
+  },
   description:
     'PhD research automation — track phases, generate papers, and measure TTDC/TTGP/TTTA from Tourist SOS operational data.',
   manifest: '/manifest.json',
