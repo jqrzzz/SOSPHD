@@ -180,6 +180,20 @@ export const CANONICAL_REQUIREMENTS: CanonicalRequirement[] = [
     match: ["referee", "reference", "recommendation", "letters of"],
   },
   {
+    slug: "ai_use_policy",
+    label: "This school's rules on AI use — in the application, and in the research",
+    kind: "process",
+    applicability: "universal",
+    scope: "per_school",
+    why:
+      "Three separate questions that are easy to conflate and expensive to get wrong. (1) The APPLICATION: policies range from silence to outright prohibition, with at least some doctoral programmes disqualifying applicants on suspected AI use and others requiring a signed attestation. A survey of 174 institutions in early 2026 found most had no explicit policy at all — which is not permission, it is an unwritten rule you can still breach. (2) The RESEARCH: most journals now require a disclosure statement for AI-assisted analysis or writing, and the norms differ from the admissions norms. (3) ASSESSMENT: the viva, qualifying exams and upgrade panels are oral and unassisted, and no policy changes that. Establish all three before drafting begins, because discovering a prohibition after the application is written means rewriting it, and discovering one after submitting means something worse.",
+    leadDays: 60,
+    match: [
+      "artificial intelligence", "generative ai", "chatgpt", "llm",
+      "ai policy", "ai use", "ai-assisted", "academic integrity", "attestation",
+    ],
+  },
+  {
     slug: "ethics_pathway",
     label: "Ethics / IRB pathway for this research",
     kind: "process",

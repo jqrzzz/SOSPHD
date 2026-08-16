@@ -410,3 +410,35 @@ describe("entry qualification", () => {
       .toBe(true);
   });
 });
+
+describe("AI use policy", () => {
+  it("is universal and per-school", () => {
+    const c = CANONICAL_REQUIREMENTS.find((x) => x.slug === "ai_use_policy")!;
+    expect(c.applicability).toBe("universal");
+    expect(c.scope).toBe("per_school");
+  });
+
+  it("matches how schools actually word it", () => {
+    for (const label of [
+      "Generative AI permitted with disclosure",
+      "Academic integrity: AI use in applications",
+      "Applicants must sign an attestation regarding ChatGPT use",
+    ]) {
+      const cov = computeCoverage(NO_SUPERVISOR, [req({ label })], NOW);
+      expect(
+        cov.items.find((i) => i.canonical.slug === "ai_use_policy")!.state,
+        label,
+      ).toBe("recorded");
+    }
+  });
+
+  it("does not collide with the ethics pathway item", () => {
+    // Both are process items about rules; they must stay distinct, because
+    // an IRB approval says nothing about whether you may draft with an LLM.
+    const cov = computeCoverage(NO_SUPERVISOR, [
+      req({ label: "Ethics / IRB approval route", verified_at: "2026-08-01T00:00:00Z" }),
+    ], NOW);
+    expect(cov.items.find((i) => i.canonical.slug === "ethics_pathway")!.state).toBe("verified");
+    expect(cov.items.find((i) => i.canonical.slug === "ai_use_policy")!.state).toBe("unknown");
+  });
+});
