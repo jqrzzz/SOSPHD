@@ -120,6 +120,22 @@ const CHECKS = [
   { section: "§5.6", label: "largest insurer (Allianz) cases", expected: 32,
     run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("payer_entity", "Allianz")) },
 
+  // The title asserts a sixteen-month baseline, so the span is a figure
+  // like any other. It was wrong once already ("five-year") and the
+  // error reached the title, the contribution list and the conclusion.
+  { section: "TITLE / §5.1", label: "first case date", expected: "2018-12-02",
+    run: async () => {
+      const { data } = await research.from("cases").select("intake_date")
+        .not("intake_date", "is", null).order("intake_date", { ascending: true }).limit(1);
+      return (data?.[0]?.intake_date ?? "").slice(0, 10);
+    } },
+  { section: "TITLE / §5.1", label: "last case date", expected: "2020-03-24",
+    run: async () => {
+      const { data } = await research.from("cases").select("intake_date")
+        .not("intake_date", "is", null).order("intake_date", { ascending: false }).limit(1);
+      return (data?.[0]?.intake_date ?? "").slice(0, 10);
+    } },
+
   { section: "§5.7 — THE CENTRAL FINDING", label: "cases with FIRST_CONTACT", expected: 835,
     run: async () => distinctCases("FIRST_CONTACT") },
   { section: "§5.7 — THE CENTRAL FINDING", label: "cases with TRANSPORT_ACTIVATED", expected: 9,
