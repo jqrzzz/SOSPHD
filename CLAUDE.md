@@ -119,6 +119,30 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
 - Krabi → Bangkok
 - Bangkok Hub
 
+## Paper figures
+
+Paper 1's numbers are queried from a database that keeps changing — backfill
+batches land, classifications get revised, cases get reconciled. A figure that
+was right when written can quietly stop being right.
+
+`pnpm verify:figures` re-derives every headline figure Paper 1 asserts straight
+from the live registry and reports drift, pointing at the section that needs
+editing. Run it before any draft leaves the building, and again after freezing
+an analysis snapshot. It is deliberately not a unit test — it talks to the live
+database and must never gate CI.
+
+Five milestone types (`TRIAGE_COMPLETE`, `FACILITY_ARRIVAL`, `GUARANTEED_PAYMENT`,
+`DEFINITIVE_CARE_START`, `DISCHARGE`) are checked separately, because the paper's
+central claim is that they are *entirely absent*. If any becomes non-zero, that
+claim needs revising rather than the number.
+
+A sibling script, `pnpm verify:security`, probes the live API for the security
+invariants (anon sees nothing, anon writes nothing, the `security_invoker` view
+holds, the or-filter grammar parses). Run it after any migration touching RLS,
+grants, views, or triggers. Like `verify:figures` it talks to the live database
+and must never gate CI — and it cannot run from a remote agent container
+(egress-blocked); it needs a machine that can reach the project.
+
 ## Rules
 
 - **No overbuilding** — each SOS project does its own job. SOSPHD handles research only.

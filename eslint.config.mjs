@@ -94,6 +94,21 @@ export default [
     },
   },
 
+  // Node scripts run outside Next and legitimately use Node globals.
+  // Declaring them beats disabling no-undef, which would hide real typos.
+  {
+    files: ["scripts/**/*.{mjs,js,ts}"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+        Buffer: "readonly",
+        __dirname: "readonly",
+      },
+    },
+  },
+
   // Config files use CommonJS patterns (plugin loaders, etc.)
   {
     files: [

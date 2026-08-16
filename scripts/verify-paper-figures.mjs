@@ -1,0 +1,322 @@
+#!/usr/bin/env node
+/* ─── Paper figure verification ────────────────────────────────────────
+ *  Re-derives every headline figure Paper 1 asserts, straight from the
+ *  live registry, and reports any that have drifted.
+ *
+ *  Why this exists. Paper 1's numbers are queried from a database that
+ *  keeps changing — backfill batches land, classifications get revised,
+ *  cases get reconciled. A figure that was right when it was written can
+ *  quietly stop being right, and a stale number in a submitted paper is
+ *  the kind of error that is very hard to explain afterwards. Writing
+ *  the assertions down and re-checking them mechanically turns "I
+ *  believe these are current" into something testable.
+ *
+ *  This is deliberately NOT a unit test. It talks to the live database,
+ *  so it must never run in CI where a network blip would fail a build.
+ *  Run it by hand before any draft leaves the building, and again after
+ *  freezing an analysis snapshot.
+ *
+ *  Usage:
+ *    node scripts/verify-paper-figures.mjs
+ *
+ *  Requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+ *  plus an owner session, or the service context the app already uses.
+ *  Exits non-zero if anything drifted, so it can gate a release script.
+ * ────────────────────────────────────────────────────────────────────── */
+
+import { createClient } from "@supabase/supabase-js";
+import { readFileSync, existsSync } from "node:fs";
+import { scanDocument } from "./lib/superseded.mjs";
+
+// ── Load .env.local without adding a dependency ──
+if (existsSync(".env.local")) {
+  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (m && !process.env[m[1]]) {
+      process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    }
+  }
+}
+
+const url = process.env.SOSPHD_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+const key = process.env.SOSPHD_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const email = process.env.SOSPHD_EMAIL;
+const password = process.env.SOSPHD_PASSWORD;
+
+if (!url || !key) {
+  console.error("Missing Supabase credentials. See mcp/README.md for the env vars.");
+  process.exit(2);
+}
+
+const sb = createClient(url, key, { auth: { persistSession: false } });
+
+if (email && password) {
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    console.error(`Sign-in failed: ${error.message}`);
+    process.exit(2);
+  }
+}
+
+const research = sb.schema("research");
+
+/**
+ * Every figure Paper 1 states, with the query that reproduces it.
+ * `section` is where it appears, so a drift report points at the exact
+ * paragraph that needs editing rather than at the paper as a whole.
+ */
+const CHECKS = [
+  { section: "§5.1 / abstract", label: "total cases", expected: 836,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true })) },
+
+  { section: "§5.1", label: "incidents in Thailand", expected: 790,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).ilike("country", "%thai%")) },
+
+  { section: "§5.3 / abstract", label: "identified nationalities", expected: 68,
+    run: async () => {
+      const { data } = await research.from("cases").select("nationality");
+      const set = new Set(
+        (data ?? [])
+          .map((r) => (r.nationality ?? "").trim().toLowerCase())
+          .filter((n) => n && !["?", "-", "n/a", "unknown"].includes(n)),
+      );
+      return set.size;
+    } },
+
+  { section: "§5.3", label: "cases missing nationality", expected: 54,
+    run: async () => {
+      const { data } = await research.from("cases").select("nationality");
+      return (data ?? []).filter((r) => {
+        const n = (r.nationality ?? "").trim();
+        return n === "" || ["?", "-"].includes(n);
+      }).length;
+    } },
+
+  { section: "§5.4 / abstract", label: "gastrointestinal cases", expected: 231,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "gastro")) },
+  { section: "§5.4 / abstract", label: "trauma cases", expected: 170,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "trauma")) },
+  { section: "§5.4 / abstract", label: "animal bite cases", expected: 114,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "animal_bite")) },
+  { section: "§5.4", label: "marine cases", expected: 46,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "marine")) },
+
+  // §4.4 distinguishes two kinds of non-classification. Earlier drafts
+  // reported only the first and understated the unknown by 98 cases.
+  { section: "§4.4 / §5.4", label: "cases with NO diagnosis text", expected: 54,
+    run: async () => {
+      const { data } = await research.from("cases").select("diagnosis_bucket");
+      return (data ?? []).filter((r) => !r.diagnosis_bucket).length;
+    } },
+  { section: "§4.4 / §5.4", label: "cases bucketed 'other' (text, no rule matched)", expected: 98,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("diagnosis_bucket", "other")) },
+
+  { section: "§5.5 / abstract", label: "evacuations", expected: 49,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("evacuated", true)) },
+  { section: "§5.5", label: "evacuations WITH a transport timestamp", expected: 7,
+    run: async () => {
+      const { data: ev } = await research.from("cases").select("id").eq("evacuated", true);
+      const ids = new Set((ev ?? []).map((r) => r.id));
+      const { data: te } = await research.from("case_events").select("case_id").eq("event_type", "TRANSPORT_ACTIVATED");
+      return new Set((te ?? []).map((r) => r.case_id).filter((id) => ids.has(id))).size;
+    } },
+
+  { section: "§5.6 / abstract", label: "self-pay cases", expected: 233,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("payer_entity", "Self-pay")) },
+  { section: "§5.6 / abstract", label: "distinct payer entities", expected: 311,
+    run: async () => {
+      const { data } = await research.from("cases").select("payer_entity");
+      return new Set((data ?? []).map((r) => r.payer_entity).filter(Boolean)).size;
+    } },
+  { section: "§5.6", label: "largest insurer (Allianz) cases", expected: 32,
+    run: async () => count(research.from("cases").select("*", { count: "exact", head: true }).eq("payer_entity", "Allianz")) },
+
+  // The title asserts a sixteen-month baseline, so the span is a figure
+  // like any other. It was wrong once already ("five-year") and the
+  // error reached the title, the contribution list and the conclusion.
+  { section: "TITLE / §5.1", label: "first case date", expected: "2018-12-02",
+    run: async () => {
+      const { data } = await research.from("cases").select("intake_date")
+        .not("intake_date", "is", null).order("intake_date", { ascending: true }).limit(1);
+      return (data?.[0]?.intake_date ?? "").slice(0, 10);
+    } },
+  { section: "TITLE / §5.1", label: "last case date", expected: "2020-03-24",
+    run: async () => {
+      const { data } = await research.from("cases").select("intake_date")
+        .not("intake_date", "is", null).order("intake_date", { ascending: false }).limit(1);
+      return (data?.[0]?.intake_date ?? "").slice(0, 10);
+    } },
+
+  { section: "§5.7 — THE CENTRAL FINDING", label: "cases with FIRST_CONTACT", expected: 835,
+    run: async () => distinctCases("FIRST_CONTACT") },
+  { section: "§5.7 — THE CENTRAL FINDING", label: "cases with TRANSPORT_ACTIVATED", expected: 9,
+    run: async () => distinctCases("TRANSPORT_ACTIVATED") },
+
+  // §6.2 argues the nine TRANSPORT_ACTIVATED rows are not activation times
+  // at all: they are the same calendar date written into a second column.
+  // Two properties carry that argument, and both are assertions about the
+  // data rather than about the prose, so they belong here.
+  //
+  // (a) Every value sits at 00:00 Indochina Time (17:00Z). A field holding
+  //     genuine activation times would not put nine of nine at midnight.
+  // (b) The interval FIRST_CONTACT → TRANSPORT_ACTIVATED takes exactly two
+  //     values — 0 h and 24 h — and no other. Measured durations are
+  //     continuous; differenced dates can only land on day boundaries.
+  //
+  // If either stops holding, the source has changed and §5.7/§6.2 must be
+  // rewritten before the draft moves.
+  { section: "§6.2 — PROVENANCE", label: "TRANSPORT_ACTIVATED values off midnight ICT", expected: 0,
+    run: async () => {
+      const { data, error } = await research
+        .from("case_events").select("occurred_at").eq("event_type", "TRANSPORT_ACTIVATED");
+      if (error) throw new Error(error.message);
+      return (data ?? []).filter((r) => !/T17:00:00/.test(new Date(r.occurred_at).toISOString())).length;
+    } },
+  { section: "§6.2 — PROVENANCE", label: "distinct TTTA values (paper: exactly 2 — 0h and 24h)", expected: "0h,24h",
+    run: async () => {
+      const [{ data: fc }, { data: ta }] = await Promise.all([
+        research.from("case_events").select("case_id, occurred_at").eq("event_type", "FIRST_CONTACT"),
+        research.from("case_events").select("case_id, occurred_at").eq("event_type", "TRANSPORT_ACTIVATED"),
+      ]);
+      const first = new Map((fc ?? []).map((r) => [r.case_id, Date.parse(r.occurred_at)]));
+      const hours = new Set(
+        (ta ?? [])
+          .filter((r) => first.has(r.case_id))
+          .map((r) => (Date.parse(r.occurred_at) - first.get(r.case_id)) / 3_600_000),
+      );
+      return [...hours].sort((a, b) => a - b).map((h) => `${h}h`).join(",");
+    } },
+
+  // The paper's principal result, now enforceable as a query rather than
+  // asserted as prose. research.case_intervals (migration 020) nulls any
+  // interval whose endpoints are not both finer than a calendar day, so a
+  // non-zero count here means either new instrumented data has arrived — in
+  // which case the baseline paper needs a stated cut-off — or something has
+  // started differencing dates again.
+  { section: "§5.7 — THE CENTRAL FINDING", label: "computable TTTA over the whole registry", expected: 0,
+    run: async () => countNonNull("ttta_minutes") },
+  { section: "§5.7 — THE CENTRAL FINDING", label: "computable TTGP over the whole registry", expected: 0,
+    run: async () => countNonNull("ttgp_minutes") },
+  { section: "§5.7 — THE CENTRAL FINDING", label: "computable TTDC over the whole registry", expected: 0,
+    run: async () => countNonNull("ttdc_minutes") },
+
+  { section: "§4 / §6.2", label: "events still unclassified for clock resolution", expected: 0,
+    run: async () => {
+      const { data, error } = await research.from("case_events").select("resolution");
+      if (error) throw new Error(error.message);
+      return (data ?? []).filter((r) => !r.resolution).length;
+    } },
+];
+
+/** Rows in research.case_intervals where the named interval is computable. */
+async function countNonNull(column) {
+  const { count, error } = await research
+    .from("case_intervals")
+    .select(column, { count: "exact", head: true })
+    .not(column, "is", null);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/**
+ * The stale-figure scan. Its judgement lives in scripts/lib/superseded.mjs
+ * so it can be unit-tested — this script talks to a live database on
+ * import, so nothing defined inside it is testable.
+ */
+async function checkSuperseded() {
+  const { data, error } = await research.from("docs").select("title, content_md");
+  if (error) throw new Error(error.message);
+  return (data ?? []).flatMap((d) => scanDocument(d.title, d.content_md));
+}
+
+// The five milestones the paper asserts are empty. Any non-zero here
+// does not just change a number — it would weaken the paper's central
+// claim, so they are checked separately and reported loudly.
+const MUST_BE_EMPTY = [
+  "TRIAGE_COMPLETE",
+  "FACILITY_ARRIVAL",
+  "GUARANTEED_PAYMENT",
+  "DEFINITIVE_CARE_START",
+  "DISCHARGE",
+];
+
+async function count(query) {
+  const { count: c, error } = await query;
+  if (error) throw new Error(error.message);
+  return c ?? 0;
+}
+
+async function distinctCases(eventType) {
+  const { data, error } = await research
+    .from("case_events")
+    .select("case_id")
+    .eq("event_type", eventType);
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((r) => r.case_id)).size;
+}
+
+let drifted = 0;
+let failed = 0;
+
+console.log("\nPaper 1 — figure verification against the live registry\n");
+
+for (const check of CHECKS) {
+  try {
+    const actual = await check.run();
+    if (actual === check.expected) {
+      console.log(`  PASS  ${check.label}: ${actual}`);
+    } else {
+      drifted += 1;
+      console.log(
+        `  DRIFT ${check.label}: paper says ${check.expected}, registry says ${actual}  [${check.section}]`,
+      );
+    }
+  } catch (e) {
+    failed += 1;
+    console.log(`  ERROR ${check.label}: ${e.message}`);
+  }
+}
+
+console.log("");
+for (const t of MUST_BE_EMPTY) {
+  try {
+    const n = await distinctCases(t);
+    if (n === 0) {
+      console.log(`  PASS  ${t} is empty, as the paper asserts`);
+    } else {
+      drifted += 1;
+      console.log(
+        `  DRIFT ${t} now has ${n} case(s). The paper claims this milestone is`,
+      );
+      console.log(
+        `        entirely absent — that claim is load-bearing and must be revised.`,
+      );
+    }
+  } catch (e) {
+    failed += 1;
+    console.log(`  ERROR ${t}: ${e.message}`);
+  }
+}
+
+console.log("");
+try {
+  const hits = await checkSuperseded();
+  if (hits.length === 0) {
+    console.log("  PASS  no superseded figure survives in any document");
+  } else {
+    for (const h of hits) {
+      drifted += 1;
+      console.log(`  STALE "${h.wrong}" still appears in: ${h.title}`);
+      console.log(`        It was corrected to: ${h.right}`);
+    }
+  }
+} catch (e) {
+  failed += 1;
+  console.log(`  ERROR superseded-figure scan: ${e.message}`);
+}
+
+console.log(
+  `\n${drifted === 0 && failed === 0 ? "All figures current." : `${drifted} drifted, ${failed} errored.`}\n`,
+);
+
+if (drifted > 0 || failed > 0) process.exit(1);

@@ -11,7 +11,7 @@ import {
 export { PROTOCOL_VERSION, PROTOCOL_EFFECTIVE_DATE };
 
 export const metadata = {
-  title: "Intervention Protocol · SOSPHD",
+  title: "Intervention Protocol",
   description:
     "The formal specification for the human-AI coordination intervention measured by Paper 2.",
 };

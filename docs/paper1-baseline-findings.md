@@ -75,13 +75,28 @@ Milestone coverage across 836 cases:
 | Milestone | Present | Coverage |
 |---|---|---|
 | FIRST_CONTACT | 835 | 99.9% |
-| TRANSPORT_ACTIVATED | 9 | 1.1% |
+| TRANSPORT_ACTIVATED\* | 9 | 1.1% |
 | TRIAGE_COMPLETE / FACILITY_ARRIVAL / GUARANTEED_PAYMENT / DEFINITIVE_CARE_START / DISCHARGE | 0 | 0% |
 
-**Zero cases support TTTA, TTGP, or TTDC computation end-to-end.** Five years
-of professionally-operated registry data, and not one case can answer "how long
-did coordination take" — because operational record-keeping captures *what*
-happened, not *when* the coordination milestones occurred. This is Paper 1's
+\* **These are not activation times.** Provenance audit 2026-08-16, now Paper 1
+§6.2. All nine sit at exactly 00:00 Asia/Bangkok, and the interval
+`FIRST_CONTACT → TRANSPORT_ACTIVATED` takes exactly two values across all nine
+cases — 0 h (seven cases) and exactly 24 h (two cases), with no third value. A
+measured duration cannot have that distribution; a pair of differenced calendar
+dates must. Their provenance annotation names the case's own registry file
+number rather than any separate transport document, and its wording appears
+nowhere in the ingest code — so they were written by a one-off statement during
+the backfill batch, not by `historicalCaseToRows`. Strictly counted, milestone
+coverage other than first contact is **zero**. The earlier reading — a fragment
+of real instrumentation, proving the field "can be populated when someone
+chooses to" — is withdrawn. Both assertions are encoded in
+`scripts/verify-paper-figures.mjs` under §6.2 — PROVENANCE.
+
+**Zero cases support TTTA, TTGP, or TTDC computation end-to-end.** Sixteen
+months of professionally-operated registry data (2 Dec 2018 – 24 Mar 2020), and
+not one case can answer "how long did coordination take" — because operational
+record-keeping captures *what* happened, not *when* the coordination milestones
+occurred. This is Paper 1's
 core motivating result: the metrics the field needs cannot be recovered
 retrospectively; they must be captured prospectively by an instrumented system
 (which is what SOSPHD's event spine + SOSCOMMAND triggers do). Frame the

@@ -762,19 +762,26 @@ lookup lands in the seed path silently. In a tool whose output feeds a
 dissertation, a silent substitution of invented content for real content is a
 data-integrity hazard, not just a dev convenience.
 
-### 8.4 Raw search input is interpolated into PostgREST filter strings
+### 8.4 Raw search input is interpolated into PostgREST filter strings — FIXED 2026-08-16
 
-Four places build an `.or()` filter by string interpolation:
+Four places built an `.or()` filter by string interpolation
+(`lib/data/docs-store.ts:getDocs`, `lib/data/workspace-store.ts:getUploads`,
+`lib/data/fieldwork-store.ts:getJournalEntries` and `getContacts`). Not SQL
+injection — PostgREST parses the string — but a search term containing a comma
+or parenthesis changed the filter tree, and a crafted term could inject
+additional predicates. RLS bounded the blast radius to the caller's own rows;
+the filter was still attacker-controlled text.
 
-- `lib/data/docs-store.ts:getDocs` — `title.ilike.%${search}%,content_md.ilike.%${search}%`
-- `lib/data/workspace-store.ts:getUploads`
-- `lib/data/fieldwork-store.ts:getJournalEntries` and `getContacts`
-
-This is not SQL injection — PostgREST parses the string — but a search term
-containing a comma or parenthesis changes the filter tree, and a crafted term can
-inject additional predicates. RLS still bounds the result to the caller's own
-rows, so the blast radius is limited to that user's data, but the filter is
-attacker-controlled.
+Fixed with PostgREST's own escape hatch: values are double-quoted with `\"` and
+`\\` escaping, built by `lib/data/pgrst.ts` (`orIlikeContains`), which is now
+the only place these strings are constructed. The output format is pinned by
+exact-string unit tests, and `scripts/verify-security-invariants.mjs` carries
+matching parse probes against the live API — the unit tests pin helper→string,
+the probes pin string→PostgREST, and a change to either side requires re-running
+the other. The probes could not be run from the agent's container (egress-blocked
+to supabase.co): **run `pnpm verify:security` once from a machine with access
+before trusting search in production.** If a genuinely new search surface needs a
+different filter shape, extend `pgrst.ts` and its tests — never interpolate.
 
 ### 8.5 The two paths into the recommendation engine are gated differently — FIXED 2026-08-13
 
@@ -969,6 +976,59 @@ the prompt sanitizers, the model routing. There are **no integration tests, no
 database tests, no component tests, and no end-to-end tests**. Nothing exercises
 RLS, the triggers, the server actions, or any route handler.
 
+### 8.17 Not every timestamp in `case_events` is a measurement (found 2026-08-16)
+
+An event's `occurred_at` can mean three different things, and until migration
+020 nothing recorded which. `research.case_events.resolution` now does:
+
+- `measured` — an operational time of when the event happened (`cases.triage_at`,
+  `case_episodes.start_date`, `cases.closed_date`).
+- `entry` — `now()` at the moment a record was written. A real timestamp, of the
+  data entry rather than the event. `TRANSPORT_ACTIVATED` and
+  `DEFINITIVE_CARE_START` from a case-status change are both this.
+- `date` — day resolution only. The entire 2018–2020 backfill, all 842 rows.
+
+**Never difference two events without checking this.** Use
+`research.case_intervals`, which returns NULL for any interval whose endpoints
+are not both finer than a calendar day. Over the current registry it yields 835
+rows and zero computable intervals — which is Paper 1's central result, and is
+asserted by `scripts/verify-paper-figures.mjs`.
+
+The audit that produced this found a live defect worth knowing about: the GOP
+trigger read `COALESCE(NEW.issued_date::timestamptz, now())`, and
+`guarantees_of_payment.issued_date` is a `date`, so it actively preferred
+midnight over the timestamp it already had. TTGP would have been recorded at day
+resolution and looked populated. Nothing had fired, so no data was affected.
+Full detail, including two things deliberately *not* fixed here, is in
+`docs/prospective-clock-audit.md`.
+
+### 8.18 A bare catch was turning every data page into a static empty shell (found + fixed 2026-08-16)
+
+`getServerSupabase` wrapped `createClient()` in `try { … } catch { return null }`.
+`createClient()` awaits `cookies()`, and during `next build` the framework's way
+of saying "this page must render per-request" is to **throw** from `cookies()` —
+so the catch swallowed the signal, `getServerSupabase` returned null, the page
+rendered its degraded-empty state, and Next happily prerendered that as static
+HTML. Every store-backed page (`/apply`, `/dashboard/*`, `/spine`, `/funding`,
+`/papers`, `/advisor`, `/workspace`) built as `○ static` and would serve an
+empty shell in production — while looking perfectly healthy under `next dev`,
+where everything renders per-request. The classic shape of this bug: invisible
+in exactly the environment you develop in.
+
+Two traps for whoever touches this next:
+
+- **A local build cannot show you the bug or the fix.** Without `.env.local`,
+  the env-var guard returns null before `cookies()` is reached, so every page
+  is legitimately static-degraded locally. Verify with dummy env:
+  `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy pnpm build`
+  and check the route table shows `ƒ` for data pages.
+- **Do not re-add the catch.** The missing-env case is already handled
+  explicitly above it; there is no other legitimate error to defend against,
+  and the "defensive" catch was the entire bug.
+
+`/contacts` and `/fieldwork` remain `○` on purpose — they are `"use client"`
+pages that fetch in the browser, so a static shell is their design.
+
 ---
 
 ## 9. Where to start
@@ -989,7 +1049,12 @@ RLS, the triggers, the server actions, or any route handler.
 | Route protection or the public/private boundary | `lib/supabase/proxy.ts` (`isPublic`), then `middleware.ts` |
 | Who can read the research spine | `supabase/migrations/20260528_008_research_cases_allowlist.sql` and `research.allowed_users` |
 | The database schema | `supabase/migrations/20260516_004_research_schema_snapshot.sql` (the snapshot), then the later migrations in order |
-| Operational→research event sync | `supabase/migrations/20260402_003_auto_sync_triggers.sql` and `…_006_case_events_dedup_and_triage.sql` — **not** application code |
+| Operational→research event sync | `supabase/migrations/20260402_003_auto_sync_triggers.sql`, `…_006_case_events_dedup_and_triage.sql`, `…_020_case_event_clock_resolution.sql` — **not** application code |
+| Whether a coordination interval is real | `research.case_intervals` and the `resolution` column (§8.17); never difference `case_events` by hand |
+| Search-term escaping for PostgREST or-filters | `lib/data/pgrst.ts` — the only place these strings are built (§8.4); verify with `pnpm verify:security` |
+| Whether RLS / the allowlist / the security_invoker view still hold | `pnpm verify:security` — live behavioral probes, run after any migration touching RLS, grants, views, or triggers |
+| What a school requires that nobody has established | `lib/data/admissions-coverage.ts` (`CANONICAL_REQUIREMENTS`) — a code taxonomy on purpose; per-school facts stay in the DB with `source_url`/`verified_at`. Findings in `docs/admissions-blindspots.md` |
+| Which application work is shared vs repeated per school | the `scope` field on each canonical item, rolled up by `portfolioRollup` — one CV serves every school, one fee does not |
 | Sidebar navigation | `components/app-shell.tsx` (`NAV_ITEMS`) |
 | Dashboard sub-tabs | `components/dashboard-nav.tsx` (`TABS`) |
 | The PhD phase tracker on `/spine` | `lib/data/phd-spine.ts` — plain data, `PHD_PHASES` and `OPEN_QUESTIONS` |

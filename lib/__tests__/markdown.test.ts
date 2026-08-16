@@ -140,6 +140,20 @@ describe("parseMarkdown", () => {
     expect(t.rows[0][0]).toEqual([{ type: "text", value: "FIRST_CONTACT" }]);
   });
 
+  it("handles the alignment syntax the papers actually use", () => {
+    // Paper 1's Results tables are right-aligned (|---:|) and one is
+    // centre-aligned. A divider the parser rejects would silently render
+    // the whole table as paragraphs in the reading view.
+    for (const divider of ["|---|---:|---:|", "|:---:|:---:|:---:|", "|:---|---:|---|"]) {
+      const src = `| A | B | C |\n${divider}\n| 1 | 2 | 3 |`;
+      const [block] = parseMarkdown(src);
+      expect(block.type, `divider ${divider} should parse as a table`).toBe("table");
+      const t = block as Extract<Block, { type: "table" }>;
+      expect(t.header).toHaveLength(3);
+      expect(t.rows).toHaveLength(1);
+    }
+  });
+
   it("does not mistake a pipe paragraph for a table without a divider", () => {
     expect(blockTypes("| not | a table |\njust text")).toEqual(["paragraph"]);
   });

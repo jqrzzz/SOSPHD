@@ -35,6 +35,11 @@ export default function SignUpPage() {
     }
 
     const supabase = createClient();
+    if (!supabase) {
+      setError("Supabase is not configured — add .env.local to sign up.");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.signUp({

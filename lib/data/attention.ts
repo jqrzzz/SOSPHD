@@ -11,7 +11,8 @@ import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server-auth";
 import { warnDegradedMode } from "@/lib/data/degraded";
-import { daysUntil } from "./admissions-types";
+import { computeCoverage, coverageSummary } from "./admissions-coverage";
+import { daysUntil, type InstitutionRequirement } from "./admissions-types";
 import type { AttentionItem } from "./attention-types";
 
 export type { AttentionItem, AttentionKind } from "./attention-types";
@@ -34,7 +35,7 @@ export async function getAttention(): Promise<AttentionItem[]> {
     return [];
   }
 
-  const [institutions, funding, tasks, contacts] = await Promise.all([
+  const [institutions, funding, tasks, contacts, liveInstitutions, requirements] = await Promise.all([
     sb
       .schema("research")
       .from("institutions")
@@ -55,6 +56,18 @@ export async function getAttention(): Promise<AttentionItem[]> {
       .from("contacts")
       .select("id, name, organization, email, email_source_url, outreach_priority, institution_id, opportunity_id")
       .in("outreach_priority", ["first_wave", "second_wave"]),
+    // Coverage needs every live institution, including ones with no
+    // deadline on file — those are the most dangerous, since a missing
+    // date makes a school invisible to every date-ordered view.
+    sb
+      .schema("research")
+      .from("institutions")
+      .select("id, name, programme, next_deadline, supervisor_required, stage, fit_score")
+      .not("stage", "in", "(submitted,offer,rejected,withdrawn)"),
+    sb
+      .schema("research")
+      .from("institution_requirements")
+      .select("id, created_at, user_id, institution_id, kind, label, detail, due_date, mandatory, status, source_url, verified_at"),
   ]);
 
   const items: AttentionItem[] = [];
@@ -104,6 +117,51 @@ export async function getAttention(): Promise<AttentionItem[]> {
       href: "/workspace",
       // Undated tasks sit just past the three-month horizon rather than last.
       weight: d ?? 100,
+    });
+  }
+
+  // Blindspots: requirements nobody has established either way. These are
+  // deliberately ranked with — not after — dated work, because an unknown
+  // cannot be planned around. A gap found six weeks out is an inconvenience;
+  // the same gap found six days out has already decided the outcome.
+  const reqsByInstitution = new Map<string, InstitutionRequirement[]>();
+  for (const r of (requirements.data ?? []) as unknown as InstitutionRequirement[]) {
+    const list = reqsByInstitution.get(r.institution_id) ?? [];
+    list.push(r);
+    reqsByInstitution.set(r.institution_id, list);
+  }
+
+  for (const r of (liveInstitutions.data ?? []) as Row[]) {
+    const coverage = computeCoverage(
+      {
+        next_deadline: (r.next_deadline as string | null) ?? null,
+        supervisor_required: Boolean(r.supervisor_required),
+      },
+      reqsByInstitution.get(r.id as string) ?? [],
+    );
+    if (coverage.unknown.length === 0 && coverage.behind.length === 0) continue;
+
+    const d = r.next_deadline ? daysUntil(r.next_deadline as string) : null;
+    const late = coverage.behind.length;
+    const gaps = coverage.unknownUniversal.length;
+
+    items.push({
+      id: `coverage-${r.id}`,
+      kind: "unverified",
+      title: `${r.name} — ${coverageSummary(coverage)}`,
+      detail:
+        (late > 0
+          ? `${late} item${late === 1 ? " is" : "s are"} already inside the lead time they need. `
+          : "") +
+        (gaps > 0
+          ? `Not established: ${coverage.unknownUniversal.map((i) => i.canonical.label).join(", ")}.`
+          : `To confirm: ${coverage.unknown.map((i) => i.canonical.label).join(", ")}.`),
+      days: d,
+      href: `/apply/${r.id}`,
+      // Sits just ahead of the deadline it endangers, so a blindspot is
+      // read before the date it would ruin. Undated schools sort to the
+      // front of the blocked band: no date is worse than a near one.
+      weight: d === null ? -0.5 : d - 0.5,
     });
   }
 

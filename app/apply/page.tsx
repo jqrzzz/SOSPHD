@@ -19,10 +19,17 @@ import {
   DeadlineTimeline,
   SchoolComparison,
 } from "@/components/school-comparison";
+import { PortfolioPanel } from "@/components/portfolio-panel";
+import {
+  computeCoverage,
+  coverageSummary,
+  greStance,
+  portfolioRollup,
+} from "@/lib/data/admissions-coverage";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-  title: "Applications · SOSPHD",
+  title: "Applications",
   description:
     "PhD admissions pipeline — institutions, requirements, deadlines, and supervisor outreach.",
 };
@@ -64,8 +71,22 @@ export default async function ApplyPage() {
   );
 
   const nextUp = dated[0];
-  const unverifiedCount = institutions.filter((i) => !i.verified_at).length;
+  const activeIds = new Set(active.map((i) => i.id));
+  const unverifiedReqCount = allReqs.filter(
+    (r) => !r.verified_at && activeIds.has(r.institution_id),
+  ).length;
   const supervisorFirst = active.filter((i) => i.supervisor_required);
+
+  // Shared work, counted once across every school still in play.
+  const portfolio = portfolioRollup(
+    active.map((i) => ({
+      id: i.id,
+      name: i.name,
+      next_deadline: i.next_deadline,
+      supervisor_required: i.supervisor_required,
+      requirements: reqsByInstitution.get(i.id) ?? [],
+    })),
+  );
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -117,18 +138,29 @@ export default async function ApplyPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="flex flex-col gap-1 p-5">
-              <span className="text-xs text-muted-foreground">Unverified</span>
-              <span className="text-2xl font-semibold tracking-tight text-foreground">
-                {unverifiedCount}
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                institutions whose dates still need confirming
-              </span>
-            </CardContent>
-          </Card>
+          {/* Links to the burn-down queue: the one admissions job only a
+              human browser can do, since institutional domains are blocked
+              from the research environment. */}
+          <Link href="/apply/verify" className="group">
+            <Card className="h-full transition-colors group-hover:border-primary/50">
+              <CardContent className="flex flex-col gap-1 p-5">
+                <span className="text-xs text-muted-foreground">
+                  Verification queue
+                </span>
+                <span className="text-2xl font-semibold tracking-tight text-foreground">
+                  {unverifiedReqCount}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  requirements to confirm against official pages →
+                </span>
+              </CardContent>
+            </Card>
+          </Link>
         </section>
+
+        {/* Shared work first. Five applications look like sixty problems
+            until the items that are one piece of work are counted once. */}
+        <PortfolioPanel actions={portfolio} />
 
         {/* Deadline strip — see the pile-up, don't infer it from a list */}
         {dated.length > 0 && (
@@ -142,18 +174,21 @@ export default async function ApplyPage() {
           </Card>
         )}
 
-        {/* Side-by-side comparison */}
-        <Card>
-          <CardContent className="p-5">
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              Compare
-            </p>
-            <SchoolComparison
-              institutions={active}
-              reqsByInstitution={reqsByInstitution}
-            />
-          </CardContent>
-        </Card>
+        {/* Side-by-side comparison — hidden when there is nothing to
+            compare, so the empty state is one message, not a bare box. */}
+        {active.length > 0 && (
+          <Card>
+            <CardContent className="p-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Compare
+              </p>
+              <SchoolComparison
+                institutions={active}
+                reqsByInstitution={reqsByInstitution}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Live pipeline, deadline order */}
         <section className="flex flex-col gap-3">
@@ -208,6 +243,8 @@ function InstitutionRow({
 }) {
   const days = inst.next_deadline ? daysUntil(inst.next_deadline) : null;
   const pct = readiness(reqs);
+  const coverage = computeCoverage(inst, reqs);
+  const gre = greStance(reqs);
 
   return (
     <Link href={`/apply/${inst.id}`} className="group">
@@ -280,9 +317,57 @@ function InstitutionRow({
                 Supervisor first
               </Badge>
             )}
-            <span className="ml-auto font-mono text-[10px] text-muted-foreground">
-              {APPLICATION_STAGE_LABELS[inst.stage]} · {reqs.length} requirement
-              {reqs.length === 1 ? "" : "s"} · {pct}% ready
+            {/* A hard filter, not one requirement among many — sitting the
+                GRE is ruled out, so a school that mandates it is ineligible
+                however well it fits otherwise. Shown at list level so that
+                never has to be rediscovered inside a school's page. */}
+            {gre === "required" && (
+              <Badge
+                variant="outline"
+                className="border-destructive/50 text-[10px] text-destructive"
+              >
+                GRE required
+              </Badge>
+            )}
+            {gre === "not_required" && (
+              <Badge
+                variant="outline"
+                className="border-primary/30 text-[10px] text-primary/80"
+              >
+                No GRE
+              </Badge>
+            )}
+            {gre === "unknown" && (
+              <Badge
+                variant="outline"
+                className="border-amber-500/40 text-[10px] text-amber-400"
+              >
+                GRE unknown
+              </Badge>
+            )}
+            <span className="ml-auto flex flex-wrap items-center justify-end gap-x-2 font-mono text-[10px] text-muted-foreground">
+              <span>
+                {APPLICATION_STAGE_LABELS[inst.stage]} · {reqs.length} requirement
+                {reqs.length === 1 ? "" : "s"} · {pct}% of known work
+              </span>
+              {/* Coverage, not progress. A row can be 100% on known work and
+                  still be missing half its requirements. */}
+              <span
+                className={cn(
+                  coverage.unknownUniversal.length > 0
+                    ? "text-destructive"
+                    : coverage.unknown.length > 0
+                      ? "text-amber-400"
+                      : "text-primary",
+                )}
+              >
+                · {coverageSummary(coverage)}
+              </span>
+              {coverage.behind.length > 0 && (
+                <span className="text-destructive">
+                  · {coverage.behind.length} past lead time
+                </span>
+              )}
             </span>
           </div>
         </CardContent>

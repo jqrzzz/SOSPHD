@@ -100,6 +100,31 @@ export async function getOutreach(institutionId?: string): Promise<Outreach[]> {
 }
 
 /**
+ * Every contact in an outreach wave, across all targets at once. Feeds
+ * the verification queue: these are the people worth emailing, and any
+ * of them without a confirmed address is blocked work.
+ */
+export async function getOutreachWaveContacts(): Promise<Contact[]> {
+  const sb = await getServerSupabase();
+  if (!sb) {
+    warnDegradedMode("getOutreachWaveContacts", "supabase unavailable");
+    return [];
+  }
+  const { data, error } = await sb
+    .schema("research")
+    .from("contacts")
+    .select("*")
+    .in("outreach_priority", ["first_wave", "second_wave"])
+    .order("outreach_priority", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) {
+    warnDegradedMode("getOutreachWaveContacts", error.message);
+    return [];
+  }
+  return (data ?? []) as Contact[];
+}
+
+/**
  * People attached to a target — prospective supervisors for an
  * institution, or programme officers for a funder. Ordered so the ones
  * worth emailing first come first.

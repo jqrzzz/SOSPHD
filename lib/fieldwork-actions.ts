@@ -9,6 +9,7 @@ import {
   createContact,
   updateContact,
   deleteContact,
+  recordContactEmail,
   createProtocolFromTemplate,
   updateProtocol,
 } from "@/lib/data/fieldwork-mutations";
@@ -219,6 +220,45 @@ export async function deleteContactAction(id: string) {
   await deleteContact(id);
   revalidatePath("/fieldwork");
   revalidatePath("/contacts");
+}
+
+const contactEmailSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email("Not a valid email address"),
+  // https only — an official page is never plain http in 2026, and a typo
+  // here poisons the provenance the whole outreach system rests on.
+  email_source_url: z
+    .string()
+    .url("Not a valid URL")
+    .refine((u) => u.startsWith("https://"), "Source must be an https:// page"),
+});
+
+/**
+ * The human attests: this address appears verbatim on this official page.
+ * Both fields required together — see recordContactEmail for why.
+ */
+export async function recordContactEmailAction(data: {
+  id: string;
+  email: string;
+  email_source_url: string;
+}) {
+  const parsed = contactEmailSchema.safeParse(data);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  try {
+    await recordContactEmail(
+      parsed.data.id,
+      parsed.data.email,
+      parsed.data.email_source_url,
+    );
+  } catch {
+    return { error: "Failed to record the email" };
+  }
+  revalidatePath("/contacts");
+  revalidatePath("/apply");
+  revalidatePath("/apply/verify");
+  return { success: true };
 }
 
 // ── Protocol Actions ────────────────────────────────────────────────

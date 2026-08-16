@@ -89,11 +89,26 @@ export function normalizePayer(raw?: string | null): string | null {
 // Widened 2026-08-13 from the real registry's 487 distinct diagnosis
 // strings. ORDER MATTERS — first match wins; the 836 backfilled rows
 // were bucketed with exactly these rules.
+// ORDER RATIONALE — mechanism outranks anatomy.
+//
+// marine and animal_bite sit ABOVE trauma deliberately. Both describe a
+// specific mechanism ("monkey", "sea urchin", "coral"), while trauma's
+// list contains generic wound vocabulary and bare body parts ("wound",
+// "cut", "knee", "shoulder"). With trauma evaluated first, a record
+// reading "monkey bite, right knee" matched "knee" and was filed as
+// trauma. An audit on 2026-08-15 found nine such rows — five monkey
+// bites and four sea-urchin/coral injuries — every one a genuine
+// mechanism case captured by an anatomical keyword.
+//
+// The general rule this encodes: a keyword naming HOW the injury
+// happened is stronger evidence of category than one naming WHERE it
+// landed, so mechanism buckets are evaluated first. gastro stays at the
+// top; it shares no vocabulary with either mechanism bucket.
 const DIAGNOSIS_BUCKETS: { bucket: string; keywords: string[] }[] = [
   { bucket: "gastro", keywords: ["age", "gastro", "diarr", "vomit", "abdominal", "appendic", "food pois", "stomach", "dehydrat", "nausea"] },
-  { bucket: "trauma", keywords: ["trauma", "fracture", "fall", "accident", "rta", "injury", "lacerat", "abrasion", "wound", "sprain", "dislocat", "motorbike", "motorcycle", "bike", "burn", "cut", "contusion", "ankle", "knee", "shoulder"] },
   { bucket: "marine", keywords: ["sea urchin", "jellyfish", "coral", "marine", "sting ray", "stingray", "fish", "lionfish", "stonefish"] },
   { bucket: "animal_bite", keywords: ["monkey", "dog bite", "cat bite", "bite", "rabies", "snake", "scorpion"] },
+  { bucket: "trauma", keywords: ["trauma", "fracture", "fall", "accident", "rta", "injury", "lacerat", "abrasion", "wound", "sprain", "dislocat", "motorbike", "motorcycle", "bike", "burn", "cut", "contusion", "ankle", "knee", "shoulder"] },
   { bucket: "infectious", keywords: ["infect", "sepsis", "dengue", "malaria", "fever", "covid", "flu", "virus", "tonsil", "uti", "urinary"] },
   { bucket: "respiratory", keywords: ["respirat", "pneumonia", "asthma", "copd", "breath", "bronch", "cough"] },
   { bucket: "neuro", keywords: ["stroke", "cva", "seizure", "neuro", "head injury", "tbi", "concussion", "headache", "migraine"] },

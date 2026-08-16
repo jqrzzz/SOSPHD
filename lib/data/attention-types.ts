@@ -22,6 +22,14 @@ export interface AttentionItem {
 export interface AttentionBands {
   overdue: AttentionItem[];
   blocked: AttentionItem[];
+  /**
+   * Real work with no date to schedule it against. Its own band because
+   * an undated item is not less urgent than a dated one — it is
+   * unassessable, which is worse. A school whose deadline nobody has
+   * established is invisible to every date-ordered view precisely when
+   * it most needs looking at.
+   */
+  undated: AttentionItem[];
   soon: AttentionItem[];
   ahead: AttentionItem[];
 }
@@ -33,6 +41,12 @@ export interface AttentionBands {
  * except for one missing piece gates everything downstream of it, which
  * makes it more actionable than a dated item further out. A blocker is
  * therefore never also counted as overdue or soon.
+ *
+ * Undated non-blockers used to be dropped entirely, on the reasoning that
+ * the panel shows a 120-day window and an undated item has no place in
+ * one. That silently swallowed two real cases — an undated task the owner
+ * created, and a school with no deadline on file — so they now get a band
+ * rather than a hole.
  */
 export function bandAttention(items: AttentionItem[]): AttentionBands {
   const blocked = items.filter((i) => i.kind === "blocked");
@@ -40,6 +54,7 @@ export function bandAttention(items: AttentionItem[]): AttentionBands {
   return {
     overdue: dated.filter((i) => i.days !== null && i.days < 0),
     blocked,
+    undated: dated.filter((i) => i.days === null),
     soon: dated.filter((i) => i.days !== null && i.days >= 0 && i.days <= 30),
     ahead: dated.filter((i) => i.days !== null && i.days > 30 && i.days <= 120),
   };

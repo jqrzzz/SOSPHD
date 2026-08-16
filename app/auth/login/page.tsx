@@ -25,6 +25,10 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const supabase = createClient();
+    if (!supabase) {
+      setError("Supabase is not configured — add .env.local to sign in.");
+      return;
+    }
     setIsLoading(true);
     setError(null);
 

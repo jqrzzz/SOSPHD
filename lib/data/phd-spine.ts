@@ -109,16 +109,16 @@ export const PHD_PHASES: Phase[] = [
         id: "step-5b",
         label: "Prospective Logging (2026 onward)",
         description:
-          "Capture milestones per Step 1 definitions. Populate minimum dataset per Step 2. Maintain failure log + missingness log.",
-        status: "pending",
+          "Instrument verified live: production triggers wrote the first system-generated FIRST_CONTACT events in July 2026, and every event now carries a clock-resolution label (measured/entry/date). Enrolment proper is gated on ethics approval, which requires an institution — the admissions track is therefore on this step's critical path.",
+        status: "next",
       },
       {
         id: "step-6",
-        label: "Descriptive Stats + Paper 1 Scaffold",
+        label: "Descriptive Stats + Paper 1 Draft",
         description:
-          "Distributions: TTDC/TTGP/TTTA. Missingness rates + estimation rates. Delay decomposition (where time is lost: imaging vs payment vs transport). Early ECL validity signals.",
-        status: "next",
-        deliverable: "Paper 1 draft v0.1",
+          "DONE beyond scaffold: Paper 1 at v0.9, ~11,000 words, every headline figure encoded as an executable assertion re-derived from the live registry (pnpm verify:figures). Central finding: zero of 836 cases support any coordination interval end-to-end. Interval distributions await prospective data — that is the paper's point, not a gap in it.",
+        status: "done",
+        deliverable: "Paper 1 draft v0.9 (in /docs)",
       },
     ],
   },
@@ -140,9 +140,9 @@ export const PHD_PHASES: Phase[] = [
         id: "step-8",
         label: "Stepped-Wedge Rollout Plan",
         description:
-          "Staggered site activation schedule. Outcome model (before/after within site; across-site inference). Pre-registration style analysis plan.",
-        status: "pending",
-        deliverable: "Evaluation Design v1.0",
+          "Protocol drafted (Paper 3 v0.3): full wedge specification, pre-specified feasibility gate on corridor volumes, two pre-registered fallbacks, and the shared-operator contamination analysis. Gate thresholds await Paper 2's variance estimates.",
+        status: "in_progress",
+        deliverable: "Paper 3 protocol v0.3 (in /docs)",
       },
       {
         id: "step-9",
@@ -161,24 +161,24 @@ export const PHD_PHASES: Phase[] = [
     steps: [
       {
         id: "paper-1",
-        label: "Paper 1 — Dataset + ECL + Descriptive Stats",
+        label: "Paper 1 — The Missing Timestamps (baseline)",
         description:
-          "Define the event taxonomy, TTDC/TTGP/TTTA, data quality strategy, corridor archetypes, ECL framework, and early descriptive stats.",
-        status: "pending",
+          "Drafted at v0.9, ~11,000 words: epidemiology across 68 nationalities, payer fragmentation (311 entities, self-pay 27.9%), and the central negative result. Remaining to v1.0: verify the provisional † references, close [REF:] gaps, ethics pathway.",
+        status: "in_progress",
       },
       {
         id: "paper-2",
-        label: "Paper 2 — Human–AI Coordination + Provenance",
+        label: "Paper 2 — Human–AI Coordination (protocol)",
         description:
-          "Describe the human–AI coordination layer, uncertainty design, and provenance logging method.",
-        status: "pending",
+          "Protocol at v0.3, ~4,700 words: decision/execution latency decomposition, three-valued exposure, competing-risks sensitivity, recording-lag audit. Pre-registration before enrolment; results await prospective data.",
+        status: "in_progress",
       },
       {
         id: "paper-3",
         label: "Paper 3 — Stepped-Wedge Impact Evaluation",
         description:
-          "Show stepped-wedge results across sites: effects, variance by region/payer, and failure modes.",
-        status: "pending",
+          "Design-and-feasibility protocol at v0.3, ~3,400 words. Execution gated on Paper 2 variance estimates, prospective corridor volumes, and ethics approval.",
+        status: "in_progress",
       },
       {
         id: "dissertation",

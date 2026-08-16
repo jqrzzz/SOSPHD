@@ -81,9 +81,9 @@ function Section({
 }
 
 export function AttentionPanel({ items }: { items: AttentionItem[] }) {
-  const { overdue, blocked, soon, ahead } = bandAttention(items);
+  const { overdue, blocked, undated, soon, ahead } = bandAttention(items);
   const nothing =
-    overdue.length + blocked.length + soon.length + ahead.length === 0;
+    overdue.length + blocked.length + undated.length + soon.length + ahead.length === 0;
 
   return (
     <Card>
@@ -93,7 +93,7 @@ export function AttentionPanel({ items }: { items: AttentionItem[] }) {
             Needs attention
           </h2>
           <span className="font-mono text-[10px] text-muted-foreground">
-            next 120 days
+            next 120 days · plus anything undated
           </span>
         </div>
 
@@ -105,6 +105,7 @@ export function AttentionPanel({ items }: { items: AttentionItem[] }) {
           <div className="flex flex-col gap-4">
             <Section title="Passed" items={overdue} tone="text-destructive" />
             <Section title="Blocked" items={blocked} tone="text-amber-400" />
+            <Section title="No date on file" items={undated} tone="text-amber-400" />
             <Section title="Within 30 days" items={soon} tone="text-destructive" />
             <Section title="Next four months" items={ahead} tone="text-muted-foreground" />
           </div>

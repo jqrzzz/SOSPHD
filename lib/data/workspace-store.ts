@@ -16,6 +16,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import "server-only";
+import { orIlikeContains } from "./pgrst";
 
 import { getServerSupabase } from "@/lib/supabase/server-auth";
 import { warnDegradedMode, seedOrEmpty } from "@/lib/data/degraded";
@@ -123,9 +124,9 @@ export async function getUploads(filters?: {
         .order("created_at", { ascending: false });
 
       if (filters?.category) query = query.eq("category", filters.category);
-      if (filters?.search) query = query.or(
-        `filename.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`
-      );
+      // Quoted via pgrst.ts — see ARCHITECTURE §8.4.
+      if (filters?.search)
+        query = query.or(orIlikeContains(["filename", "notes"], filters.search));
 
       const { data, error } = await query;
       if (!error && data) return data as Upload[];
