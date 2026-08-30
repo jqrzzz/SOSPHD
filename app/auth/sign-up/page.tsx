@@ -1,162 +1,27 @@
-"use client";
-
-import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function SignUpPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      setIsLoading(false);
-      return;
-    }
-
-    const supabase = createClient();
-    if (!supabase) {
-      setError("Supabase is not configured — add .env.local to sign up.");
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-            `${window.location.origin}/spine`,
-        },
-      });
-      if (error) throw error;
-      router.push("/auth/sign-up-success");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+export default function SignUpClosedPage() {
   return (
-    <div className="relative flex min-h-svh w-full items-center justify-center overflow-hidden p-6 md:p-10">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10"
-      >
-        <div className="absolute left-1/2 top-0 h-[500px] w-[1000px] -translate-x-1/2 rounded-full bg-primary/[0.08] blur-3xl" />
-      </div>
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3">
-          <div className="relative">
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 -z-10 rounded-xl bg-primary/30 blur-lg"
-            />
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 font-mono text-sm font-bold text-primary-foreground shadow-[0_6px_18px_-4px_hsl(170_50%_38%/0.6)]">
-              S
-            </div>
-          </div>
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            SOS PHD · Research
-          </span>
-        </div>
-        <Card className="surface-lifted">
-          <CardHeader>
-            <CardTitle className="text-balance text-xl font-semibold tracking-tight text-foreground">
-              Create account
-            </CardTitle>
-            <CardDescription>
-              A single-user research workspace, scoped to your auth.uid().
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSignUp}>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="juanquirozjr@gmail.com"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    minLength={6}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-                {error && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {error}
-                  </p>
-                )}
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Creating account..." : "Sign Up"}
-                </Button>
-              </div>
-              <div className="mt-4 text-center text-sm text-muted-foreground">
-                Already have an account?{" "}
-                <Link
-                  href="/auth/login"
-                  className="text-primary underline underline-offset-4 hover:text-primary/80"
-                >
-                  Sign in
-                </Link>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-        <div className="mt-4 text-center">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            Back to home
-          </Link>
-        </div>
-      </div>
-    </div>
+    <main className="flex min-h-svh items-center justify-center p-6">
+      <Card className="w-full max-w-sm surface-lifted">
+        <CardHeader>
+          <CardTitle>Account creation is closed</CardTitle>
+          <CardDescription>
+            SOS PHD is a private, single-user research workspace.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            New accounts cannot be created here. Existing authorized researchers
+            can continue to the sign-in page.
+          </p>
+          <Button asChild>
+            <Link href="/auth/login">Go to sign in</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </main>
   );
 }

@@ -87,7 +87,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="juanquirozjr@gmail.com"
+                    placeholder="researcher@example.com"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -114,15 +114,9 @@ export default function LoginPage() {
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </div>
-              <div className="mt-4 text-center text-sm text-muted-foreground">
-                {"Don't have an account? "}
-                <Link
-                  href="/auth/sign-up"
-                  className="text-primary underline underline-offset-4 hover:text-primary/80"
-                >
-                  Sign up
-                </Link>
-              </div>
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                Private workspace. Account creation is closed.
+              </p>
             </form>
           </CardContent>
         </Card>

@@ -237,7 +237,7 @@ export function CorridorJourney() {
       viewBox="0 0 760 140"
       className="w-full"
       role="img"
-      aria-label="A corridor journey: incident, local clinic stabilization, payment guarantee, transport, definitive care in Bangkok"
+      aria-label="A corridor journey from incident through local clinic, payment guarantee, transport, and definitive care in Bangkok. The journey starts at the incident; TTTA, TTGP, and TTDC start at FIRST_CONTACT."
     >
       <path d={pathD} fill="none" stroke={TEAL} strokeWidth="1.5" strokeDasharray="7 4" opacity="0.6" />
       {JOURNEY_STOPS.map((s) => (
@@ -258,9 +258,9 @@ export function CorridorJourney() {
           </text>
         </g>
       ))}
-      {/* the three clocks tick across the whole journey */}
+      {/* The journey starts at incident; research clocks start at contact. */}
       <text x={X0 + SPAN / 2} y={126} textAnchor="middle" className="fill-muted-foreground" fontSize="8.5" fontFamily="var(--font-mono, monospace)">
-        TTTA · TTGP · TTDC — all clocks start at the incident
+        Journey starts at incident · TTTA · TTGP · TTDC start at FIRST_CONTACT
       </text>
     </svg>
   );

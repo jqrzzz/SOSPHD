@@ -42,23 +42,15 @@ export default function LandingPage() {
         </p>
 
         {/* Auth buttons */}
-        <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+        <div className="flex w-full justify-center">
           <Button asChild size="lg" className="w-full sm:w-auto sm:min-w-[140px]">
             <Link href="/auth/login">Sign in</Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            className="w-full sm:w-auto sm:min-w-[140px]"
-          >
-            <Link href="/auth/sign-up">Create account</Link>
           </Button>
         </div>
 
         {/* Footer */}
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/50">
-          Single-user research environment · Not for patient-facing use
+          Private single-user research environment · Not for patient-facing use
         </p>
       </div>
     </div>

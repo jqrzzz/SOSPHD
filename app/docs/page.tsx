@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PhiWarning } from "@/components/phi-warning";
 
 const STATUS_STYLES: Record<string, string> = {
   active: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
@@ -38,22 +39,7 @@ export default async function DocsPage(props: {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      {/* No-PHI banner */}
-      <div
-        className="flex items-center gap-2 border-b border-emerald-500/20 bg-emerald-500/5 px-4 py-1.5"
-        role="status"
-      >
-        <span className="text-[11px] leading-tight text-emerald-200/90">
-          Documents workspace — no PHI stored or processed. Safe for research
-          writing.
-        </span>
-        <Badge
-          variant="outline"
-          className="ml-auto shrink-0 border-emerald-500/30 bg-emerald-500/10 font-mono text-[9px] tracking-[0.12em] text-emerald-300"
-        >
-          NO-PHI
-        </Badge>
-      </div>
+      <PhiWarning />
 
       <PageHeader
         eyebrow="Research artefacts"
