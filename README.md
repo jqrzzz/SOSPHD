@@ -84,7 +84,12 @@ SOSPHD_MODEL_RECOMMENDATIONS=gpt-4o
 SOSPHD_MODEL_DEFAULT=gpt-4o-mini
 ```
 
-**Dev without Supabase.** If `NEXT_PUBLIC_SUPABASE_*` is missing, the app runs in degraded mode: middleware skips auth redirects, AI route handlers return `dev_user`, server actions throw `AuthRequiredError`, and read paths emit `[SOSPHD:DEGRADED]` warnings to console. You'll see seed/empty data in the UI. This is intentional for clean checkouts; in production builds `lib/env.ts:assertProductionEnv` refuses to serve requests until the Supabase vars are set.
+**Dev without Supabase.** If `NEXT_PUBLIC_SUPABASE_*` is missing, the app runs in degraded mode: the request proxy skips auth redirects, AI route handlers return `dev_user`, server actions throw `AuthRequiredError`, and read paths emit `[SOSPHD:DEGRADED]` warnings to console. You'll see seed/empty data in the UI. This is intentional for clean checkouts; in production builds `lib/env.ts:assertProductionEnv` refuses to serve requests until the Supabase vars are set.
+
+**Private deployment.** In Supabase Dashboard → Authentication → General
+Configuration, disable **Allow new users to sign up**. The app exposes no signup
+form, but the hosted Auth setting is the server-side control that blocks direct
+signup API calls.
 
 ```bash
 pnpm dev    # http://localhost:3000

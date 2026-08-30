@@ -10,6 +10,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { executeAgent } from "./core";
+import { requireResearchUser } from "@/lib/auth/research-user";
 
 // Re-export the pure categorization helper so existing callers still work.
 export { autoCategorize } from "./categorize";
@@ -146,6 +147,8 @@ export async function handleAgentContract(request: {
   params?: Record<string, unknown>;
   caller: { system: string; context?: string };
 }) {
+  await requireResearchUser();
+
   // Validate the caller is from the SOS ecosystem
   const validCallers = ["soswebsite", "soscommand", "sostravel", "sospro", "sossafe", "user"];
   if (!validCallers.includes(request.caller.system)) {

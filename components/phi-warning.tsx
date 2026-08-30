@@ -8,14 +8,14 @@ export function PhiWarning() {
     >
       <ShieldIcon className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
       <span className="text-[11px] leading-tight text-emerald-200/90">
-        Patient references are pseudonymised (patient_ref only). No real
-        identifiers are stored or transmitted to the model.
+        PHI is prohibited. De-identify material before saving it or using AI;
+        automatic identifier detection or removal is not provided.
       </span>
       <Badge
         variant="outline"
         className="ml-auto shrink-0 border-emerald-500/30 bg-emerald-500/10 font-mono text-[9px] tracking-[0.12em] text-emerald-300"
       >
-        PHI-SAFE
+        PHI PROHIBITED
       </Badge>
     </div>
   );

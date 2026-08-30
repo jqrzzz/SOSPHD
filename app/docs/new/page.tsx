@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DocCreateForm } from "@/components/doc-create-form";
+import { PhiWarning } from "@/components/phi-warning";
 
 export default function NewDocPage() {
   return (
     <div className="flex flex-1 flex-col">
+      <PhiWarning />
       <header className="flex items-center gap-4 border-b border-border px-6 py-4">
         <Link
           href="/docs"

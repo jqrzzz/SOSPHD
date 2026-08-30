@@ -13,7 +13,8 @@ interface AIResult {
   mode: DocAIMode;
   output: string;
   can_apply?: boolean;
-  tasks_created?: number;
+  provisional?: boolean;
+  tasks_suggested?: number;
 }
 
 export function DocAITools({ docId }: { docId: string }) {
@@ -45,8 +46,8 @@ export function DocAITools({ docId }: { docId: string }) {
         const data = await res.json();
         setResult(data);
 
-        if (data.tasks_created) {
-          toast.success(`${data.tasks_created} task(s) created from document`);
+        if (data.mode === "extract_tasks" && data.provisional) {
+          toast.info("Task suggestions are provisional; no tasks were created.");
         }
       } catch {
         toast.error("Failed to connect to AI service");
@@ -114,11 +115,12 @@ export function DocAITools({ docId }: { docId: string }) {
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            {result.tasks_created && (
-              <p className="text-xs text-[hsl(var(--status-closed))]">
-                {result.tasks_created} task(s) added to your task list.
+            {result.mode === "extract_tasks" && result.provisional ? (
+              <p className="text-xs text-amber-300">
+                {result.tasks_suggested ?? 0} provisional suggestion(s). Review
+                or copy them; nothing was added to your task list.
               </p>
-            )}
+            ) : null}
 
             <ScrollArea className="max-h-64">
               <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-foreground/80">

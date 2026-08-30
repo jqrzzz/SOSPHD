@@ -14,8 +14,8 @@ import {
  *  These formatters previously lived inside the route handler, where Next
  *  permits only HTTP-verb exports and so no test could import them. The
  *  agent-insights block shipped without sanitizing gap text as a result —
- *  and gap text carries task titles, which the model itself can write via
- *  createTasksFromAI. The invariant asserted here is deliberately blunt:
+ *  and gap text carries researcher-authored task titles. AI task creation is
+ *  now disabled, but those values remain untrusted. The invariant is blunt:
  *  no output of either formatter may contain a literal closing tag.
  * ────────────────────────────────────────────────────────────────────── */
 

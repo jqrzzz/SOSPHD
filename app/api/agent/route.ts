@@ -11,10 +11,11 @@
 
 import { z } from "zod";
 import { executeAgent, getAgentCapabilities, type AgentAction } from "@/lib/agent/core";
+import { gateResearchRequest } from "@/lib/ai/gate";
 import {
-  requireAuthenticatedUser,
-  UnauthenticatedError,
-} from "@/lib/ai/config";
+  readAIRequestJson,
+  requestPolicyErrorResponse,
+} from "@/lib/ai/request-policy";
 
 const VALID_ACTIONS: AgentAction[] = [
   "research_status",
@@ -33,47 +34,31 @@ const requestSchema = z.object({
   action: z.enum(VALID_ACTIONS as [AgentAction, ...AgentAction[]]),
   params: z.record(z.unknown()).optional(),
   caller: z.object({
-    system: z.string(),
-    context: z.string().optional(),
+    system: z.string().min(1).max(64),
+    context: z.string().max(4_000).optional(),
   }).optional(),
 });
 
 /** GET /api/agent — Discover agent capabilities. Auth-gated so capability
  *  discovery doesn't leak the action surface to unauthenticated callers. */
 export async function GET() {
-  try {
-    await requireAuthenticatedUser();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      return Response.json({ error: err.message }, { status: err.status });
-    }
-    throw err;
-  }
+  const research = await gateResearchRequest();
+  if (!research.ok) return research.response;
   return Response.json(getAgentCapabilities());
 }
 
 /** POST /api/agent — Execute an agent action */
 export async function POST(req: Request) {
-  try {
-    await requireAuthenticatedUser();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      return Response.json({ error: err.message }, { status: err.status });
-    }
-    throw err;
-  }
+  const research = await gateResearchRequest();
+  if (!research.ok) return research.response;
 
   let body: unknown;
   try {
-    body = await req.json();
-  } catch (err) {
-    return Response.json(
-      {
-        error: "Malformed JSON in request body",
-        detail: err instanceof Error ? err.message : undefined,
-      },
-      { status: 400 },
-    );
+    body = await readAIRequestJson(req);
+  } catch (error) {
+    const response = requestPolicyErrorResponse(error);
+    if (response) return response;
+    throw error;
   }
 
   const parsed = requestSchema.safeParse(body);
@@ -98,11 +83,13 @@ export async function POST(req: Request) {
 
     return Response.json(response);
   } catch (err) {
-    console.error("[SOSPHD] /api/agent: executeAgent failed:", err);
+    console.error("[SOSPHD] /api/agent: executeAgent failed", {
+      code: "agent_execution_failed",
+      error_type: err instanceof Error ? err.name : "unknown",
+    });
     return Response.json(
       {
         error: "Agent execution failed",
-        message: err instanceof Error ? err.message : "Unknown error",
       },
       { status: 500 },
     );
