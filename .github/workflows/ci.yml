@@ -9,13 +9,18 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Lint, typecheck, build, test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       # This repo ships pnpm-lock.yaml and no package-lock.json. CI previously
       # ran `npm install --legacy-peer-deps`, which ignored the committed
@@ -27,9 +32,9 @@ jobs:
       # pnpm + --frozen-lockfile fixes all three: identical tree everywhere,
       # a working cache, and the build fails loudly if the lockfile and
       # package.json ever disagree.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
