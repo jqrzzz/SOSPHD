@@ -51,7 +51,7 @@ SOSCOMMAND.
 
 | Layer | Choice | Version (from `package.json`) |
 |---|---|---|
-| Framework | Next.js App Router | `next` 16.1.6 |
+| Framework | Next.js App Router | `next` 16.3.3 |
 | UI runtime | React | 19.2.3 |
 | Language | TypeScript, `strict: true` | 5.7.3 |
 | Styling | Tailwind CSS + shadcn/ui over Radix | tailwindcss 3.4.17 |
@@ -101,10 +101,10 @@ target is unclear — needs checking outside the repo.
 
 This is the core of the document. Each flow is traced from entry point to database.
 
-### Flow 4.1 — Sign up, sign in, and route protection
+### Flow 4.1 — Private sign-in and route protection
 
-**Entry:** `app/page.tsx` (the only truly public page) links to `/auth/login` and
-`/auth/sign-up`.
+**Entry:** `app/page.tsx` (the only truly public page) links only to
+`/auth/login`.
 
 `app/auth/login/page.tsx` is a client component. It builds a browser Supabase
 client via `lib/supabase/client.ts:createClient()` and calls
@@ -113,18 +113,18 @@ On success it does `router.push("/spine")` and `router.refresh()`. There is no
 server action and no session endpoint — the Supabase JS client writes the auth
 cookies itself.
 
-`app/auth/sign-up/page.tsx` is the same shape, calling `supabase.auth.signUp` with
-`emailRedirectTo` set from `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL` or
-`${window.location.origin}/spine`. It then redirects to
-`/auth/sign-up-success`, which just says "check your email". **Sign-up is open** —
-anyone who can reach the deployment can create an `auth.users` row. What they
-cannot do is read research data, because RLS gates that separately (see §7).
+`app/auth/sign-up/page.tsx` is a static closed-registration page and
+`/auth/sign-up-success` redirects to sign-in. The application exposes no
+`supabase.auth.signUp` call or owner-email placeholder. Hosted deployments must
+also disable **Allow new users to sign up** in Supabase Auth settings; removing the
+UI does not disable direct calls to the hosted Auth API. Even if that external
+setting drifts, the research allowlist and RLS still deny research data (see §7).
 
-Every request then passes through `middleware.ts`, which delegates to
+Every request then passes through `proxy.ts`, which delegates to
 `lib/supabase/proxy.ts:updateSession()`. That function refreshes the Supabase
 session, then: if the path is not `/` and not under `/auth/`, and there is no
 user, it redirects to `/`; if the path is `/` and there *is* a user, it redirects
-to `/spine`. The matcher in `middleware.ts` excludes only `_next/static`,
+to `/spine`. The matcher in `proxy.ts` excludes only `_next/static`,
 `_next/image`, `favicon.ico`, and image extensions — so API routes and server
 actions are covered too.
 
@@ -217,42 +217,42 @@ instead of the `{ error }` envelope the form is written to render.
 
 ### Flow 4.5 — Generating AI recommendations for a case (Paper 2, part 1)
 
-There are two entry points into the same engine, and they are **not gated
-identically**.
+There are two entry points into the same engine. Both use the same research-user,
+provider-key, and rate-limit gates before the engine can receive an issued usage
+grant.
 
 **Path A — the button.** `components/generate-recommendations-button.tsx` calls
-the server action `lib/actions.ts:generateRecommendationsAction(caseId, count)`,
-which calls `lib/recommendations.ts:generateRecommendationsForCase`.
+the server action `lib/actions.ts:generateRecommendationsAction(caseId, count)`.
+The action checks the research allowlist, validates arguments, checks provider
+configuration/rate budget, then calls
+`lib/recommendations.ts:generateRecommendationsForCase` with the issued grant.
 
 **Path B — HTTP.** `POST /api/recommendations/generate`
-(`app/api/recommendations/generate/route.ts`) calls
-`lib/ai/gate.ts:gateAIRequest("recommendations")` first — auth, then API key, then
-rate limit — and only then calls the same
-`generateRecommendationsForCase`. It exists so external callers can reach the
-engine without a self-HTTP round trip.
+(`app/api/recommendations/generate/route.ts`) checks the research allowlist,
+reads at most 32 KiB of JSON, validates the body, then checks provider
+configuration/rate budget and calls the same engine with the issued grant.
 
 Inside `generateRecommendationsForCase` (`lib/recommendations.ts`):
 
-1. `requireAIKey("recommendations")` — checks the credential for the *resolved*
-   provider (see §5).
+1. `assertAIUsageGrant(..., "recommendations")` rejects accidental internal
+   callers that bypass the centralized gate.
 2. `getCaseById(caseId)` and `getEventsByCaseId(caseId)` from `lib/data/store.ts`.
-3. `formatCaseContext()` builds a markdown block: case header, every event with
-   its `occurred_at`, and the three computed metrics from
+3. `formatCaseContext()` builds a bounded markdown block: case header, at most
+   20 earliest/latest events with `occurred_at`, and the three computed metrics from
    `lib/data/metrics.ts:computeAllMetrics`. All operator-authored free text
    (`chief_complaint`, `notes`, event `payload`) goes through
    `lib/ai/sanitize.ts:safeFreeText`, which clips to 2000 chars and neutralizes
    `<case>` / `</case>` tags so a crafted string cannot break out of the prompt
    envelope.
-4. `generateText()` from the AI SDK with `model: modelFor("recommendations")` and
+4. `generateText()` from the AI SDK with `model: modelFor("recommendations")`,
+   `Output.object({ schema: recommendationSchema })`, an explicit output cap, and
    `SYSTEM_PROMPT`, which quotes SOSPHD Intervention Protocol `PROTOCOL_VERSION`
    (`lib/protocol.ts`, currently `v0.1`) verbatim — the allowed categories and the
    confidence policy.
-5. The response is de-fenced (a `​```json` wrapper is stripped if present) and
-   validated with `recommendationSchema` (1–5 items, each with
-   `recommendation`, `explanation`, `confidence` 0–1, and a `category` enum). On a
-   parse failure it throws `RecommendationError(…, 502)` and logs the raw preview
-   **server-side only**, deliberately, so PHI-adjacent model output is not echoed
-   back to the client.
+5. The AI SDK validates the structured response with `recommendationSchema`
+   (1–5 items, bounded text, confidence 0–1, category enum). Invalid output becomes
+   a controlled 502. Logs contain only an error code, never raw model text, case ID,
+   or parser text.
 6. Each item is persisted by `createRecommendation()` into
    `research.recommendations` with
    `engine_version = "llm-paper2-v0.1/${category}"` — plus a `/historical`
@@ -330,49 +330,47 @@ most recent override reasons.
 
 ### Flow 4.8 — The AI advisor chat
 
-**Entry:** `components/advisor-chat.tsx`, using `useChat()` from `@ai-sdk/react`
-with a `DefaultChatTransport` pointed at `/api/advisor`, carrying `sessionId` in
-the body.
+**Entry:** `components/advisor-chat.tsx`, using `useChat({ id: sessionId })`
+from `@ai-sdk/react` with a `DefaultChatTransport` pointed at `/api/advisor`.
+The request body carries only the chat ID and messages; the session ID scopes
+ephemeral client state and is not persisted by the route.
 
 `app/api/advisor/route.ts:POST`:
 
-1. `gateAIRequest("advisor")` — auth → key → rate limit (30/min).
-2. Builds four context sources in parallel: `buildContextSnapshot()`
+1. Checks authentication plus `research.is_allowed_user()`.
+2. Reads at most 32 KiB, validates the UI-message envelope, then checks the
+   provider key and 30/min process-local budget.
+3. Builds four context sources in parallel: `buildContextSnapshot()`
    (`lib/data/context-builder.ts`), `getResearchPulse()`, `suggestNextActions(5)`,
    `detectGaps()`.
-3. `buildContextSnapshot` itself is 4 queries flat: `getCases()`,
+4. `buildContextSnapshot` itself is 4 queries flat: `getCases()`,
    `getAllCaseEvents()`, `getTasks({limit:5})`, `getNotes(5)`. It groups events by
    case in memory, computes metrics for the active case, and derives
    missing-milestone lists for every non-closed case.
-4. `lib/ai/advisor-prompt.ts:formatContextForPrompt` and `formatAgentInsights`
+5. `lib/ai/advisor-prompt.ts:formatContextForPrompt` and `formatAgentInsights`
    render those into text. **Every human- or model-authored string is passed
    through `sanitizeForContext`** — chief complaints, task titles, note titles and
    bodies, gap strings. That module exists as its own file specifically so it can
    be unit-tested (`lib/ai/__tests__/advisor-prompt.test.ts`); Next.js route
    handlers can only export HTTP verbs, so the functions were untestable while
    they lived in the route.
-5. `streamText()` with the system prompt plus `<context>…</context>`, streamed
-   back via `toUIMessageStreamResponse`.
-6. In `onFinish` (skipped if aborted): `extractAndCreateTasks()` scans the
-   assistant text for a fenced ` ```json ` block containing `{"tasks":[…]}` — with
-   the regex input capped at 100,000 chars — and passes it to
-   `lib/advisor-actions.ts:createTasksFromAI`, which zod-validates each item and
-   inserts the valid ones. Then the assistant message plus the full context
-   snapshot is persisted to `research.advisor_messages` (`context_snapshot` JSONB).
-
-Note the loop this creates: the model writes task titles → those are stored in
-`research.tasks` → `detectGaps()` interpolates overdue task titles into gap
-strings → those gap strings go back into the next request's system prompt. The
-sanitizer is what breaks the injection risk in that loop; the comment in
-`lib/ai/advisor-prompt.ts` calls this out explicitly.
+6. The prompt includes at most 20 illustrative missing-milestone rows and the
+   complete evidence block is capped at 64 KiB.
+7. `streamText()` uses an explicit output cap and the request abort signal, then
+   returns `toUIMessageStreamResponse`. There is no `onFinish` callback:
+   streaming text is provisional and creates no task, assistant-message row, or
+   stored context snapshot.
 
 ### Flow 4.9 — Paper builder (drafting a paper section from live data)
 
 **Entry:** `components/paper-builder.tsx` → `fetch("/api/paper-builder")`.
 
-`app/api/paper-builder/route.ts` gates with `gateAIRequest("paper_builder")` (the
-tightest rate limit, 5/min), validates `{ section, custom_instructions }`, then
-calls `lib/data/analytics.ts:buildPaperContext()`.
+`app/api/paper-builder/route.ts` checks the research allowlist, enforces the
+32-KiB request cap and 4,000-character custom-instruction cap, then applies the
+tightest rate limit (5/min) before calling
+`lib/data/analytics.ts:buildPaperContext()`. Aggregate facts remain complete;
+only 20 rows may be included as illustrations, the evidence block is capped at
+64 KiB, and generation has an explicit output ceiling.
 
 `buildPaperContext` returns both raw `rows` and a `formatted` block of
 pre-written English sentences — sample size, metric summary, payment-delay
@@ -408,9 +406,9 @@ document's *current* `content_md` into `research.doc_versions`.
 (`app/api/docs/ai/route.ts`) with `{ doc_id, mode, selection_text? }`. Five modes:
 `summarize`, `rewrite`, `outline`, `extract_tasks`, `one_pager`. Title and content
 go through `sanitizeForDocument` and into a `<document title="…">…</document>`
-envelope. `extract_tasks` parses a fenced JSON block and inserts each valid task
-via `createTask`, returning counts (`tasks_created`, `tasks_attempted`,
-`tasks_invalid`) or an `extraction_error` — it does not silently pretend success.
+envelope. Requests are capped at 32 KiB, document evidence at 64 KiB, and model
+output explicitly. `extract_tasks` uses `Output.object` for schema validation
+and returns provisional suggestions only; it never inserts an operational task.
 
 ### Flow 4.11 — Field journal capture (a browser-side read path)
 
@@ -436,7 +434,8 @@ methodology, ethics, data-source).
 `GET` returns `getAgentCapabilities()` — thesis, action list, tool schemas,
 corridor names, metric keys, and a `contractProtocol` descriptor. `POST` takes
 `{ action, params?, caller? }`, validated against a 10-value action enum. Both
-verbs call `requireAuthenticatedUser()`.
+verbs require a signed-in `research.allowed_users` member; POST also enforces
+the shared 32-KiB request limit before action validation/execution.
 
 `lib/agent/core.ts:executeAgent` maps the action to one or more tool names via
 `ACTION_TOOL_MAP`, executes them, and attaches a human summary and follow-up
@@ -498,11 +497,18 @@ rather than silently building an OpenAI request for a Claude model (which is wha
 the code did before). `requireAIKey(surface)` checks the credential for the
 **resolved** provider, not `OPENAI_API_KEY` unconditionally.
 
-`lib/ai/gate.ts:gateAIRequest(surface)` bundles the three checks every
-cost-bearing route needs — `requireAuthenticatedUser`, `requireAIKey`,
-`requireWithinAILimit` — and translates each failure into a `Response` with the
-right status (401 / 503 / 429 with `Retry-After`, or 500 with the message intact
-for provider misconfiguration).
+`lib/auth/research-user.ts:requireResearchUser()` authenticates once, then calls
+the database-owned `research.is_allowed_user()` function. Missing sessions return
+401, non-allowlisted sessions 403, and lookup failures fail closed with 503.
+`lib/ai/gate.ts` deliberately separates `gateResearchRequest()` from
+`gateAIUsage()` so bounded body parsing and schema validation happen before
+provider/key resolution or rate-budget consumption. The latter issues a
+surface-bound grant required by the recommendation library.
+
+`lib/ai/request-policy.ts` owns the 32-KiB streamed request limit, 4,000-character
+custom-instruction limit, 20-row/64-KiB evidence limits, and explicit per-surface
+output ceilings. It measures actual UTF-8 stream bytes rather than trusting
+`Content-Length`.
 
 `lib/ai/rate-limit.ts` is a sliding-window limiter in a module-level `Map` keyed
 by `userId|surface`. Limits per minute: advisor 30, recommendations 15,
@@ -633,7 +639,7 @@ Four Supabase entry points, and which one you use matters:
 |---|---|---|---|
 | `lib/supabase/client.ts` | `createBrowserClient` | Browser cookies | Client components |
 | `lib/supabase/server.ts` | `createServerClient` | `next/headers` cookies | Server components, actions, routes |
-| `lib/supabase/proxy.ts` | `createServerClient` | Request cookies | `middleware.ts` only |
+| `lib/supabase/proxy.ts` | `createServerClient` | Request cookies | `proxy.ts` only |
 | `lib/supabase/db.ts` | Wraps `client.ts` | Browser cookies | Client components (`warnDegradedMode` moved to `lib/data/degraded.ts`) |
 
 `lib/supabase/server-auth.ts` is the server-side gatekeeper. `requireAuthOrThrow()`
@@ -647,12 +653,14 @@ codebase splits every module into `*-store.ts` (reads) and `*-mutations.ts`
 
 Four layers, in order of encounter:
 
-1. **`middleware.ts` → `lib/supabase/proxy.ts:updateSession`.** Redirects any
+1. **`proxy.ts` → `lib/supabase/proxy.ts:updateSession`.** Redirects any
    unauthenticated request away from any path that is not `/` or `/auth/*`.
 2. **Server-side auth helpers.** Every function in `lib/data/*-mutations.ts` and
    `lib/data/backfill/ingest.ts` starts with `await requireAuthOrThrow()`.
-   Every AI route starts with `gateAIRequest(surface)`; `/api/agent` calls
-   `requireAuthenticatedUser()`.
+   Every AI route, the recommendation server action, `/api/agent`, the external
+   agent-contract handler, and the MCP session use the database-owned research
+   allowlist before provider calls or research actions. Cached MCP sessions
+   recheck membership on every tool call and clear the cache on denial.
 3. **Postgres RLS.** RLS is enabled on all 13 `research` tables. Two patterns:
    - **Shared research spine** (`case_events`, `recommendations`, `cases`):
      `USING (research.is_allowed_user())`. Set by migration 008, which replaced the
@@ -694,7 +702,7 @@ three separate places treated "Supabase env vars are absent" as "development
 mode, allow everything":
 
 - `lib/supabase/proxy.ts:updateSession` returns before checking auth, so
-  middleware stops redirecting.
+  proxy stops redirecting.
 - `lib/ai/config.ts:requireAuthenticatedUser` returns `{ id: "dev_user" }`, so
   `gateAIRequest` passes and every LLM endpoint becomes callable by anyone.
 - `/api/agent` uses that same helper for both GET and POST.
@@ -786,13 +794,13 @@ different filter shape, extend `pgrst.ts` and its tests — never interpolate.
 ### 8.5 The two paths into the recommendation engine are gated differently — FIXED 2026-08-13
 
 **Status: fixed.** `generateRecommendationsAction` now applies the same
-auth + rate-limit gate as the HTTP route (`requireAuthenticatedUser` +
-`requireWithinAILimit("recommendations")`), and `addEventAction` resolves the
+research-user, provider-key, and rate-limit gates as the HTTP route, and
+`addEventAction` resolves the
 operator explicitly (no more `actor_id = "system"` mislabeling for
 unauthenticated callers) and returns `{ error }` envelopes instead of throwing
 unhandled. Original issue for the record: the UI-button path reached the paid
-LLM with no explicit auth check and no rate limit, relying entirely on
-middleware.
+LLM with no explicit auth check and no rate limit, relying entirely on the
+request proxy.
 
 ### 8.6 The rate limiter does not work on serverless
 
@@ -880,8 +888,8 @@ fixed. Original issue for the record:
 
 - `lib/data/backfill/ingest.ts:ingestHistoricalCases` has no caller anywhere.
 - `lib/agent/workflows.ts:handleAgentContract` — which validates that the calling
-  system is one of the six SOS apps — is exported and never used. `/api/agent`
-  does not apply that validation; the `caller` field is accepted and ignored.
+  system is one of the six SOS apps and now checks the research allowlist first —
+  is exported and never used. `/api/agent` accepts `caller` as metadata.
 - ~~`hooks/use-mobile.tsx` and `components/ui/use-mobile.tsx` are byte-identical.~~
   Fixed 2026-08-13: the unused `components/ui/use-mobile.tsx` copy is deleted.
 - ~~Two toast systems ship.~~ Fixed 2026-08-13: the unused
@@ -967,14 +975,12 @@ genuinely empty database; zeros *with* the banner means this setting.
 
 ### 8.16 Test coverage
 
-Ten Vitest files, all unit tests, all pure-function or mocked:
-`lib/data/__tests__/` (analytics, metrics, retry, store-projections),
-`lib/ai/__tests__/` (advisor-prompt, config, rate-limit, sanitize),
-`lib/__tests__/recommendations-tagging`, `lib/data/backfill/__tests__/transform`.
-The tests concentrate on exactly the right things — the measurement projections,
-the prompt sanitizers, the model routing. There are **no integration tests, no
-database tests, no component tests, and no end-to-end tests**. Nothing exercises
-RLS, the triggers, the server actions, or any route handler.
+There are 32 Vitest files. In addition to measurement, analytics, prompt, retry,
+and projection tests, the suite now covers the research-user gate, byte/evidence
+limits, provider-zero-call rejection ordering, AI route and server-action
+containment, provisional Advisor/Docs behavior, safe-log canaries, and MCP/agent
+allowlist checks. These are mocked application contracts: there are still **no
+live database contract tests, component tests, or end-to-end browser tests**.
 
 ### 8.17 Not every timestamp in `case_events` is a measurement (found 2026-08-16)
 
@@ -1046,7 +1052,7 @@ pages that fetch in the browser, so a static shell is their design.
 | Dashboard numbers, or a new aggregate figure | `lib/data/analytics.ts` — keep the three-round-trip contract |
 | The Paper 2 figure set | `lib/data/analytics.ts:computePaper2Coordination` and `app/dashboard/paper2/page.tsx` |
 | The advisor's context or system prompt | `app/api/advisor/route.ts` and `lib/data/context-builder.ts` |
-| Route protection or the public/private boundary | `lib/supabase/proxy.ts` (`isPublic`), then `middleware.ts` |
+| Route protection or the public/private boundary | `lib/supabase/proxy.ts` (`isPublic`), then `proxy.ts` |
 | Who can read the research spine | `supabase/migrations/20260528_008_research_cases_allowlist.sql` and `research.allowed_users` |
 | The database schema | `supabase/migrations/20260516_004_research_schema_snapshot.sql` (the snapshot), then the later migrations in order |
 | Operational→research event sync | `supabase/migrations/20260402_003_auto_sync_triggers.sql`, `…_006_case_events_dedup_and_triage.sql`, `…_020_case_event_clock_resolution.sql` — **not** application code |
