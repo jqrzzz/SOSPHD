@@ -8,7 +8,7 @@
  *  cites the protocol scope and confidence policy verbatim.
  * ────────────────────────────────────────────────────────────────────── */
 
-import { generateText } from "ai";
+import { generateText, NoObjectGeneratedError, Output } from "ai";
 import { z } from "zod";
 import {
   getCaseById,
@@ -16,13 +16,17 @@ import {
   createRecommendation,
 } from "@/lib/data/store";
 import { computeAllMetrics, formatDuration } from "@/lib/data/metrics";
+import { modelFor } from "@/lib/ai/config";
 import {
-  modelFor,
-  requireAIKey,
-  MissingAIKeyError,
-  UnknownProviderError,
-  ProviderNotInstalledError,
-} from "@/lib/ai/config";
+  assertAIUsageGrant,
+  type AIUsageGrant,
+} from "@/lib/ai/gate";
+import {
+  AI_MAX_ILLUSTRATIVE_ROWS,
+  assertWithinAIEvidenceLimit,
+  maxOutputTokensFor,
+  AIEvidenceTooLargeError,
+} from "@/lib/ai/request-policy";
 import { safeFreeText } from "@/lib/ai/sanitize";
 import { PROTOCOL_VERSION } from "@/lib/protocol";
 import type { Recommendation } from "@/lib/data/types";
@@ -53,8 +57,8 @@ const recommendationSchema = z.object({
   recommendations: z
     .array(
       z.object({
-        recommendation: z.string().min(1),
-        explanation: z.string().min(1),
+        recommendation: z.string().min(1).max(500),
+        explanation: z.string().min(1).max(2_000),
         confidence: z.number().min(0).max(1),
         category: z
           .enum([
@@ -112,6 +116,13 @@ function formatCaseContext(
   events: Awaited<ReturnType<typeof getEventsByCaseId>>,
 ): string {
   const metrics = computeAllMetrics(events);
+  const illustrativeEvents =
+    events.length <= AI_MAX_ILLUSTRATIVE_ROWS
+      ? events
+      : [
+          ...events.slice(0, AI_MAX_ILLUSTRATIVE_ROWS / 2),
+          ...events.slice(-AI_MAX_ILLUSTRATIVE_ROWS / 2),
+        ];
   const lines: string[] = [
     `## Case ${caseRow.patient_ref}`,
     `- Status: ${caseRow.status}`,
@@ -121,11 +132,14 @@ function formatCaseContext(
   ];
   if (caseRow.notes) lines.push(`- Notes: ${safeFreeText(caseRow.notes)}`);
 
-  lines.push("", `## Events (${events.length})`);
+  lines.push(
+    "",
+    `## Events (${illustrativeEvents.length} of ${events.length}; earliest and latest retained)`,
+  );
   if (events.length === 0) {
     lines.push("- (no events logged yet)");
   } else {
-    for (const e of events) {
+    for (const e of illustrativeEvents) {
       const payload = e.payload ? ` — ${safeFreeText(e.payload)}` : "";
       lines.push(`- [${e.occurred_at}] ${e.event_type}${payload}`);
     }
@@ -147,6 +161,7 @@ export interface GenerateOptions {
   caseId: string;
   count?: number;
   signal?: AbortSignal;
+  grant: AIUsageGrant<"recommendations">;
 }
 
 /**
@@ -158,26 +173,9 @@ export async function generateRecommendationsForCase({
   caseId,
   count = 3,
   signal,
+  grant,
 }: GenerateOptions): Promise<Recommendation[]> {
-  try {
-    requireAIKey("recommendations");
-  } catch (err) {
-    // requireAIKey resolves the surface's provider in order to know which
-    // credential to check, so a misconfigured SOSPHD_MODEL_* value surfaces
-    // here too. Wrap all three in the RecommendationError envelope this
-    // function uses everywhere else — otherwise the server-action path
-    // (which shares this code, see the header) returns a raw throw instead
-    // of the { error } shape its callers expect, and the message naming the
-    // bad config never reaches the UI.
-    if (
-      err instanceof MissingAIKeyError ||
-      err instanceof UnknownProviderError ||
-      err instanceof ProviderNotInstalledError
-    ) {
-      throw new RecommendationError(err.message, err.status);
-    }
-    throw err;
-  }
+  assertAIUsageGrant(grant, "recommendations");
 
   const caseRow = await getCaseById(caseId);
   if (!caseRow) {
@@ -186,49 +184,46 @@ export async function generateRecommendationsForCase({
 
   const events = await getEventsByCaseId(caseId);
   const context = formatCaseContext(caseRow, events);
-
-  const result = await generateText({
-    model: modelFor("recommendations"),
-    system: SYSTEM_PROMPT,
-    prompt: [
-      `Generate ${count} recommendation${count === 1 ? "" : "s"} for the case below. Output strictly valid JSON.`,
-      "",
-      "<case>",
-      context,
-      "</case>",
-    ].join("\n"),
-    abortSignal: signal,
-  });
-
-  // Strip fences if the model wrapped output despite instructions.
-  const jsonText = (() => {
-    const fenced = result.text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (fenced) return fenced[1];
-    return result.text;
-  })();
+  try {
+    assertWithinAIEvidenceLimit(context);
+  } catch (error) {
+    if (error instanceof AIEvidenceTooLargeError) {
+      throw new RecommendationError(error.message, error.status, {
+        code: "evidence_too_large",
+      });
+    }
+    throw error;
+  }
 
   let parsedResult: z.infer<typeof recommendationSchema>;
   try {
-    parsedResult = recommendationSchema.parse(JSON.parse(jsonText));
-  } catch (err) {
-    // Do NOT include the raw model output in the response — it
-    // could contain PHI-adjacent text (case context, patient_ref,
-    // chief_complaint) that gets parroted back. Log it server-side
-    // for debugging instead.
+    const result = await generateText({
+      model: modelFor("recommendations"),
+      system: SYSTEM_PROMPT,
+      prompt: [
+        `Generate ${count} recommendation${count === 1 ? "" : "s"} for the case below.`,
+        "",
+        "<case>",
+        context,
+        "</case>",
+      ].join("\n"),
+      output: Output.object({ schema: recommendationSchema }),
+      abortSignal: signal,
+      maxOutputTokens: maxOutputTokensFor("recommendations"),
+    });
+    parsedResult = result.output;
+  } catch (error) {
+    if (!NoObjectGeneratedError.isInstance(error)) throw error;
     console.error(
-      "[SOSPHD] generateRecommendationsForCase: AI returned malformed JSON",
+      "[SOSPHD] generateRecommendationsForCase: invalid structured output",
       {
-        case_id: caseId,
-        parse_error: err instanceof Error ? err.message : "parse failure",
-        raw_preview: result.text.slice(0, 500),
+        code: "invalid_model_json",
       },
     );
     throw new RecommendationError(
       "AI returned malformed recommendations",
       502,
-      {
-        detail: err instanceof Error ? err.message : "parse failure",
-      },
+      { code: "invalid_model_json" },
     );
   }
 

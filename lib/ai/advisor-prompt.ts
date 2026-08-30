@@ -17,6 +17,7 @@
  * ────────────────────────────────────────────────────────────────────── */
 
 import { sanitizeForContext } from "./sanitize";
+import { AI_MAX_ILLUSTRATIVE_ROWS } from "./request-policy";
 import { formatDuration } from "@/lib/data/metrics";
 import type { buildContextSnapshot } from "@/lib/data/context-builder";
 import type {
@@ -65,8 +66,15 @@ export function formatContextForPrompt(ctx: ContextSnapshot): string {
   }
 
   if (ctx.missing_milestones_all.length > 0) {
-    lines.push("", "### Missing Milestones (all open/active cases)");
-    for (const m of ctx.missing_milestones_all) {
+    const missingForPrompt = ctx.missing_milestones_all.slice(
+      0,
+      AI_MAX_ILLUSTRATIVE_ROWS,
+    );
+    lines.push(
+      "",
+      `### Missing Milestones (${missingForPrompt.length} of ${ctx.missing_milestones_all.length} open/active cases)`,
+    );
+    for (const m of missingForPrompt) {
       lines.push(`- ${m.patient_ref} (${m.case_id}): ${m.missing.join(", ")}`);
     }
   }
@@ -126,10 +134,9 @@ export function formatAgentInsights(
     lines.push("", `### Research Gaps (${gaps.totalGaps} total)`);
     // `gap` DOES carry user-authored text: lib/agent/tools.ts interpolates
     // task.title ("Overdue task: …") and protocol.title ("Protocol … is only
-    // N% complete") straight into it. Task titles can also be written by the
-    // MODEL — createTasksFromAI persists whatever the assistant emits — so
-    // an unsanitized gap string closes the loop from model output back into
-    // the next request's system prompt. Sanitizing here breaks that loop.
+    // N% complete") straight into it. Those values remain untrusted even
+    // though AI task auto-creation is disabled; sanitizing here prevents a
+    // researcher-authored title from breaking the context envelope.
     const highGaps = gaps.gaps.filter((g) => g.severity === "high");
     for (const g of highGaps.slice(0, 5)) {
       lines.push(

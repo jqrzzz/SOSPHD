@@ -26,13 +26,13 @@ export function AdvisorChat({ sessionId }: AdvisorChatProps) {
 
   const { messages, sendMessage, status, error, regenerate, clearError } =
     useChat({
+      id: sessionId,
       transport: new DefaultChatTransport({
         api: "/api/advisor",
         prepareSendMessagesRequest: ({ id, messages: msgs }) => ({
           body: {
             id,
             messages: msgs,
-            sessionId,
           },
         }),
       }),
@@ -277,7 +277,8 @@ export function AdvisorChat({ sessionId }: AdvisorChatProps) {
           </Button>
         </form>
         <p className="mx-auto mt-2 max-w-3xl text-[10px] text-muted-foreground/60">
-          ⏎ to send · ⇧⏎ for new line · The advisor sees pseudonyms only (no PHI).
+          ⏎ to send · ⇧⏎ for new line · Suggestions are provisional and are
+          not saved as tasks or chat history. Do not enter PHI.
         </p>
       </div>
     </div>

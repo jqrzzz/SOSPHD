@@ -213,7 +213,7 @@ export function getAgentCapabilities() {
     contractProtocol: {
       endpoint: "/api/agent",
       method: "POST",
-      auth: "supabase-jwt",
+      auth: "supabase-jwt + research.allowed_users",
       requestFormat: {
         action: "AgentAction",
         params: "Record<string, unknown>",

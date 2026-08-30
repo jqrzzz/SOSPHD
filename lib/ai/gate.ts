@@ -1,70 +1,125 @@
 /* ─── Unified AI Endpoint Gate ─────────────────────────────────────────
- *  Every cost-bearing AI route has the same three gates:
- *    1. Auth (requireAuthenticatedUser)
- *    2. Key present (requireAIKey)
- *    3. Within rate limit (requireWithinAILimit)
- *  Plus a uniform error → Response translation. This helper bundles
- *  the three into one call so each route reads as a single guarded
- *  step rather than 15 lines of repeated try/catch.
+ *  Every cost-bearing AI route uses the same ordered boundary:
+ *    1. Auth + research allowlist (gateResearchRequest)
+ *    2. Bounded request parsing + route validation
+ *    3. Provider/key readiness + rate limit (gateAIUsage)
+ *  Keeping the phases separate ensures invalid/oversized requests do not
+ *  resolve provider configuration or consume rate budget.
  * ────────────────────────────────────────────────────────────────────── */
 
 import {
   AISurface,
   requireAIKey,
   MissingAIKeyError,
-  requireAuthenticatedUser,
-  UnauthenticatedError,
   UnknownProviderError,
   ProviderNotInstalledError,
 } from "./config";
 import { requireWithinAILimit, AIRateLimitError } from "./rate-limit";
+import {
+  requireResearchUser,
+  ResearchAuthenticationError,
+  ResearchAccessDeniedError,
+  ResearchAuthorizationUnavailableError,
+} from "@/lib/auth/research-user";
 
-export type GateResult =
-  | { ok: true; userId: string }
+const researchAccessGrantBrand: unique symbol = Symbol("researchAccessGrant");
+const aiUsageGrantBrand: unique symbol = Symbol("aiUsageGrant");
+
+export type ResearchAccessGrant = {
+  readonly userId: string;
+  readonly [researchAccessGrantBrand]: true;
+};
+
+export type AIUsageGrant<S extends AISurface = AISurface> = {
+  readonly surface: S;
+  readonly userId: string;
+  readonly [aiUsageGrantBrand]: true;
+};
+
+export type ResearchGateResult =
+  | { ok: true; userId: string; grant: ResearchAccessGrant }
   | { ok: false; response: Response };
 
-/**
- * Run the auth → key → rate-limit gate sequence for an AI route.
- * On success returns the authenticated user id. On failure returns
- * a Response the caller should return directly.
- *
- * Usage in a route:
- *
- *   const gate = await gateAIRequest("advisor");
- *   if (!gate.ok) return gate.response;
- *   // ... proceed with gate.userId
- */
-export async function gateAIRequest(surface: AISurface): Promise<GateResult> {
-  try {
-    const user = await requireAuthenticatedUser();
-    requireAIKey(surface);
-    requireWithinAILimit(user.id, surface);
-    return { ok: true, userId: user.id };
-  } catch (err) {
-    // The provider errors are MISCONFIGURATION, not client error — a 500
-    // with the message intact, because the message names the exact env
-    // value at fault and the exact command to fix it. Swallowing them into
-    // a generic 500 would throw that away. They surface here because
-    // requireAIKey now resolves the provider in order to know which key to
-    // check.
-    if (
-      err instanceof UnauthenticatedError ||
-      err instanceof MissingAIKeyError ||
-      err instanceof AIRateLimitError ||
-      err instanceof UnknownProviderError ||
-      err instanceof ProviderNotInstalledError
-    ) {
-      const body: Record<string, unknown> = { error: err.message };
-      const headers: Record<string, string> = {};
-      if (err instanceof AIRateLimitError) {
-        body.retry_after_ms = err.retry_after_ms;
-        headers["Retry-After"] = String(Math.ceil(err.retry_after_ms / 1000));
-      }
-      return {
-        ok: false,
-        response: Response.json(body, { status: err.status, headers }),
-      };
+export type AIGateResult<S extends AISurface = AISurface> =
+  | { ok: true; userId: string; grant: AIUsageGrant<S> }
+  | { ok: false; response: Response };
+
+function errorResponse(error: unknown): Response | null {
+  if (
+    error instanceof ResearchAuthenticationError ||
+    error instanceof ResearchAccessDeniedError ||
+    error instanceof ResearchAuthorizationUnavailableError ||
+    error instanceof MissingAIKeyError ||
+    error instanceof AIRateLimitError ||
+    error instanceof UnknownProviderError ||
+    error instanceof ProviderNotInstalledError
+  ) {
+    const body: Record<string, unknown> = { error: error.message };
+    const headers: Record<string, string> = {};
+    if (error instanceof AIRateLimitError) {
+      body.retry_after_ms = error.retry_after_ms;
+      headers["Retry-After"] = String(
+        Math.ceil(error.retry_after_ms / 1000),
+      );
     }
-    throw err;
+    return Response.json(body, { status: error.status, headers });
+  }
+  return null;
+}
+
+/** Authenticate and enforce the research allowlist, without touching AI config. */
+export async function gateResearchRequest(): Promise<ResearchGateResult> {
+  try {
+    const user = await requireResearchUser();
+    return {
+      ok: true,
+      userId: user.id,
+      grant: { userId: user.id, [researchAccessGrantBrand]: true },
+    };
+  } catch (error) {
+    const response = errorResponse(error);
+    if (response) return { ok: false, response };
+    throw error;
+  }
+}
+
+/** Resolve provider/key readiness and consume one process-local rate slot. */
+export function gateAIUsage<S extends AISurface>(
+  researchGrant: ResearchAccessGrant,
+  surface: S,
+): AIGateResult<S> {
+  if (
+    !researchGrant ||
+    researchGrant[researchAccessGrantBrand] !== true
+  ) {
+    throw new Error("Missing research access grant");
+  }
+  const userId = researchGrant.userId;
+  try {
+    requireAIKey(surface);
+    requireWithinAILimit(userId, surface);
+    return {
+      ok: true,
+      userId,
+      grant: { surface, userId, [aiUsageGrantBrand]: true },
+    };
+  } catch (error) {
+    const response = errorResponse(error);
+    if (response) return { ok: false, response };
+    throw error;
+  }
+}
+
+/** Runtime guard for provider libraries that require an issued usage grant. */
+export function assertAIUsageGrant<S extends AISurface>(
+  grant: AIUsageGrant<S>,
+  surface: S,
+): void {
+  if (
+    !grant ||
+    grant.surface !== surface ||
+    grant[aiUsageGrantBrand] !== true
+  ) {
+    throw new Error(`Missing AI usage grant for surface "${surface}"`);
   }
 }

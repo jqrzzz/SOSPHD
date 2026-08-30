@@ -7,16 +7,14 @@ import {
   decideRecommendation,
   getRecommendationById,
 } from "@/lib/data/store";
-import { createClient } from "@/lib/supabase/server";
 import {
   generateRecommendationsForCase,
   RecommendationError,
 } from "@/lib/recommendations";
 import {
-  requireAuthenticatedUser,
-  UnauthenticatedError,
-} from "@/lib/ai/config";
-import { requireWithinAILimit, AIRateLimitError } from "@/lib/ai/rate-limit";
+  gateAIUsage,
+  gateResearchRequest,
+} from "@/lib/ai/gate";
 import { EVENT_TYPES } from "@/lib/data/types";
 
 // ── Schemas ──────────────────────────────────────────────────────────
@@ -27,6 +25,21 @@ const addEventSchema = z.object({
   occurred_at: z.string().min(1, "Event time is required"),
   payload: z.string().default(""),
 });
+
+const generateRecommendationsSchema = z.object({
+  caseId: z.string().min(1).max(128),
+  count: z.number().int().min(1).max(5),
+});
+
+async function gateErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    if (typeof body.error === "string") return body.error;
+  } catch {
+    // Fall through to the stable generic message.
+  }
+  return "Request was not authorized";
+}
 
 // Per docs/audit-action-plan.md Decision C: SOSPHD does not create
 // cases. Cases originate in SOSCOMMAND. The former createCaseAction
@@ -40,6 +53,11 @@ export async function addEventAction(
   _prevState: { error?: string; success?: boolean } | null,
   formData: FormData,
 ) {
+  const research = await gateResearchRequest();
+  if (!research.ok) {
+    return { error: await gateErrorMessage(research.response) };
+  }
+
   const raw = {
     case_id: formData.get("case_id"),
     event_type: formData.get("event_type"),
@@ -53,25 +71,10 @@ export async function addEventAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  // Resolve the operator explicitly. Without this, addEvent's internal
-  // fallback would stamp actor_id = "system" for an unauthenticated
-  // caller — mislabeling provenance as trigger-synced. Operator-typed
-  // events must carry a real operator id (same rule as decideRecommendationAction).
-  let actorId: string;
-  try {
-    const user = await requireAuthenticatedUser();
-    actorId = user.id;
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      return { error: err.message };
-    }
-    throw err;
-  }
-
   // addEvent throws on DB failure; return the { error } envelope this
   // form renders instead of letting the action explode unhandled.
   try {
-    await addEvent({ ...parsed.data, actor_id: actorId });
+    await addEvent({ ...parsed.data, actor_id: research.userId });
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to add event",
@@ -102,8 +105,17 @@ export async function decideRecommendationAction(
   decision: "accept" | "override",
   overrideReason?: string,
 ): Promise<{ error?: string; success?: boolean }> {
+  const research = await gateResearchRequest();
+  if (!research.ok) {
+    return { error: await gateErrorMessage(research.response) };
+  }
+
   if (!recommendationId) {
     return { error: "Missing recommendation id" };
+  }
+
+  if (decision === "override" && (!overrideReason || !overrideReason.trim())) {
+    return { error: "Override requires a reason" };
   }
 
   const existing = await getRecommendationById(recommendationId);
@@ -113,33 +125,9 @@ export async function decideRecommendationAction(
   if (existing.accepted !== null) {
     return { error: "Decision has already been recorded for this recommendation" };
   }
-  if (decision === "override" && (!overrideReason || !overrideReason.trim())) {
-    return { error: "Override requires a reason" };
-  }
 
-  // Resolve the authenticated user once — the same id goes onto both the
-  // recommendation row (decided_by) and the audit NOTE (actor_id) so the
-  // two records stay consistent.
-  let actorId: string;
-  try {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
-      return {
-        error:
-          "Not authenticated — sign in before deciding recommendations. Paper 2 provenance requires a real operator id.",
-      };
-    }
-    actorId = data.user.id;
-  } catch (err) {
-    return {
-      error:
-        err instanceof Error
-          ? `Auth check failed: ${err.message}`
-          : "Auth check failed",
-    };
-  }
-
+  // The allowlisted operator id is used for both records so provenance agrees.
+  const actorId = research.userId;
   const accepted = decision === "accept";
   const decidedAt = new Date().toISOString();
   try {
@@ -183,29 +171,28 @@ export async function generateRecommendationsAction(
   caseId: string,
   count: number = 3,
 ): Promise<{ error?: string; success?: boolean; count?: number }> {
-  // Same auth + rate-limit gate the HTTP route applies via gateAIRequest.
-  // Without it, the UI-button path reached the paid LLM with no explicit
-  // auth check and no rate limit — middleware alone stood between a retry
-  // loop and unbounded OpenAI spend.
-  try {
-    const user = await requireAuthenticatedUser();
-    requireWithinAILimit(user.id, "recommendations");
-  } catch (err) {
-    if (
-      err instanceof UnauthenticatedError ||
-      err instanceof AIRateLimitError
-    ) {
-      return { error: err.message };
-    }
-    throw err;
+  const research = await gateResearchRequest();
+  if (!research.ok) {
+    return { error: await gateErrorMessage(research.response) };
+  }
+
+  const parsed = generateRecommendationsSchema.safeParse({ caseId, count });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid request" };
+  }
+
+  const usage = gateAIUsage(research.grant, "recommendations");
+  if (!usage.ok) {
+    return { error: await gateErrorMessage(usage.response) };
   }
 
   try {
     const recommendations = await generateRecommendationsForCase({
-      caseId,
-      count,
+      caseId: parsed.data.caseId,
+      count: parsed.data.count,
+      grant: usage.grant,
     });
-    revalidatePath(`/cases/${caseId}`);
+    revalidatePath(`/cases/${parsed.data.caseId}`);
     return { success: true, count: recommendations.length };
   } catch (err) {
     if (err instanceof RecommendationError) {

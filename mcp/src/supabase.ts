@@ -72,9 +72,30 @@ function loadCredentials(): Credentials {
 let client: SupabaseClient | null = null;
 let userId: string | null = null;
 
+/** Fail closed unless the signed-in session is in research.allowed_users. */
+export async function assertResearchAllowlisted(
+  sb: SupabaseClient,
+): Promise<void> {
+  const { data, error } = await sb
+    .schema("research")
+    .rpc("is_allowed_user");
+  if (error || data !== true) {
+    throw new Error("SOSPHD MCP: research access denied");
+  }
+}
+
 /** Signed-in, RLS-scoped client + the owner's auth uid (for user_id columns). */
 export async function getSession(): Promise<{ sb: SupabaseClient; userId: string }> {
-  if (client && userId) return { sb: client, userId };
+  if (client && userId) {
+    try {
+      await assertResearchAllowlisted(client);
+      return { sb: client, userId };
+    } catch (error) {
+      client = null;
+      userId = null;
+      throw error;
+    }
+  }
   const creds = loadCredentials();
   const sb = createClient(creds.url, creds.anonKey, {
     auth: { persistSession: false, autoRefreshToken: true },
@@ -88,6 +109,7 @@ export async function getSession(): Promise<{ sb: SupabaseClient; userId: string
       `SOSPHD MCP: Supabase sign-in failed — ${error?.message ?? "no user returned"}`,
     );
   }
+  await assertResearchAllowlisted(sb);
   client = sb;
   userId = data.user.id;
   return { sb: client, userId };
