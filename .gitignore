@@ -12,3 +12,6 @@ tsconfig.tsbuildinfo
 
 # Local gstack QA/review evidence (kept on disk, never committed)
 .gstack/
+
+# Disposable database-contract result (uploaded by CI, not committed)
+/test-results/db-contract-summary.json

@@ -53,3 +53,30 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+  database-contract:
+    name: Disposable database contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Run isolated migration and role contracts
+        run: pnpm run test:db
+
+      - name: Upload sanitized database-contract summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: database-contract-summary
+          path: test-results/db-contract-summary.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -190,6 +190,10 @@ uses `INSERT ... ON CONFLICT ON CONSTRAINT case_events_dedup_unique DO NOTHING`.
 The constraint is `UNIQUE (case_id, event_type, occurred_at, actor_id)`. Because
 the functions are `SECURITY DEFINER`, they bypass RLS — which is why tightening
 the `research.case_events` policies in migration 008 did not break the sync.
+Migration `20260830100628` restores that atomic writer after migration 020
+temporarily regressed it, gives all six internal writers an empty `search_path`,
+and removes direct execution from `PUBLIC`, `anon`, and `authenticated`. Trigger
+execution still works; Data API clients cannot call the writers as RPCs.
 
 Trigger-written rows carry `actor_id` = the case owner's UUID or the literal
 `'system'`. Backfilled rows carry `actor_id = 'historical_backfill'`. Operator-typed
@@ -673,12 +677,15 @@ Four layers, in order of encounter:
    the mutation files also appends `.eq("user_id", userId)`, so a misconfigured
    policy alone would not permit a cross-user write.
 
-`SECURITY DEFINER` functions (`research.upsert_case_event`,
-`research.is_allowed_user`) deliberately bypass RLS. That is why database triggers
-can write `research.case_events` despite the allowlist.
+`SECURITY DEFINER` functions deliberately bypass RLS for two narrow reasons. The
+five `research.on_*` trigger functions and `research.upsert_case_event` form an
+internal-only operational sync chain. `research.is_allowed_user` is the one
+authenticated RPC and returns only the current session's membership result.
 
-Grants (migration 004): `authenticated` gets `ALL` on all `research` tables,
-`anon` gets `SELECT`. RLS is what actually filters rows for both.
+Migration 009 replaced migration 004's broad grants with app-shaped DML grants
+and removed anonymous table access. Migration `20260830100628` also revokes all
+client table privileges on `research.allowed_users`; authenticated code reaches
+that table only through `research.is_allowed_user()`.
 
 There is deliberately **no `SUPABASE_SERVICE_ROLE_KEY`** anywhere in the codebase.
 `.env.example` states this and says not to add one, because it would bypass every

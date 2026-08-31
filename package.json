@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:db": "node scripts/test-db-contract.mjs",
     "test:watch": "vitest",
     "verify:figures": "node scripts/verify-paper-figures.mjs",
     "verify:security": "node scripts/verify-security-invariants.mjs"

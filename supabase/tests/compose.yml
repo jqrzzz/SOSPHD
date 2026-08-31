@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:15.18-bookworm@sha256:e8db9bd3e9e1751eb639fb17be53cc6d1b62a322adf75b99e791767a7a16ce69
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sosphd-contract-local-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=postgres --dbname=postgres"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    restart: "no"
+    stop_grace_period: 10s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - contract-only
+
+volumes:
+  postgres-data:
+
+networks:
+  contract-only:
+    internal: true
