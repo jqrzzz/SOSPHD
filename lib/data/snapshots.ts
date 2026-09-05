@@ -27,6 +27,7 @@ import {
   computeMissingness,
 } from "./analytics";
 import { classifyAllInterventions } from "./intervention";
+import { loadPaper1Evidence } from "./paper1-snapshot";
 
 export interface SnapshotMeta {
   id: string;
@@ -40,14 +41,25 @@ export interface SnapshotMeta {
 }
 
 /**
- * Compute the current analysis batch and persist it as a frozen
- * snapshot. Three data round-trips (the standard batch) + one insert.
+ * Read the complete, paginated Paper 1 baseline, then compute the existing
+ * dashboard analysis batch and persist both in one frozen snapshot.
  */
 export async function createAnalysisSnapshot(
   label: string,
   note?: string | null,
 ): Promise<SnapshotMeta> {
   const { supabase: sb, userId } = await requireAuthOrThrow();
+
+  let access;
+  try {
+    access = await sb.schema("research").rpc("is_allowed_user");
+  } catch {
+    throw new Error("Research access required to freeze a snapshot.");
+  }
+  if (access.error || access.data !== true) {
+    throw new Error("Research access required to freeze a snapshot.");
+  }
+  const paper1 = await loadPaper1Evidence(sb);
 
   const [allCases, allEvents, allRecs] = await Promise.all([
     getCases(),
@@ -57,6 +69,7 @@ export async function createAnalysisSnapshot(
 
   const payload = {
     generated_at: new Date().toISOString(),
+    paper1,
     summary: computeDashboardSummary(allCases, allEvents, allRecs),
     rows: computeCaseMetricRows(allCases, allEvents, allRecs),
     missingness: computeMissingness(allCases, allEvents),
