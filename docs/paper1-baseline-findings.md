@@ -1,5 +1,13 @@
 # Paper 1 — Baseline Findings Memo (v0.1)
 
+> **Submission-readiness update (2026-08-31):** the live manuscript census,
+> primary-source citation corrections, seasonality recommendation, and v1.0
+> release gate are in
+> [`paper1-submission-readiness-2026-08-31.md`](paper1-submission-readiness-2026-08-31.md).
+> This memo is a historical working record and still contains superseded counts.
+> Do not use any figure for submission until it is reconciled to the frozen
+> baseline snapshot and the current verifier assertions.
+
 **Date**: 2026-08-14 · **Dataset**: `research.cases` where
 `source='backfill_2018_2023'` — ingest batches
 `c201c6c2-3f5d-41db-8f06-40bfdef82b82` (665) + `b3264682-d691-4cec-9d0f-ece4fb62a3cd` (171).
@@ -36,7 +44,8 @@ reported as missingness, not seasonality.
 ## 3. Who the patients are
 
 Top nationalities: UK 119, Germany 64, US 51, Russia 44, Canada 41, Poland 33,
-Spain 32, Sweden 30, Finland 28, France 26 — a long tail across 67 countries.
+Spain 32, Sweden 30, Finland 28, France 26 — a long tail across 68 identified
+nationalities.
 Tourist-origin diversity is itself a coordination-friction finding (language,
 payer jurisdiction, insurer variety).
 

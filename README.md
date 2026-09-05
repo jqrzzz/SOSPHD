@@ -2,9 +2,13 @@
 
 PhD research automation tool for **Juan Quiroz Jr.**, part of the [Tourist SOS](https://tourist-sos.com) ecosystem.
 
-**Thesis.** *Human-AI coordination reduces measurable delay and access friction in tourist emergencies across heterogeneous health systems.*
+**Thesis.** *This research tests whether prospectively instrumented,
+human-in-the-loop coordination can reduce measurable delay and access friction
+in tourist emergencies across heterogeneous health systems.*
 
 This app is the research workbench: it captures the field data, runs the AI intervention that Paper 2 measures, and produces the figures that go into the manuscripts.
+
+**Current execution:** [Outcome Portfolio — 2026-08-31](docs/outcome-portfolio-2026-08-31.md)
 
 ---
 
@@ -41,7 +45,7 @@ SOSPHD is **one of six apps** sharing a single Supabase project (`jnbxkvlkqmwnql
 | `/workspace` | Mind maps, uploads, notes, tasks. |
 | `/advisor` | Streaming AI research assistant with case + metric context. |
 
-The **central paper-2 mechanism** is at `/cases/[id]`: an AI recommendation engine surfaces 1–3 coordination suggestions per case, the operator accepts or overrides each one (overrides require a written reason), and every decision lands in both `research.recommendations` (denormalized columns) and `research.case_events` (immutable NOTE event) so the provenance chain is queryable two ways.
+The **central paper-2 mechanism** is at `/cases/[id]`: an AI recommendation engine surfaces 1–3 coordination suggestions per case, and the operator accepts or overrides each one (overrides require a written reason). The action commits the decision to `research.recommendations` first, then mirrors it to `research.case_events` as an immutable NOTE. These are sequential rather than transactional writes; the recommendation row is authoritative if the NOTE insert fails, and the missing mirror requires reconciliation.
 
 ---
 
@@ -53,7 +57,7 @@ The **central paper-2 mechanism** is at `/cases/[id]`: an AI recommendation engi
 
 Event timestamps come from two sources, distinguishable by `actor_id`:
 1. **Operator-entered** events (`actor_id` = the signed-in user's UUID) — typed via the case detail event form.
-2. **SOSCOMMAND-synced** events (`actor_id = 'soscommand_sync'`) — materialized by **database triggers** in `supabase/migrations/20260402_003_auto_sync_triggers.sql` and `20260519_006_case_events_dedup_and_triage.sql`. Whenever SOSCOMMAND writes to `public.cases.intake_date`/`triage_at`/etc., `case_transport.*`, `guarantees_of_payment.*`, or `case_episodes.*`, the trigger emits the corresponding `research.case_events` row, dedup'd at `(case_id, event_type, occurred_at, actor_id)`.
+2. **SOSCOMMAND-synced** events (`actor_id = 'soscommand_sync'`) — materialized by **database triggers** in `supabase/migrations/20260402_003_auto_sync_triggers.sql` and `20260519_006_case_events_dedup_and_triage.sql`. Writes to the configured fields on `public.cases`, `public.guarantees_of_payment`, or `public.case_episodes` emit the corresponding `research.case_events` row, dedup'd at `(case_id, event_type, occurred_at, actor_id)`.
 
 ---
 
@@ -102,9 +106,10 @@ pnpm run lint         # ESLint v9 flat config
 pnpm exec tsc --noEmit  # TypeScript strict check
 pnpm run build        # production build
 pnpm test             # Vitest unit tests
+pnpm run test:db      # disposable PostgreSQL contracts (Docker required)
 ```
 
-CI runs all four on every push and PR (`.github/workflows/ci.yml`).
+CI runs all five on every push and PR (`.github/workflows/ci.yml`).
 
 ---
 
@@ -112,7 +117,7 @@ CI runs all four on every push and PR (`.github/workflows/ci.yml`).
 
 The schema lives in `supabase/migrations/`. The files that matter most for SOSPHD specifically:
 
-- `20260516_004_research_schema_snapshot.sql` — full DDL for the `research.*` schema (10 tables, 7 enums, RLS policies, indexes). Authoritative; idempotent. A fresh clone applying migrations in order reaches the same state the live project has.
+- `20260516_004_research_schema_snapshot.sql` — full DDL for the `research.*` schema (10 tables, 7 enums, RLS policies, indexes). Authoritative; idempotent. A fresh clone applying repository migrations in order reaches the repository-intended research schema; the hosted shared project may lag until later migrations are separately reviewed and applied.
 - `20260516_005_recommendations_decision_audit.sql` — adds `decided_by` + `decided_at` to `research.recommendations` with a CHECK constraint enforcing the pending/decided invariant.
 - `20260519_006_case_events_dedup_and_triage.sql` — the `(case_id, event_type, occurred_at, actor_id)` dedup constraint + the TRIAGE_COMPLETE trigger.
 - `20260528_008_research_cases_allowlist.sql` — `research.cases` dimension + the SD-001 `allowed_users` allowlist gating the research spine.
@@ -127,7 +132,7 @@ The shared Supabase project has 400+ other migrations owned by SOSCOMMAND, SOSWE
 - **Server actions** (`lib/*-actions.ts`) — zod-validated, call mutation functions, revalidate paths. Auth-gated, return `{ error }` envelopes on failure.
 - **Reads** (`lib/data/*-store.ts`) — typed wrappers over Supabase queries. Reads can fall back to seed data in dev (with a `[SOSPHD:DEGRADED]` log).
 - **Writes** (`lib/data/*-mutations.ts`) — server-only mutation paths using `requireAuthOrThrow`. Surface errors loudly via thrown exceptions; no silent failure.
-- **Analytics** (`lib/data/analytics.ts`) — pure aggregators with a strict performance contract: every aggregator uses exactly **three** database round-trips regardless of dataset size. Pure `computeDashboardSummary` / `computeCaseMetricRows` allow callers to share a single batch across multiple aggregators (e.g. `buildPaperContext`).
+- **Analytics** (`lib/data/analytics.ts`) — pure aggregators use bounded batched reads rather than per-row queries; current main paths use two or three database round-trips regardless of dataset size. Pure `computeDashboardSummary` / `computeCaseMetricRows` allow callers to share a single batch across multiple aggregators (e.g. `buildPaperContext`).
 - **Sync** — handled by **database triggers** (migration `20260402_003_auto_sync_triggers.sql`), not application code. SOSCOMMAND writes → `research.case_events` is automatic.
 - **AI config** (`lib/ai/config.ts`) — single source of truth for model selection + auth-gate helpers for LLM endpoints. Per-surface env overrides for Paper 2 engine comparison.
 - **Protocol** (`lib/protocol.ts`) — `PROTOCOL_VERSION` constant. The full prose lives at `/protocol`.
