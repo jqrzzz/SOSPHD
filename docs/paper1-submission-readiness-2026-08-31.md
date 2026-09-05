@@ -227,8 +227,8 @@ Before calling the paper v1.0:
 - [ ] create a new `doc_versions` row preserving the full prior manuscript;
 - [ ] remove each dagger only after the corrected claim and citation are in place;
 - [ ] ensure no body-level `[REF:]` or unresolved `[ACTION:]` remains;
-- [ ] implement snapshot-bound figure verification, then run it against the named
-      baseline snapshot;
+- [ ] run `corepack pnpm verify:figures --snapshot "path/to/download.json"` against
+      the named baseline download, following the [snapshot verification guide](paper1-snapshot-verification.md);
 - [ ] confirm every headline number matches the frozen release;
 - [ ] render the target-journal manuscript and supplementary material;
 - [ ] perform a final citation-to-claim audit.

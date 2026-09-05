@@ -111,6 +111,8 @@ pnpm run test:db      # disposable PostgreSQL contracts (Docker required)
 
 CI runs all five on every push and PR (`.github/workflows/ci.yml`).
 
+For Paper 1 release figures, follow the [frozen snapshot verification guide](docs/paper1-snapshot-verification.md).
+
 ---
 
 ## Database
