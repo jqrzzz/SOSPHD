@@ -1,5 +1,11 @@
 # Admissions blindspots — 2026-08-16
 
+> **Official-source update (2026-08-31):** Mahidol, NUS, and HKU were
+> re-verified and re-ranked in
+> [`admissions-funding-verification-2026-08-31.md`](admissions-funding-verification-2026-08-31.md).
+> Use that document for current decisions; this file remains the historical
+> record of the earlier search-index pass.
+
 What the top schools require, what nobody has established, and why the app now
 measures the second thing rather than only the first.
 

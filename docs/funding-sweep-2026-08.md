@@ -1,5 +1,11 @@
 # Funding sweep — 2026-08-14
 
+> **Official-source update (2026-08-31):** the actionable shortlist and
+> corrections are in
+> [`admissions-funding-verification-2026-08-31.md`](admissions-funding-verification-2026-08-31.md).
+> The live database still has zero funding rows marked verified; do not act on
+> this original sweep without checking the newer verification record.
+
 Produced by a 14-agent research + adversarial-verification sweep (7 funding domains,
 each researched then attacked by an independent verifier). **90 raw candidates → 32
 survivors.** Everything below is recorded in `research.funding_opportunities` and shown

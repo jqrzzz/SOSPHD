@@ -1,5 +1,9 @@
 # Funder contact routes — verified 2026-08-15
 
+> **Official-source update (2026-08-31):** Laerdal, Fulbright Thailand, the
+> NUS Research Scholarship, and the paused RSTMH route are re-triaged in
+> [`admissions-funding-verification-2026-08-31.md`](admissions-funding-verification-2026-08-31.md).
+
 Produced by a 10-agent search + adversarial-verification workflow over the eleven
 company-eligible funding opportunities. **15 routes found → 14 survived, 1 rejected.**
 

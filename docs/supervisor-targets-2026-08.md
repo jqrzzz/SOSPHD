@@ -1,5 +1,10 @@
 # Supervisor and funder targets — verified 2026-08-15
 
+> **Status update (2026-08-31):** the live database now contains three contacts
+> with verified email provenance, so the zero-address statement below is no
+> longer current. Programme-level decisions for Mahidol, NUS, and HKU are in
+> [`admissions-funding-verification-2026-08-31.md`](admissions-funding-verification-2026-08-31.md).
+
 Produced by a 12-agent search + adversarial-verification workflow (5 institutions + funders,
 each output attacked by an independent verifier). **36 candidates found → 33 survived, 3 removed.**
 
