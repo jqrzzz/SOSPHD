@@ -3,6 +3,11 @@
 Status: development contract, 7 September 2026. This does not grant study,
 clinical, production-database, publication or spending authorization.
 
+For research audits and substantive manuscript revisions, also follow the
+[Academic Research Standard](academic-research-standard.md). It separates
+source correspondence, event meaning, interpretation and release decisions;
+it is a working procedure, not a claim of automatic application enforcement.
+
 ## Principle
 
 Be ambitious about what we investigate, precise about what evidence establishes,
