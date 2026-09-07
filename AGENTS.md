@@ -9,6 +9,23 @@ The preferred interface is the **SOSPHD MCP server** in `mcp/` (see
 exists for agents that reach the database another way (e.g. a Supabase SQL
 connector) and as the contract both paths follow.
 
+## Research writing and development
+
+Read [the research writing policy](docs/research-writing-policy.md) before
+writing or revising research content. The owner may authorize substantive
+rewriting, reorganization, alternative designs and labelled simulations now;
+that permission is not limited to stylistic editing. Preserve recoverable
+versions, evidence boundaries and all database/privacy rules below.
+
+Treat claims that human-AI coordination reduces delay as hypotheses to test,
+not established findings. Earlier work-tranche exclusions are scoped deferrals,
+not permanent bans on useful development. This does not waive research ethics,
+consent, production-write, cost or publication approval requirements.
+
+This repository is public. Do not commit private live manuscripts, annotations,
+case-level material, credentials or database exports. Use synthetic test fixtures
+and keep private draft revisions in the authenticated research workflow.
+
 ## Hard rules (non-negotiable)
 
 1. **Write to `research.*` only.** The Supabase project is shared by six SOS
@@ -54,7 +71,7 @@ All are in schema `research`, all have RLS `auth.uid() = user_id`, so
 | `journal_entries` | `user_id, entry_type, title, content, location?, corridor?, tags[], consent_status, consent_method?, consent_jurisdiction?` | `entry_type` ∈ observation, conversation, interview, site_visit, event, idea, media. |
 | `contacts` | `user_id, name, role, organization?, title?, email?, phone?, location?, corridor?, notes?, tags[]` | `role` ∈ doctor, nurse, hospital_admin, insurance, embassy, transport, government, academic, ngo, fixer, other. |
 | `mind_maps` | update `nodes` / `edges` (JSONB arrays), `updated_at` | Node: `{id, x, y, label, color, radius, nodeType?, origin?}`. Edge: `{id, from, to, label?}`. Never replace the arrays wholesale — append/modify. Agent node ids use an `ag-` prefix. |
-| `docs` + `doc_versions` | append to `docs.content_md`, bump `updated_at`; insert a `doc_versions` row (`doc_id, user_id, content_md, note`) with the new full content | Never overwrite a doc's content destructively. |
+| `docs` + `doc_versions` | Revise `docs.content_md` through the authenticated, version-preserving workflow. Verify a recoverable full prior version before saving the full revised version with a change note and updated timestamp. | Substantive rewriting, restructuring and deletion of weak prose are allowed. Never discard history or replace a full manuscript with a partial generation. |
 | `doc_annotations` | READ open annotations before revising a doc (`quote` = the passage, `comment` = what to change). Do not resolve or delete them — resolution is the owner's judgement in the app. | The paper-revision loop: annotate → revise → new version → owner resolves. |
 | `institutions`, `institution_requirements` | `source_url` is REQUIRED on every row. Set `verified_at` ONLY after reading the official page for the **current** admissions cycle — a date inferred from a previous year stays NULL and the UI marks it unverified. | A wrong deadline costs a whole application cycle. Same discipline as the `[REF:]` placeholders in the papers: never state what you have not checked. |
 | `outreach` | Write DRAFTS only (`status='draft'`). Never set `status='sent'` or send mail on the owner's behalf. Set `institution_id` for supervisor approaches, `opportunity_id` for funder approaches. | First contact with a prospective supervisor or donor is a one-shot impression; the owner reviews and sends. |
