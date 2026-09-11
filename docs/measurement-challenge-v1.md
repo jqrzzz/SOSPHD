@@ -15,6 +15,8 @@ The pure evaluator in `scripts/lib/measurement-challenge.mjs` consumes already-c
 events. It does NOT extract events from text, choose a clinically correct source,
 validate whether a commitment or treatment really occurred, or establish a causal effect.
 
+**Common fictional calculation context:** Unless explicitly replaced or made uncertain by a scenario, use 15 January 2030, UTC+07:00, first documented operator awareness at 10:00, the same synthetic episode and its first outbound leg A. Date-only, unzoned and unknown-time scenarios override that default; do not use the default to fill their missing evidence. These are stated exercise assumptions, not established clinical facts.
+
 ## Coding order
 
 1. Identify the episode, intended endpoint, and transport leg where relevant.
