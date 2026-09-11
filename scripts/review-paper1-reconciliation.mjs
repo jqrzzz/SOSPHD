@@ -5,7 +5,7 @@ import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parseArgs } from "node:util";
+import { parseArgs, TextDecoder } from "node:util";
 import { buildPaper1ReviewReport, renderPaper1ReviewMarkdown, ReviewInputError } from "./lib/paper1-review-report.mjs";
 
 export const MAX_INPUT_BYTES = 4 * 1024 * 1024;
