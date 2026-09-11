@@ -32,6 +32,11 @@ export function registerScholarlyTests(test) {
     ["duplicated location", (f) => { f.manuscript = Buffer.from(f.manuscript.toString().repeat(2)); f.manifest.manuscript.sha256 = sha256(f.manuscript); }],
   ]) test(`reports mismatch: ${name}`, () => { const f = fixture(); mutate(f); assert.equal(run(f).result, "mismatch"); });
   for (const [name, mutate] of [
+    ["array version", (f) => { f.manifest.manuscript.version = ["0.1"]; }],
+    ["array manuscript hash", (f) => { f.manifest.manuscript.sha256 = [f.manifest.manuscript.sha256]; }],
+    ["array evidence hash", (f) => { f.manifest.evidence[0].sha256 = [f.manifest.evidence[0].sha256]; }],
+    ["version prefix substitution", (f) => { f.manifest.manuscript.marker = "# Paper 1 v0.13"; }],
+    ["non-snapshot label", (f) => { f.manifest.evidence[0].label = "authenticated-release"; }],
     ["empty claims", (f) => { f.manifest.claims = []; }],
     ["duplicate claim IDs", (f) => { f.manifest.claims.push({ ...f.manifest.claims[0] }); }],
     ["duplicate evidence IDs", (f) => { f.manifest.evidence.push({ ...f.manifest.evidence[0] }); }],

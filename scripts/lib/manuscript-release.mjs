@@ -6,6 +6,7 @@ export const RELEASE_FORMAT = "sosphd-manuscript-release-v1";
 export const MAX_BYTES = 4 * 1024 * 1024;
 const ID = /^[a-z][a-z0-9._-]{0,63}$/;
 const SHA = /^[a-f0-9]{64}$/;
+const validSha = (value) => typeof value === "string" && SHA.test(value);
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const object = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
 const count = (x) => Number.isSafeInteger(x) && x >= 0;
@@ -44,16 +45,16 @@ function parseManifest(bytes) {
   requireValid(keys(m, ["format", "paper", "manuscript", "evidence", "claims"]));
   requireValid(m.format === RELEASE_FORMAT && m.paper === "paper1");
   requireValid(keys(m.manuscript, ["version", "sha256", "marker"]));
-  requireValid(/^\d{1,3}\.\d{1,3}(?:\.\d{1,3})?$/.test(m.manuscript.version) && SHA.test(m.manuscript.sha256));
+  requireValid(typeof m.manuscript.version === "string" && /^\d{1,3}\.\d{1,3}(?:\.\d{1,3})?$/.test(m.manuscript.version) && validSha(m.manuscript.sha256));
   requireValid(typeof m.manuscript.marker === "string" && m.manuscript.marker.length <= 300 &&
-    m.manuscript.marker.includes(`v${m.manuscript.version}`));
+    new RegExp(`(?:^|[^A-Za-z0-9])v${m.manuscript.version.replaceAll(".", "\\.")}(?![A-Za-z0-9.])`).test(m.manuscript.marker));
   requireValid(Array.isArray(m.evidence) && m.evidence.length > 0 && m.evidence.length <= 4);
   const ids = new Set();
   for (const e of m.evidence) {
     requireValid(keys(e, ["id", "format", "sha256", "label"]));
     requireValid(typeof e.id === "string" && ID.test(e.id) && !ids.has(e.id)); ids.add(e.id);
-    requireValid(formats.includes(e.format) && SHA.test(e.sha256) && typeof e.label === "string" && e.label.length <= 120);
-    requireValid(e.format !== "paper1-snapshot-v1" || e.label.trim().length > 0);
+    requireValid(formats.includes(e.format) && validSha(e.sha256) && typeof e.label === "string" && e.label.length <= 120);
+    requireValid(e.format === "paper1-snapshot-v1" ? e.label.trim().length > 0 : e.label === "");
   }
   requireValid(Array.isArray(m.claims) && m.claims.length > 0 && m.claims.length <= 100);
   const claims = new Set();
