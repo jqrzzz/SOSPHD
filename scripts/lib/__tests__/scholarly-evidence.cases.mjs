@@ -63,7 +63,7 @@ export function registerScholarlyTests(test) {
   });
   test("snapshot profile does not apply old manuscript constants", () => {
     const f = fixture(); f.manifest.evidence[0].format = "paper1-snapshot-v1"; f.manifest.evidence[0].label = "synthetic-release";
-    f.data = { meta: { label: "synthetic-release", created_at: "2030-01-01T00:00:01Z" }, payload: { paper1: { version: 1, source: "backfill_2018_2023", capture: { started_at: "2030-01-01T00:00:00Z", ended_at: "2030-01-01T00:00:01Z" }, case_count: 3, event_count: 3, interval_count: 2, figures: { total_cases: 3, thailand_cases: 2, first_contact: 2, transport: 1, computable_ttta: 0, computable_ttgp: 0, computable_ttdc: 0 } } };
+    f.data = { meta: { label: "synthetic-release", created_at: "2030-01-01T00:00:01Z" }, payload: { paper1: { version: 1, source: "backfill_2018_2023", capture: { started_at: "2030-01-01T00:00:00Z", ended_at: "2030-01-01T00:00:01Z" }, case_count: 3, event_count: 3, interval_count: 2, figures: { total_cases: 3, thailand_cases: 2, first_contact: 2, transport: 1, computable_ttta: 0, computable_ttgp: 0, computable_ttdc: 0 } } } };
     f.manifest.claims[0].field = "total_cases"; f.manifest.evidence[0].sha256 = sha256(bytes(f.data));
     assert.equal(run(f).result, "declared_checks_agree");
     f.data.meta.label = "another-snapshot"; assert.throws(() => run(f), ReleaseInputError);
