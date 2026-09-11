@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   getAnnotationsByDocId,
@@ -36,6 +37,9 @@ export default async function DocDetailPage(props: {
         <DocWorkspace doc={doc} cases={cases} />
 
         <aside className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-t border-border bg-card/50 p-4 lg:w-72 lg:border-l lg:border-t-0">
+          <Link href={`/docs/${doc.id}/revise`} target="_blank" rel="noopener noreferrer" prefetch={false} className="rounded-md border border-border p-3 text-sm font-medium hover:bg-accent">
+            Revise saved sections in a new tab
+          </Link>
           <DocAnnotations docId={doc.id} annotations={annotations} />
           <DocAITools docId={doc.id} />
           <DocVersions docId={doc.id} versions={versions} />
