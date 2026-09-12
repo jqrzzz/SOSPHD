@@ -1,0 +1,39 @@
+name: Fieldwork acceptance
+on:
+  pull_request:
+    paths:
+      - 'app/fieldwork/**'
+      - 'components/fieldwork/**'
+      - 'lib/fieldwork/**'
+      - 'lib/data/fieldwork-*.ts'
+      - 'lib/fieldwork-actions.ts'
+      - 'scripts/browser/fieldwork*'
+      - '.github/workflows/fieldwork-acceptance.yml'
+permissions:
+  contents: read
+concurrency:
+  group: fieldwork-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-checkpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # Temporary implementation checkpoint. Only tracked public source, no
+      # dependencies, credentials, private evidence or workspace files.
+      - name: Preserve exact reviewed source
+        run: |
+          mkdir -p /tmp/sosphd-fieldwork-source
+          git archive --format=zip --output=/tmp/sosphd-fieldwork-source/source.zip HEAD
+          git rev-parse HEAD > /tmp/sosphd-fieldwork-source/commit.txt
+          git ls-tree -r HEAD > /tmp/sosphd-fieldwork-source/tree.txt
+          sha256sum /tmp/sosphd-fieldwork-source/source.zip > /tmp/sosphd-fieldwork-source/sha256.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fieldwork-public-source-checkpoint
+          path: /tmp/sosphd-fieldwork-source/
+          if-no-files-found: error
+          retention-days: 1
