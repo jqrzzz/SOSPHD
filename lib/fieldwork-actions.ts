@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { JournalCaptureError } from "@/lib/fieldwork/journal-capture";
 import {
   createJournalEntry,
   updateJournalEntry,
@@ -18,9 +19,10 @@ import type { JournalEntryType, ContactRole } from "@/lib/data/fieldwork-types";
 // ── Schemas ─────────────────────────────────────────────────────────
 
 const journalSchema = z.object({
+  request_id: z.string().uuid().optional(),
   entry_type: z.enum(["observation", "conversation", "interview", "site_visit", "event", "idea", "media"]),
-  title: z.string().min(1, "Title is required"),
-  content: z.string().min(1, "Content is required"),
+  title: z.string().trim().min(1, "Title is required").max(300),
+  content: z.string().min(1, "Content is required").max(64000).refine((s) => !!s.trim() && !s.includes("\0"), "Details cannot be blank or contain a null character"),
   location: z.string().optional().default(""),
   corridor: z.string().optional().default(""),
   tags: z.string().optional().default(""),
@@ -54,11 +56,12 @@ export async function createJournalAction(
   formData: FormData,
 ) {
   const raw = {
+    request_id: formData.get("request_id") ?? undefined,
     entry_type: formData.get("entry_type"),
     title: formData.get("title"),
     content: formData.get("content"),
     location: formData.get("location") ?? "",
-    corridor: formData.get("corridor") ?? "",
+    corridor: formData.get("corridor") === "__none" ? "" : formData.get("corridor") ?? "",
     tags: formData.get("tags") ?? "",
     contact_ids: formData.get("contact_ids") ?? "",
     linked_case_id: formData.get("linked_case_id") ?? "",
@@ -69,7 +72,7 @@ export async function createJournalAction(
 
   const parsed = journalSchema.safeParse(raw);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { code: "invalid_input", error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
   const tagList = parsed.data.tags
@@ -82,6 +85,7 @@ export async function createJournalAction(
 
   try {
     const entry = await createJournalEntry({
+      request_id: parsed.data.request_id,
       entry_type: parsed.data.entry_type as JournalEntryType,
       title: parsed.data.title,
       content: parsed.data.content,
@@ -100,11 +104,12 @@ export async function createJournalAction(
           ? new Date().toISOString()
           : null,
     });
-    revalidatePath("/fieldwork");
+    try { revalidatePath("/fieldwork"); } catch { /* Persistence was confirmed independently. */ }
     return { success: true, id: entry.id };
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "Failed to create entry",
+      code: err instanceof JournalCaptureError ? err.code : "unconfirmed",
+      error: err instanceof JournalCaptureError ? err.message : "The save was not confirmed. Retry this same entry after checking research access; your text has not been cleared.",
     };
   }
 }
@@ -135,8 +140,12 @@ export async function deleteJournalAction(id: string) {
 }
 
 export async function togglePinAction(id: string, pinned: boolean) {
-  await updateJournalEntry(id, { is_pinned: pinned });
-  revalidatePath("/fieldwork");
+  try {
+    if (!z.string().uuid().safeParse(id).success || typeof pinned !== "boolean") return { error: "Invalid pin request." };
+    await updateJournalEntry(id, { is_pinned: pinned });
+    try { revalidatePath("/fieldwork"); } catch { /* The pin write succeeded. */ }
+    return { success: true };
+  } catch { return { error: "Pin change was not confirmed. Refresh before retrying." }; }
 }
 
 // ── Contact Actions ─────────────────────────────────────────────────
@@ -267,18 +276,24 @@ export async function startProtocolAction(
   templateId: string,
   data: { location?: string; corridor?: string; linked_contact_ids?: string[] },
 ) {
-  const protocol = await createProtocolFromTemplate(templateId, data);
-  if (!protocol) return { error: "Template not found" };
-  revalidatePath("/fieldwork");
-  return { success: true, id: protocol.id };
+  try {
+    if (!z.string().uuid().safeParse(templateId).success) return { error: "Invalid template identifier." };
+    const protocol = await createProtocolFromTemplate(templateId, data);
+    if (!protocol) return { error: "Template not found" };
+    try { revalidatePath("/fieldwork"); } catch { /* Creation was confirmed. */ }
+    return { success: true, id: protocol.id };
+  } catch { return { error: "Checklist creation was not confirmed. Refresh the list before trying again." }; }
 }
 
 export async function updateProtocolAction(
   id: string,
   data: Parameters<typeof updateProtocol>[1],
 ) {
-  const result = await updateProtocol(id, data);
-  if (!result) return { error: "Protocol not found" };
-  revalidatePath("/fieldwork");
-  return { success: true };
+  try {
+    if (!z.string().uuid().safeParse(id).success) return { error: "Invalid checklist identifier." };
+    const result = await updateProtocol(id, data);
+    if (!result) return { error: "Protocol not found" };
+    try { revalidatePath("/fieldwork"); } catch { /* Progress was confirmed. */ }
+    return { success: true };
+  } catch { return { error: "Checklist save was not confirmed. Your changes remain in this dialog." }; }
 }

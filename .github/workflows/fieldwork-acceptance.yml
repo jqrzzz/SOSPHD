@@ -1,4 +1,4 @@
-name: Fieldwork acceptance
+name: Fieldwork acceptance (synthetic backend)
 on:
   pull_request:
     paths:
@@ -8,6 +8,8 @@ on:
       - 'lib/data/fieldwork-*.ts'
       - 'lib/fieldwork-actions.ts'
       - 'scripts/browser/fieldwork*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/fieldwork-acceptance.yml'
 permissions:
   contents: read
@@ -15,9 +17,9 @@ concurrency:
   group: fieldwork-acceptance-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  source-checkpoint:
+  browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -27,30 +29,21 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      # Temporary implementation-only checkpoint for an egress-restricted
-      # test container. No credentials, private records or environment files.
-      - name: Preserve exact reviewed source
+      - run: pnpm install --frozen-lockfile
+      - name: Install isolated browser tools
         run: |
-          mkdir -p /tmp/sosphd-fieldwork-source
-          git archive --format=zip --output=/tmp/sosphd-fieldwork-source/source.zip HEAD
-          git rev-parse HEAD > /tmp/sosphd-fieldwork-source/commit.txt
-          git ls-tree -r HEAD > /tmp/sosphd-fieldwork-source/tree.txt
-          sha256sum /tmp/sosphd-fieldwork-source/source.zip > /tmp/sosphd-fieldwork-source/sha256.txt
-      - name: Install existing locked dependencies only
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm --dir mcp install --frozen-lockfile
-          tar -czf /tmp/sosphd-dependencies.tgz node_modules mcp/node_modules
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+          python -m venv /tmp/fieldwork-browser
+          /tmp/fieldwork-browser/bin/pip install playwright==1.55.0
+          /tmp/fieldwork-browser/bin/python -m playwright install --with-deps chromium
+      - name: Exercise real page and actions with fictional local persistence
+        run: /tmp/fieldwork-browser/bin/python scripts/browser/fieldwork_acceptance.py
+      - name: Upload synthetic acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: fieldwork-public-source-checkpoint
-          path: /tmp/sosphd-fieldwork-source/
+          name: fieldwork-browser-synthetic
+          path: |
+            test-results/fieldwork-browser/summary.json
+            test-results/fieldwork-browser/*.png
           if-no-files-found: error
-          retention-days: 1
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: fieldwork-locked-test-dependencies
-          path: /tmp/sosphd-dependencies.tgz
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+          retention-days: 7
