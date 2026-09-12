@@ -17,13 +17,18 @@ concurrency:
 jobs:
   source-checkpoint:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      # Temporary implementation checkpoint. Only tracked public source, no
-      # dependencies, credentials, private evidence or workspace files.
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: pnpm
+      # Temporary implementation-only checkpoint for an egress-restricted
+      # test container. No credentials, private records or environment files.
       - name: Preserve exact reviewed source
         run: |
           mkdir -p /tmp/sosphd-fieldwork-source
@@ -31,9 +36,21 @@ jobs:
           git rev-parse HEAD > /tmp/sosphd-fieldwork-source/commit.txt
           git ls-tree -r HEAD > /tmp/sosphd-fieldwork-source/tree.txt
           sha256sum /tmp/sosphd-fieldwork-source/source.zip > /tmp/sosphd-fieldwork-source/sha256.txt
+      - name: Install existing locked dependencies only
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir mcp install --frozen-lockfile
+          tar -czf /tmp/sosphd-dependencies.tgz node_modules mcp/node_modules
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: fieldwork-public-source-checkpoint
           path: /tmp/sosphd-fieldwork-source/
           if-no-files-found: error
           retention-days: 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fieldwork-locked-test-dependencies
+          path: /tmp/sosphd-dependencies.tgz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
