@@ -13,6 +13,8 @@
  *  writes and from fieldwork-store for reads.
  * ────────────────────────────────────────────────────────────────────── */
 
+import { randomUUID } from "node:crypto";
+import { saveJournalCapture, type JournalCaptureRow } from "@/lib/fieldwork/journal-capture";
 import { requireAuthOrThrow } from "@/lib/supabase/server-auth";
 import { getProtocolById } from "./fieldwork-store";
 import type { ConsentStatus } from "./types";
@@ -28,6 +30,7 @@ import type {
 // ── Journal entries ─────────────────────────────────────────────────
 
 export async function createJournalEntry(data: {
+  request_id?: string;
   entry_type: JournalEntryType;
   title: string;
   content: string;
@@ -44,32 +47,31 @@ export async function createJournalEntry(data: {
 }): Promise<JournalEntry> {
   const { supabase: sb, userId } = await requireAuthOrThrow();
 
-  const { data: row, error } = await sb
-    .schema("research")
-    .from("journal_entries")
-    .insert({
-      user_id: userId,
-      entry_type: data.entry_type,
-      title: data.title,
-      content: data.content,
-      location: data.location ?? null,
-      corridor: data.corridor ?? null,
-      tags: data.tags ?? [],
-      contact_ids: data.contact_ids ?? [],
-      linked_case_id: data.linked_case_id ?? null,
-      attachments: data.attachments ?? [],
-      is_pinned: false,
-      consent_status: data.consent_status ?? "not_required",
-      consent_method: data.consent_method ?? null,
-      consent_jurisdiction: data.consent_jurisdiction ?? null,
-      consent_captured_at: data.consent_captured_at ?? null,
-    })
-    .select()
-    .single();
-  if (error || !row) {
-    throw new Error(`Failed to create journal entry: ${error?.message}`);
-  }
-  return row as JournalEntry;
+  const row: JournalCaptureRow = {
+    id: (data.request_id ?? randomUUID()).toLowerCase(), user_id: userId,
+    entry_type: data.entry_type, title: data.title, content: data.content,
+    location: data.location ?? null, corridor: data.corridor ?? null,
+    tags: data.tags ?? [], contact_ids: data.contact_ids ?? [],
+    linked_case_id: data.linked_case_id ?? null, attachments: data.attachments ?? [],
+    is_pinned: false, consent_status: data.consent_status ?? "not_required",
+    consent_method: data.consent_method ?? null,
+    consent_jurisdiction: data.consent_jurisdiction ?? null,
+    consent_captured_at: data.consent_captured_at ?? null,
+  };
+  const db = sb.schema("research");
+  const result = await saveJournalCapture({
+    async read(id) {
+      const { data: found, error } = await db.from("journal_entries").select("*")
+        .eq("id", id).eq("user_id", userId).maybeSingle();
+      if (error) throw new Error("Journal read unavailable");
+      return found as JournalEntry | null;
+    },
+    async insert(value) {
+      const { error } = await db.from("journal_entries").insert(value);
+      if (error) throw new Error("Journal insert unconfirmed");
+    },
+  }, row);
+  return result.entry;
 }
 
 export async function updateJournalEntry(
