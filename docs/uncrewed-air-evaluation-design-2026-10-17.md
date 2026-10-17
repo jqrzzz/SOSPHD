@@ -27,13 +27,16 @@ build container), so each is "provisional" until the full text is read.
    victims are the moral and funding case and must be a **pre-specified, descriptively
    reported subgroup**; the statistical population is all time-critical emergencies in the
    catchment. Road trauma supplies the volume: Lao official 2025 figures of 6,779 crashes,
-   over 10,000 injuries and 917 deaths (KPL, index read).
+   over 10,000 injuries and 917 deaths (KPL, index read). The only travel-time datum found
+   for UXO casualties is a UNICEF/NRA child-survivor study's average of 2 h 45 min to the
+   district hospital (index read); no dataset records the interval to definitive care.
 2. **No published drone-health evaluation has shown a patient-survival benefit against an
    observed concurrent comparator.** Rwanda's blood programme measured delivery time
    against *estimated* road times (Nisingizwe et al., Lancet Glob Health 2022) and later
    in-hospital postpartum-haemorrhage deaths in a quasi-experimental design with a
-   distance-to-port gradient (Song et al., M&SOM 2025; a 2023 preprint gives different
-   figures — do not cite either number without the paper). Sweden's AED drones were
+   distance-to-port gradient (Jeon, Song et al. — first a non-peer-reviewed Wharton
+   working paper, since published in M&SOM; unrelated figures of 46 %, 56 % and 88 %
+   circulate and must not be merged with it — do not cite a number without the paper). Sweden's AED drones were
    dispatched concurrently with ambulances and stopped at time-to-arrival and
    payload-used (Schierbeck et al., Lancet Digit Health 2023: drone first in 67 %, median
    lead 3 min 14 s, AED attached in 6 cases). Ghana's vaccine study was funder-aligned
