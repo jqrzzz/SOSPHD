@@ -245,3 +245,34 @@ citation above was read in the research pass at the quoted lines. Web claims:
 search-index reads only; none promoted beyond "provisional". Event meaning: the §7
 mappings are the pass's readings — semantic review pending. Statistical design: proposed,
 not powered. Ethics, authorship, release: nothing determined; nothing authorised.
+
+---
+
+## 12. Amendment 2026-10-18 — the founder's clock
+
+The founder, 2026-10-18, quoted as written: *"We are doing patient flying by 2028 we are on
+track to get this done and we will have many tests in the process and have to customize the
+drone."* The ladder's order (cargo → a clinician in → an attended adult out → a stretcher
+aircraft as a manufacturer programme) stands; the clock is now the founder's, and the brain's
+record is SOSCOMMAND `DECISIONS.md` 2026-10-18 and `docs/UNCREWED_AIR_PROGRAM.md` §8.
+
+What it changes here, and what it does not:
+
+- **Phase 0 and Phase 1 are unchanged in design** and compress in time: Phase 0 runs on the
+  Vientiane pilot's clock (2027); Phase 1 (concurrent cargo dispatch) opens on the first
+  corridor from late 2027.
+- **A Phase 1b is added — the airframe test ledger.** The human-capable airframe's unoccupied
+  evaluation flights (2027–2028) produce a safety and reliability ledger (sorties, aborts,
+  link losses, forced landings, hours), read from the brain's de-identified view only. It is
+  an engineering record, published as such, and never a patient study.
+- **The first attended adult patient flight (L3), targeted 2028, is its own registered
+  protocol**: a prospective cohort under a medical director's inclusion list (conscious,
+  airway safe, bleeding controlled and seen controlled, adult, a clinician beside or on the
+  link), with safety as the primary outcome and time to definitive care as secondary. It is
+  gated on Phase 1's ledger and on the regulator's patient-carriage instrument, and the
+  protocol says in its first line that the date is a target and the gates are what make it
+  true.
+- **The stepped wedge (Phase 2) does not evaluate patient carriage in 2028.** It evaluates
+  supply and responder delivery, as §2 already allows; a patient-carriage wedge is a later
+  protocol on the L3 cohort's record.
+- Nothing in `research.*` changes today. The owner decisions in §10 stand.
