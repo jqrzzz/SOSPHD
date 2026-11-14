@@ -38,6 +38,7 @@ SOSPHD is **one of six apps** sharing a single Supabase project (`jnbxkvlkqmwnql
 | `/cases/[id]` | Single-case detail: timeline, metrics, operational context, AI recommendations + decisions. The Paper 2 surface. |
 | `/dashboard` | Phase 1 (Paper 1) dashboard. Distributions of TTTA, TTGP, TTDC across all cases. |
 | `/dashboard/paper2` | Phase 2 (Paper 2) dashboard. Acceptance rate, confidence calibration, engine breakdown, override reasons. |
+| `/cube` | The Case Cube's six questions and where they meet, with the PhD's events, clocks and Paper 2 categories placed on them: what the instrument can and can't see yet. |
 | `/protocol` | Intervention Protocol v0.1 — the formal spec the recommendation engine cites. |
 | `/fieldwork` | Field journal: site visits, conversations, observations. |
 | `/contacts` | Research network CRM (doctors, fixers, academics). |
