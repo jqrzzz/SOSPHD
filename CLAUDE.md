@@ -100,6 +100,7 @@ The legacy `public.phd_*` schema (migration 001) was **never applied** to the li
 | `/docs` | Markdown document editor with versioning |
 | `/workspace` | Mind maps, uploads, notes, tasks |
 | `/dashboard` | Analytics dashboard |
+| `/cube` | The PhD's instrument placed on the Case Cube's six questions (`lib/cube/`: the cube's words only, copied from its spec; Terra's rules and test sets stay private) |
 | `/advisor` | AI research advisor chat |
 | `/protocol` | Intervention Protocol (versioned, citable — Paper 2's spec) |
 | `/guide` | Onboarding walkthrough of the app's surfaces |

@@ -19,6 +19,7 @@ const NAV_SECTIONS = [
       { href: "/spine", label: "PhD Spine", icon: SpineIcon },
       { href: "/cases", label: "Cases", icon: ClipboardIcon },
       { href: "/dashboard", label: "Dashboard", icon: ChartIcon },
+      { href: "/cube", label: "The Cube", icon: CubeIcon },
     ],
   },
   {
@@ -275,6 +276,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 /* ── Inline icons ──── */
+
+function CubeIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7z" />
+      <path d="M3.5 7 12 11.5 20.5 7" />
+      <path d="M12 11.5v10" />
+    </svg>
+  );
+}
 
 function SpineIcon({ className }: { className?: string }) {
   return (

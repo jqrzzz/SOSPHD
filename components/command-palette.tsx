@@ -39,6 +39,7 @@ const NAV_ITEMS = [
   { label: "Documents", href: "/docs", group: "Navigate" },
   { label: "Workspace", href: "/workspace", group: "Navigate" },
   { label: "Dashboard", href: "/dashboard", group: "Navigate" },
+  { label: "The Cube", href: "/cube", group: "Navigate" },
   { label: "Advisor Chat", href: "/advisor", group: "Navigate" },
   { label: "Paper 2 · Coordination", href: "/dashboard/paper2", group: "Navigate" },
   { label: "Corridor Briefings", href: "/dashboard/corridors", group: "Navigate" },
